@@ -136,8 +136,12 @@ const Schedule = sequelize.define("Schedule", {
     type: DataTypes.UUID,
     allowNull: false,
   },
-  date_of_play:{
-    type: DataTypes.DATEONLY,
+  start_time:{
+    type: DataTypes.DATE,
+    allowNull: false,
+  },
+  end_time:{
+    type: DataTypes.DATE,
     allowNull: false,
   },
   total_duration:{
@@ -201,7 +205,7 @@ Device.hasMany(Schedule, { foreignKey: "device_id" });
 Schedule.belongsTo(Device, { foreignKey: "device_id" });
 
 Device.belongsTo(DeviceGroup, {foreignKey: "group_id"})
-DeviceGroup.hasMany(DeviceGroup, {foreignKey: "group_id"})
+DeviceGroup.hasMany(Device, {foreignKey: "group_id"})
 
 
 Schedule.hasOne(AdPlayback, {foreignKey: "schedule_id"})

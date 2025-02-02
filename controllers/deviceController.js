@@ -1,19 +1,64 @@
 const { getCustomUTCDateTime, getUTCDate } = require("../helpers");
 const { Ad, Device, Schedule, sequelize, DeviceGroup } = require("../models");
-
+const {addHours} = require('date-fns')
 module.exports.getFullSchedule = async (req, res) => {
-    try {
-        const schedules = await Schedule.findAll({
+        try {
+          // Dummy data for testing
+          const schedules = await Schedule.findAll({
             include: [{ model: Ad }, { model: Device }],
-        });
-
-        res.json(schedules);
+        });      
+          // Get the timezone offset
+          const timezoneOffset = new Date().getTimezoneOffset() * 60000; // Convert minutes to milliseconds
+      
+          const deviceColorMap = {}; // Store assigned colors for each device
+          const colorOptions = [ "blue", "green", "pink", "purple"]; 
+          let colorIndex = 0;
+          
+          const formattedSchedules = schedules.map((schedule) => {
+            const startTimeUTC = new Date(`${schedule.date_of_play}`);
+            const startTimeLocal = new Date(startTimeUTC.getTime() - timezoneOffset); // Convert to local time
+            const endTimeLocal = new Date(startTimeLocal.getTime() + schedule.total_duration * 60000); // Add duration to start time
+      
+            if (!deviceColorMap[schedule.Device.device_id]) {
+                deviceColorMap[schedule.Device.device_id] = colorOptions[colorIndex % colorOptions.length];
+                colorIndex++; // Move to the next color
+            }
+            return {
+              id: schedule.schedule_id,
+              start: schedule.start_time,
+               end: schedule.end_time,
+              title: `${schedule.Ad.name} @ ${schedule.Device.location}`, // Ad name and location
+              ad: schedule.Ad,
+              device: schedule.Device,
+              color: deviceColorMap[schedule.Device.device_id], // Assign color based on device_id
+            };
+          });
+       
+          res.json(formattedSchedules); // Send the transformed data
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Internal Server Error" });
     }
 }
 
+module.exports.getDeviceList = async(req, res) =>{
+    try {
+      const devices  = await Device.findAll({include:{model:DeviceGroup, attributes:['name']},
+      raw: true,
+      nest: true,
+    });
+    
+    // Flatten the Client name field
+    const flattenedDevices = devices.map((device) => ({
+      ...device,
+      group_name: device.DeviceGroup?.name || null, // Extracts 'name' from 'Client' and puts it in 'client_name'
+    }));
+      res.json({devices:flattenedDevices});
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+}
 module.exports.createDevice = async(req, res) =>{
     try {
        const {location, group_id} = req.body;
@@ -101,6 +146,26 @@ module.exports.createGroup = async(req,res)=>{
         const group =  await DeviceGroup.create({name});
 
         return res.status(201).json({message:"group created succesfully", group})
+    } catch (error) {
+        console.error("Sync error:", error);
+        return res.status(500).json({ error: "Internal server error" });
+    }
+}
+
+module.exports.fetchGroups = async(req,res)=>{
+    try {
+        const groups = await DeviceGroup.findAll({
+            attributes: ['group_id', 'name', [sequelize.fn('COUNT', sequelize.col('Devices.device_id')), 'device_count']],
+            include: [
+              {
+                model: Device,
+                attributes: [],
+              },
+            ],
+            group: ['DeviceGroup.group_id'],
+            raw: true,
+          });
+        return res.status(201).json({groups})
     } catch (error) {
         console.error("Sync error:", error);
         return res.status(500).json({ error: "Internal server error" });

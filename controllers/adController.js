@@ -1,6 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const { Ad } = require("../models");
+const { where } = require('sequelize');
 
 module.exports.addAd = async(req, res)=>{
     try {
@@ -21,7 +22,19 @@ module.exports.addAd = async(req, res)=>{
 
     }
 }
+module.exports.sendAdDetails = async (req, res) =>{
+    try {
+        if(!req.params.id){
+            res.status(400).json({message:"no poarameter ad_id found "})
+        }
+        const ad = await Ad.findOne({where:{ad_id:req.params.id}})
+        res.json({data:ad})
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({message: "Internal Server Error dsdsd", error: error.message})
 
+    }
+}
 module.exports.sendAdFile = async (req, res) =>{
     try {
         const filePath = path.join(__dirname, '..', 'uploads/ads', req.params.path);

@@ -1,5 +1,6 @@
 const { Op, where } = require("sequelize");
 const { Ad, Schedule, Device } = require("../models");
+const { parseISO, isBefore, setHours, setMinutes, formatISO, addDays } = require("date-fns");
 
 module.exports.scheduleAd2 = async (req, res)=>{
         try {
@@ -79,23 +80,41 @@ module.exports.scheduleAd2 = async (req, res)=>{
 
 module.exports.scheduleAd = async (req, res)=>{
     try {
-        const { ad_id, date_of_play, total_duration, priority, devices } = req.body;
+        const { ad_id, start_time, end_time, total_duration, priority, devices } = req.body;
     
-        if (!ad_id || !date_of_play || !total_duration || !priority || !devices) {
+        if (!ad_id || !start_time || !end_time || !total_duration || !priority || !devices) {
             return res.status(400).json({ error: "Missing required parameters" });
         }
+        const startDate = parseISO(start_time);
+        const endDate = parseISO(end_time);
     
-        for (const device_id of devices) {
-            await Schedule.create({
-                ad_id,
-                device_id,
-                date_of_play,
-                total_duration,
-                priority,
-            });
+        let currentDay = new Date(startDate);
+        let schedules = [];
+    
+        while (isBefore(currentDay, endDate) || currentDay.toDateString() === endDate.toDateString()) {
+            // Set the ad schedule between 6 AM and 10 PM
+            const dayStart = setHours(setMinutes(new Date(currentDay), 0), 6);  // 6:00 AM
+            const dayEnd = setHours(setMinutes(new Date(currentDay), 0), 22);   // 10:00 PM
+            devices.forEach((device_id)=>{
+                schedules.push({
+                    ad_id,
+                    device_id: device_id,
+                    start_time: formatISO(dayStart), // Convert to ISO format
+                    end_time: formatISO(dayEnd),     // Convert to ISO format
+                    total_duration: parseInt(total_duration),
+                    priority,
+                });
+            currentDay = addDays(currentDay, 1); // Move to next day
+
+            })
+           
+            
         }
+        
+        const createdSchedules = await Schedule.bulkCreate(schedules);
+        // return schedules;
     
-        return res.json({ message: "Schedules Added Successfully" });
+        return res.json({ message: "Schedules Added Successfully" , schedules: createdSchedules});
     } catch (error) {
         console.error(error);
         return res.status(500).json({ error: "Internal Server Error" });
