@@ -27,7 +27,6 @@ module.exports.getAllAds = async(req, res) =>{
           // Flatten the Client name field
           const flattenedAds = ads.map((ad) => ({
             ...ad,
-            url: `http://localhost:8080/api/ads/${ad.url}`,
             client_name: ad.Client?.name || null, // Extracts 'name' from 'Client' and puts it in 'client_name'
           }));
           
@@ -55,7 +54,6 @@ module.exports.getAllClients = async(req, res) =>{
             group: ["Client.client_id"], // Group by client to get correct counts
           });
           
-          console.log(clients);
 
         return res.status(200).json({clients})
     } catch (error) {

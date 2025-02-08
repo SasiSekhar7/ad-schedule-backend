@@ -22,7 +22,7 @@ const Client = sequelize.define("Client", {
   phone_number: {
     type: DataTypes.STRING,
     unique: true,
-    allowNull: true, 
+    allowNull: true,
     validate: {
       isNumeric: true, // Ensures only numbers are stored
     },
@@ -75,9 +75,9 @@ const Device = sequelize.define("Device", {
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true,
   },
-  group_id:{
+  group_id: {
     type: DataTypes.UUID,
-    allowNull:false,
+    allowNull: false,
   },
   location: {
     type: DataTypes.STRING,
@@ -101,7 +101,7 @@ const Device = sequelize.define("Device", {
   },
 });
 
-const DeviceGroup = sequelize.define("DeviceGroup",{
+const DeviceGroup = sequelize.define("DeviceGroup", {
   group_id: {
     type: DataTypes.UUID,
     defaultValue: DataTypes.UUIDV4,
@@ -119,8 +119,7 @@ const DeviceGroup = sequelize.define("DeviceGroup",{
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
   },
-  
-})
+});
 
 const Schedule = sequelize.define("Schedule", {
   schedule_id: {
@@ -136,17 +135,17 @@ const Schedule = sequelize.define("Schedule", {
     type: DataTypes.UUID,
     allowNull: false,
   },
-  start_time:{
+  start_time: {
     type: DataTypes.DATE,
     allowNull: false,
   },
-  end_time:{
+  end_time: {
     type: DataTypes.DATE,
     allowNull: false,
   },
-  total_duration:{
+  total_duration: {
     type: DataTypes.INTEGER,
-    allowNull: null
+    allowNull: null,
   },
   priority: {
     type: DataTypes.INTEGER, // Higher number = higher priority
@@ -191,7 +190,45 @@ const AdPlayback = sequelize.define("AdPlayback", {
   },
 });
 
-
+const User = sequelize.define("User", {
+  user_id: {
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
+    primaryKey: true,
+  },
+  client_id: {
+    type: DataTypes.UUID,
+    allowNull: false,
+  },
+  name: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  email: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  phone_number: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
+  password: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  role:{
+    type:DataTypes.STRING,
+    allowNull:false,
+  },
+  created_at: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW,
+  },
+  updated_at: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW,
+  },
+});
 // A Client can have many Ads
 Client.hasMany(Ad, { foreignKey: "client_id" });
 Ad.belongsTo(Client, { foreignKey: "client_id" });
@@ -204,11 +241,21 @@ Schedule.belongsTo(Ad, { foreignKey: "ad_id" });
 Device.hasMany(Schedule, { foreignKey: "device_id" });
 Schedule.belongsTo(Device, { foreignKey: "device_id" });
 
-Device.belongsTo(DeviceGroup, {foreignKey: "group_id"})
-DeviceGroup.hasMany(Device, {foreignKey: "group_id"})
+Device.belongsTo(DeviceGroup, { foreignKey: "group_id" });
+DeviceGroup.hasMany(Device, { foreignKey: "group_id" });
 
+Schedule.hasOne(AdPlayback, { foreignKey: "schedule_id" });
 
-Schedule.hasOne(AdPlayback, {foreignKey: "schedule_id"})
+User.belongsTo(Client, {foreignKey: 'client_id'})
+Client.hasMany(User, {foreignKey: 'client_id'})
 
-
-module.exports = { sequelize, Client, Ad, Device, Schedule, AdPlayback, DeviceGroup };
+module.exports = {
+  sequelize,
+  Client,
+  Ad,
+  Device,
+  Schedule,
+  AdPlayback,
+  DeviceGroup,
+  User
+};

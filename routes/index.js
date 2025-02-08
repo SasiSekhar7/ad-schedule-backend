@@ -1,45 +1,66 @@
 const express =  require('express');
 const { createClient, getAllClients, updateClient, deleteClient, getAllAds, getAllDetails } = require('../controllers/clientController');
 const { Client, Ad, Schedule, Device } = require('../models');
-const upload = require('../middleware/multer');
-const { addAd, sendAdFile, sendAdDetails } = require('../controllers/adController');
+const { sendAdFile, sendAdDetails } = require('../controllers/adController');
 const { scheduleAd, deleteSchedule, updateSchedule } = require('../controllers/scheduleController');
-const { getFullSchedule, syncDevice, createDevice, createGroup, getDeviceList, fetchGroups } = require('../controllers/deviceController');
+const { getFullSchedule, syncDevice, registerDevice, createGroup, getDeviceList, fetchGroups, getFullScheduleCalendar } = require('../controllers/deviceController');
+const { addUser, getUserData } = require('../controllers/userController');
+const { login } = require('../controllers/authController');
 const router = express.Router();
+const upload = require('../middleware/s3multer');
+const { uploadFile, changeFile, addAd, deleteAd } = require('../controllers/s3Controller');
+const {validateToken, validateDeviceToken} = require('../middleware/auth');
+
+router.post('/device/register', registerDevice) // takes group id and location input 
+
+router.get('/device/sync',validateDeviceToken,  syncDevice)
 
 
-router.get('/device/sync', syncDevice)
-router.post('/device/create', createDevice) // takes group id and location input 
-router.post('/device/update/:id', createDevice)
-router.post('/device/delete/:id', createDevice)
-router.get('/device/all', getDeviceList)
-
-router.get('/dashboard', getAllDetails)
+router.post('/login',  login)
 
 
-router.post('/device/create-group', createGroup); // only takes name as input 
-router.get('/device/fetch-groups', fetchGroups); // only takes name as input 
+router.post('/device/update/:id', validateToken,  registerDevice)
+router.post('/device/delete/:id', validateToken,  registerDevice)
+router.get('/device/all', validateToken,  getDeviceList)
+
+router.get('/dashboard', validateToken,  getAllDetails)
 
 
-router.get("/schedule/all", getFullSchedule);
+router.post('/device/create-group', validateToken,  createGroup); // only takes name as input 
+router.get('/device/fetch-groups', validateToken,  fetchGroups); // only takes name as input 
 
-router.post("/schedule/add", scheduleAd)
+
+router.get("/schedule/calendar", validateToken,  getFullScheduleCalendar);
+router.get("/schedule/all", validateToken,  getFullSchedule);
+
+
+router.post("/schedule/add", validateToken,  scheduleAd)
 router.post("/schedule/update/:id",updateSchedule)
-router.post("/schedule/delete/:id", deleteSchedule)
+router.post("/schedule/delete/:id", validateToken,  deleteSchedule)
 
-router.get('/ads/clients', getAllClients )
-router.get('/ads/all', getAllAds )
+router.get('/ads/clients', validateToken,  getAllClients )
+router.get('/ads/all', validateToken,  getAllAds )
 
 
-router.post('/ads/create-client', createClient )
-router.post('/ads/update-client/:id', updateClient )
-router.post('/ads/delete-client:/id', deleteClient )
+router.post('/ads/create-client', validateToken,  createClient )
+router.post('/ads/update-client/:id', validateToken,  updateClient )
+router.post('/ads/delete-client:/id', validateToken,  deleteClient )
 
-router.post('/ads/add', upload.single('file'),  addAd)
-router.post('/ads/update', upload.single('file'),  addAd)
-router.get('/ads/:id', sendAdDetails)
+router.post('/ads/add', validateToken,   upload.single('file'),addAd)
+router.post('/ads/update', validateToken,  addAd)
+router.post('/ads/delete/:ad_id', validateToken,  deleteAd)
 
-router.get('/ads/send-ad/:path', sendAdFile)
+router.get('/ads/:id', validateToken,  sendAdDetails)
+
+router.get('/ads/file/get/:path', validateToken,  sendAdFile)
+router.post('/ads/file/edit/:ad_id', validateToken,  upload.single('file'),changeFile)
+
+router.post('/user/add', validateToken,  addUser)
+router.get('/user/data', validateToken,  getUserData)
+
+
+
+
 
 
 /**
