@@ -227,14 +227,17 @@ module.exports.syncDevice = async (req, res) => {
 
     const ads = [];
     scheduledAds.forEach(async (schedule) => {
+      console.log(schedule)
       const url = await getBucketURL(schedule.Ad.url);
-      ads.push({
+      const obj = {
         ad_id: schedule.Ad.ad_id,
         name: schedule.Ad.name,
         url,
         duration: schedule.Ad.duration,
         start_time: schedule.start_time,
-      });
+      }
+      console.log(obj)
+      ads.push(obj);
     });
     return res.json({
       device_id,
