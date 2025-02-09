@@ -51,7 +51,7 @@ module.exports.getFullSchedule = async (req, res) => {
     const schedules = await Schedule.findAll({
       include: [
         { model: Ad, attributes: ["name"] },
-        { model: Device, attributes: ["location"] },
+        { model: DeviceGroup, attributes: ["name"] },
       ],
       order: [["start_time", "DESC"]],
     });
