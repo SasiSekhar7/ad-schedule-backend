@@ -213,7 +213,7 @@ module.exports.syncDevice = async (req, res) => {
     const scheduledAds = await Schedule.findAll({
       where: {
         group_id,
-        start_time: formatISO(dayStart),
+        start_time: dayStart.toLocaleString(),
       },
       include: [{ model: Ad }],
     });
