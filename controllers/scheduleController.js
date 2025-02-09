@@ -80,9 +80,9 @@ module.exports.scheduleAd2 = async (req, res)=>{
 
 module.exports.scheduleAd = async (req, res)=>{
     try {
-        const { ad_id, start_time, end_time, total_duration, priority, devices } = req.body;
+        const { ad_id, start_time, end_time, total_duration, priority, groups } = req.body;
     
-        if (!ad_id || !start_time || !end_time || !total_duration || !priority || !devices) {
+        if (!ad_id || !start_time || !end_time || !total_duration || !priority || !groups) {
             return res.status(400).json({ error: "Missing required parameters" });
         }
         const startDate = parseISO(start_time);
@@ -95,10 +95,10 @@ module.exports.scheduleAd = async (req, res)=>{
             // Set the ad schedule between 6 AM and 10 PM
             const dayStart = setHours(setMinutes(new Date(currentDay), 0), 6);  // 6:00 AM
             const dayEnd = setHours(setMinutes(new Date(currentDay), 0), 22);   // 10:00 PM
-            devices.forEach((device_id)=>{
+            groups.forEach((group_id)=>{
                 schedules.push({
                     ad_id,
-                    device_id: device_id,
+                    group_id: group_id,
                     start_time: formatISO(dayStart), // Convert to ISO format
                     end_time: formatISO(dayEnd),     // Convert to ISO format
                     total_duration: parseInt(total_duration),

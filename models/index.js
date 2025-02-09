@@ -13,7 +13,6 @@ const Client = sequelize.define("Client", {
   },
   email: {
     type: DataTypes.STRING,
-    unique: true,
     allowNull: true, // Email is optional but recommended
     validate: {
       isEmail: true, // Ensures email format is valid
@@ -21,7 +20,6 @@ const Client = sequelize.define("Client", {
   },
   phone_number: {
     type: DataTypes.STRING,
-    unique: true,
     allowNull: true,
     validate: {
       isNumeric: true, // Ensures only numbers are stored
@@ -79,6 +77,10 @@ const Device = sequelize.define("Device", {
     type: DataTypes.UUID,
     allowNull: false,
   },
+  android_id: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
   location: {
     type: DataTypes.STRING,
     allowNull: false,
@@ -131,7 +133,7 @@ const Schedule = sequelize.define("Schedule", {
     type: DataTypes.UUID,
     allowNull: false,
   },
-  device_id: {
+  group_id: {
     type: DataTypes.UUID,
     allowNull: false,
   },
@@ -238,8 +240,8 @@ Ad.hasMany(Schedule, { foreignKey: "ad_id" });
 Schedule.belongsTo(Ad, { foreignKey: "ad_id" });
 
 // A Device can have multiple scheduled Ads
-Device.hasMany(Schedule, { foreignKey: "device_id" });
-Schedule.belongsTo(Device, { foreignKey: "device_id" });
+DeviceGroup.hasMany(Schedule, { foreignKey: "group_id" });
+Schedule.belongsTo(DeviceGroup, { foreignKey: "group_id" });
 
 Device.belongsTo(DeviceGroup, { foreignKey: "group_id" });
 DeviceGroup.hasMany(Device, { foreignKey: "group_id" });
