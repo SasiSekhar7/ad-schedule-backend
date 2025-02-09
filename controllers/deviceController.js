@@ -192,7 +192,6 @@ console.log('device Exists',deviceExists)
 module.exports.syncDevice = async (req, res) => {
   try {
     const { group_id, device_id } = req.device;
-    console.log(req.device);
     if (!device_id) {
       return res.status(400).json({ error: "Device ID is required" });
     }
@@ -218,7 +217,7 @@ module.exports.syncDevice = async (req, res) => {
       },
       include: [{ model: Ad }],
     });
-
+    console.log(scheduledAds)
     // Update last sync time in the database
     await Device.update(
       { last_synced: getCustomUTCDateTime() },
