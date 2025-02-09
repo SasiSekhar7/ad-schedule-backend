@@ -104,7 +104,7 @@ module.exports.registerDevice = async (req, res) => {
         group_id,
       },
     });
-
+console.log('device Exists',deviceExists)
     if (deviceExists) {
       const deviceUpdate = await Device.update(
         {
@@ -118,6 +118,7 @@ module.exports.registerDevice = async (req, res) => {
           },
         }
       );
+      console.log('device update',deviceExists)
 
       const payload = {
         device_id: deviceUpdate.device_id,
@@ -146,6 +147,8 @@ module.exports.registerDevice = async (req, res) => {
       status: "active",
       last_synced: getCustomUTCDateTime(),
     });
+    console.log('device',deviceExists)
+
     const payload = {
       device_id: device.device_id,
       group_id: device.group_id,
