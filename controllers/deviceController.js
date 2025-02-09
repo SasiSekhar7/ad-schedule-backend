@@ -1,7 +1,7 @@
 const jwt = require("jsonwebtoken");
 const { getCustomUTCDateTime, getUTCDate } = require("../helpers");
 const { Ad, Device, Schedule, sequelize, DeviceGroup } = require("../models");
-const { addHours } = require("date-fns");
+const { addHours, setHours, setMinutes, formatISO } = require("date-fns");
 const { getBucketURL } = require("./s3Controller");
 module.exports.getFullScheduleCalendar = async (req, res) => {
   try {
@@ -208,11 +208,13 @@ module.exports.syncDevice = async (req, res) => {
     // const lastSyncTime = device.last_synced || new Date(0); // Default to epoch if never synced before
 
     // // Find ads scheduled for this device that are new/updated since last sync
+    const currentDay = getCustomUTCDateTime()
+  const dayStart = setHours(setMinutes(new Date(currentDay), 0), 6);  // 6:00 AM
+    
     const scheduledAds = await Schedule.findAll({
       where: {
         group_id,
-        start_time: getCustomUTCDateTime(),
-        // date_of_play: "25-02-01", // comment out this if you want to test with limited number of files on a device
+        start_time: formatISO(dayStart),
       },
       include: [{ model: Ad }],
     });
