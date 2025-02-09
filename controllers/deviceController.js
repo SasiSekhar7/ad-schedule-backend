@@ -184,6 +184,7 @@ module.exports.registerDevice = async (req, res) => {
 module.exports.syncDevice = async (req, res) => {
   try {
     const { group_id, device_id } = req.device;
+    console.log(req.device)
     if (!device_id) {
       return res.status(400).json({ error: "Device ID is required" });
     }
