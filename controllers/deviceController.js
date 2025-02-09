@@ -199,21 +199,13 @@ module.exports.syncDevice = async (req, res) => {
     if (!group_id) {
       return res.status(400).json({ error: "Group ID is required" });
     }
-    // // Fetch the device's last sync timestamp from the database
-    // const device = await Device.findByPk(group_id);
-    // if (!device) {
-    //     return res.status(404).json({ error: "Device not found" });
-    // }
 
-    // const lastSyncTime = device.last_synced || new Date(0); // Default to epoch if never synced before
-
-    // // Find ads scheduled for this device that are new/updated since last sync
     const today = new Date(getCustomUTCDateTime()); 
 
     // Construct the start and end times in ISO format
-    const startOfDay = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 5, 0, 0, 0)).toISOString(); // 6 AM UTC
+    const startOfDay = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 6, 0, 0, 0)).toISOString(); // 6 AM UTC
     const endOfDay = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 22, 0, 0, 0)).toISOString(); // 10 PM UTC
-    
+
     const scheduledAds = await Schedule.findAll({
       where: {
         group_id,
@@ -222,28 +214,29 @@ module.exports.syncDevice = async (req, res) => {
         },
       },
       include: [{ model: Ad }],
-    });    // Update last sync time in the database
+    });
+
+    // Update last sync time in the database
     await Device.update(
       { last_synced: getCustomUTCDateTime() },
       { where: { device_id } }
     );
 
-    const ads = [];
-    scheduledAds.forEach(async (schedule) => {
-      console.log(schedule)
-      const url = await getBucketURL(schedule.Ad.url);
-      const obj = {
-        ad_id: schedule.Ad.ad_id,
-        name: schedule.Ad.name,
-        url,
-        duration: schedule.Ad.duration,
-        start_time: schedule.start_time,
-      }
-      console.log('obj---.',obj)
-      ads.push(obj);
-    });
+    // Process ads asynchronously
+    const ads = await Promise.all(
+      scheduledAds.map(async (schedule) => {
+        console.log(schedule);
+        const url = await getBucketURL(schedule.Ad.url);
+        return {
+          ad_id: schedule.Ad.ad_id,
+          name: schedule.Ad.name,
+          url,
+          duration: schedule.Ad.duration,
+          start_time: schedule.start_time,
+        };
+      })
+    );
 
-    console.log('ADS---.',ads)
 
     return res.json({
       device_id,
@@ -255,6 +248,7 @@ module.exports.syncDevice = async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 };
+
 
 module.exports.createGroup = async (req, res) => {
   try {
