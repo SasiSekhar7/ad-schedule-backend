@@ -118,12 +118,12 @@ console.log('device Exists',deviceExists)
           },
         }
       );
-      console.log('device update',deviceExists)
+      console.log('device update',deviceUpdate)
 
       const payload = {
-        device_id: deviceUpdate.device_id,
-        group_id: deviceUpdate.group_id,
-        last_synced: deviceUpdate.last_synced,
+        device_id: deviceExists.device_id,
+        group_id: deviceExists.group_id,
+        last_synced: deviceExists.last_synced,
       };
       console.log('payload -------->',payload)
       const token = jwt.sign(payload
@@ -147,7 +147,7 @@ console.log('device Exists',deviceExists)
       status: "active",
       last_synced: getCustomUTCDateTime(),
     });
-    console.log('device',deviceExists)
+    console.log('device',device)
 
     const payload = {
       device_id: device.device_id,
