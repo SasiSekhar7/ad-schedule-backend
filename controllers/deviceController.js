@@ -106,25 +106,29 @@ module.exports.registerDevice = async (req, res) => {
     });
 
     if (deviceExists) {
-      const deviceUpdate = await Device.update({
-        location,
-        status: "active",
-        last_synced: getCustomUTCDateTime(),
-      },{
-        where:{
-          android_id
-        }
-      });
-
-      const token = jwt.sign(
+      const deviceUpdate = await Device.update(
         {
-          device_id: deviceUpdate.device_id,
-          group_id: deviceUpdate.group_id,
-          last_synced: deviceUpdate.last_synced,
+          location,
+          status: "active",
+          last_synced: getCustomUTCDateTime(),
         },
-        process.env.JWT_DEVICE_SECRET,
-        { expiresIn: "30d" }
+        {
+          where: {
+            android_id,
+          },
+        }
       );
+
+      const payload = {
+        device_id: deviceUpdate.device_id,
+        group_id: deviceUpdate.group_id,
+        last_synced: deviceUpdate.last_synced,
+      };
+      console.log(payload)
+      const token = jwt.sign(payload
+        , process.env.JWT_DEVICE_SECRET, {
+        expiresIn: "30d",
+      });
 
       const url = await getBucketURL("placeholder.jpg");
 
@@ -142,13 +146,14 @@ module.exports.registerDevice = async (req, res) => {
       status: "active",
       last_synced: getCustomUTCDateTime(),
     });
-
+    const payload = {
+      device_id: device.device_id,
+      group_id: device.group_id,
+      last_synced: device.last_synced,
+    };
+    console.log(payload)
     const token = jwt.sign(
-      {
-        device_id: device.device_id,
-        group_id: device.group_id,
-        last_synced: device.last_synced,
-      },
+     payload,
       process.env.JWT_DEVICE_SECRET,
       { expiresIn: "30d" }
     );
@@ -184,7 +189,7 @@ module.exports.registerDevice = async (req, res) => {
 module.exports.syncDevice = async (req, res) => {
   try {
     const { group_id, device_id } = req.device;
-    console.log(req.device)
+    console.log(req.device);
     if (!device_id) {
       return res.status(400).json({ error: "Device ID is required" });
     }
