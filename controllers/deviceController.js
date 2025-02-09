@@ -124,7 +124,7 @@ module.exports.registerDevice = async (req, res) => {
         group_id: deviceUpdate.group_id,
         last_synced: deviceUpdate.last_synced,
       };
-      console.log(payload)
+      console.log('payload -------->',payload)
       const token = jwt.sign(payload
         , process.env.JWT_DEVICE_SECRET, {
         expiresIn: "30d",
@@ -151,7 +151,7 @@ module.exports.registerDevice = async (req, res) => {
       group_id: device.group_id,
       last_synced: device.last_synced,
     };
-    console.log(payload)
+    console.log('payload -------->',payload)
     const token = jwt.sign(
      payload,
       process.env.JWT_DEVICE_SECRET,
