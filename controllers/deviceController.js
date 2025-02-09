@@ -222,9 +222,7 @@ module.exports.syncDevice = async (req, res) => {
         },
       },
       include: [{ model: Ad }],
-    });
-    console.log(scheduledAds)
-    // Update last sync time in the database
+    });    // Update last sync time in the database
     await Device.update(
       { last_synced: getCustomUTCDateTime() },
       { where: { device_id } }
@@ -241,9 +239,12 @@ module.exports.syncDevice = async (req, res) => {
         duration: schedule.Ad.duration,
         start_time: schedule.start_time,
       }
-      console.log(obj)
+      console.log('obj---.',obj)
       ads.push(obj);
     });
+
+    console.log('ADS---.',ads)
+
     return res.json({
       device_id,
       last_sync: getCustomUTCDateTime(),
