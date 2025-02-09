@@ -116,7 +116,9 @@ module.exports.registerDevice = async (req, res) => {
                   { expiresIn:"30d" }
               );
       
-      return res.json({message:"Device Registered Successfully", token})
+      const url = await getBucketURL('placeholder.jpg')
+
+      return res.json({message:"Device Registered Successfully", token, ads:[url]})
     }
 
     const device = await Device.create({
