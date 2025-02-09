@@ -49,25 +49,26 @@ module.exports.getFullScheduleCalendar = async (req, res) => {
 module.exports.getFullSchedule = async (req, res) => {
   try {
     const schedules = await Schedule.findAll({
-        include: [{ model: Ad, attributes:['name'] }, { model: Device , attributes:['location']}],
-        order:[['start_time', 'DESC']]
-      });
+      include: [
+        { model: Ad, attributes: ["name"] },
+        { model: Device, attributes: ["location"] },
+      ],
+      order: [["start_time", "DESC"]],
+    });
 
     //   console.log(schedules)
-  
-//    
-      const result =  schedules.map((schedule)=>{
-        const { Ad, Device, ...data} = schedule.dataValues;
 
-        return({
+    //
+    const result = schedules.map((schedule) => {
+      const { Ad, Device, ...data } = schedule.dataValues;
+
+      return {
         ...data,
         ad_name: Ad.name,
         device_location: Device.location,
+      };
+    });
 
-      })
-    }
-      )
-   
     res.json({ schedules: result });
   } catch (error) {
     console.error(error);
@@ -96,29 +97,42 @@ module.exports.getDeviceList = async (req, res) => {
 module.exports.registerDevice = async (req, res) => {
   try {
     const { location, group_id, android_id } = req.body;
-     console.log('andorid id', android_id, location, group_id )
-    const deviceExists = await Device.findOne({where: {
-      android_id,
-      group_id,
+    console.log("andorid id", android_id, location, group_id);
+    const deviceExists = await Device.findOne({
+      where: {
+        android_id,
+        group_id,
+      },
+    });
 
-    }})
-
-    if(deviceExists){
-      const deviceUpdate =  await Device.update({
+    if (deviceExists) {
+      const deviceUpdate = await Device.update({
         location,
         status: "active",
         last_synced: getCustomUTCDateTime(),
-      })
+      },{
+        where:{
+          android_id
+        }
+      });
 
-       const token = jwt.sign(
-                  { device_id: deviceUpdate.device_id, group_id:deviceUpdate.group_id, last_synced: deviceUpdate.last_synced }, 
-                  process.env.JWT_DEVICE_SECRET, 
-                  { expiresIn:"30d" }
-              );
-      
-      const url = await getBucketURL('placeholder.jpg')
+      const token = jwt.sign(
+        {
+          device_id: deviceUpdate.device_id,
+          group_id: deviceUpdate.group_id,
+          last_synced: deviceUpdate.last_synced,
+        },
+        process.env.JWT_DEVICE_SECRET,
+        { expiresIn: "30d" }
+      );
 
-      return res.json({message:"Device Registered Successfully", token, ads:[url]})
+      const url = await getBucketURL("placeholder.jpg");
+
+      return res.json({
+        message: "Device Registered Successfully",
+        token,
+        ads: [url],
+      });
     }
 
     const device = await Device.create({
@@ -130,16 +144,20 @@ module.exports.registerDevice = async (req, res) => {
     });
 
     const token = jwt.sign(
-      { device_id: device.device_id,  group_id:device.group_id, last_synced: device.last_synced }, 
-      process.env.JWT_DEVICE_SECRET, 
-      { expiresIn:"30d" }
-  );
+      {
+        device_id: device.device_id,
+        group_id: device.group_id,
+        last_synced: device.last_synced,
+      },
+      process.env.JWT_DEVICE_SECRET,
+      { expiresIn: "30d" }
+    );
 
-  const url = await getBucketURL('placeholder.jpg')
+    const url = await getBucketURL("placeholder.jpg");
 
     return res
       .status(201)
-      .json({ message: "Device enrolled successfully", token, ads:[url]});
+      .json({ message: "Device enrolled successfully", token, ads: [url] });
     //     return Device.findOrCreate({
     //       where: {
     //         userId:    profile.userId,
@@ -157,14 +175,15 @@ module.exports.registerDevice = async (req, res) => {
     //   });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Internal Server Error" , error: error.message});
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
   }
 };
 
 module.exports.syncDevice = async (req, res) => {
   try {
-
-    const {group_id, device_id} = req.device;
+    const { group_id, device_id } = req.device;
     if (!device_id) {
       return res.status(400).json({ error: "Device ID is required" });
     }
@@ -194,24 +213,22 @@ module.exports.syncDevice = async (req, res) => {
       { last_synced: getCustomUTCDateTime() },
       { where: { device_id } }
     );
-  
-    const ads =  []
-    scheduledAds.forEach(async(schedule) => {
 
-      const url = await getBucketURL(schedule.Ad.url)
+    const ads = [];
+    scheduledAds.forEach(async (schedule) => {
+      const url = await getBucketURL(schedule.Ad.url);
       ads.push({
-      ad_id: schedule.Ad.ad_id,
-      name: schedule.Ad.name,
-      url,
-      duration: schedule.Ad.duration,
-      start_time: schedule.start_time,
-    })
-    }
-)
+        ad_id: schedule.Ad.ad_id,
+        name: schedule.Ad.name,
+        url,
+        duration: schedule.Ad.duration,
+        start_time: schedule.start_time,
+      });
+    });
     return res.json({
       device_id,
       last_sync: getCustomUTCDateTime(),
-      ads
+      ads,
     });
   } catch (error) {
     console.error("Sync error:", error);
@@ -219,7 +236,6 @@ module.exports.syncDevice = async (req, res) => {
   }
 };
 
-          
 module.exports.createGroup = async (req, res) => {
   try {
     const { name } = req.body;
