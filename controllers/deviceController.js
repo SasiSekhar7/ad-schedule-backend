@@ -3,6 +3,7 @@ const { getCustomUTCDateTime, getUTCDate } = require("../helpers");
 const { Ad, Device, Schedule, sequelize, DeviceGroup } = require("../models");
 const { addHours, setHours, setMinutes, formatISO } = require("date-fns");
 const { getBucketURL } = require("./s3Controller");
+const { Op } = require("sequelize");
 module.exports.getFullScheduleCalendar = async (req, res) => {
   try {
     // Extract device_id from query params
@@ -207,13 +208,18 @@ module.exports.syncDevice = async (req, res) => {
     // const lastSyncTime = device.last_synced || new Date(0); // Default to epoch if never synced before
 
     // // Find ads scheduled for this device that are new/updated since last sync
-    const currentDay = getCustomUTCDateTime()
-  const dayStart = setHours(setMinutes(new Date(currentDay), 0), 6);  // 6:00 AM
+    const today = new Date(getCustomUTCDateTime()); 
+
+    // Construct the start and end times in ISO format
+    const startOfDay = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 6, 0, 0, 0)).toISOString(); // 6 AM UTC
+    const endOfDay = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 22, 0, 0, 0)).toISOString(); // 10 PM UTC
     
     const scheduledAds = await Schedule.findAll({
       where: {
         group_id,
-        start_time: dayStart.toLocaleString(),
+        start_time: {
+          [Op.between]: [startOfDay, endOfDay],
+        },
       },
       include: [{ model: Ad }],
     });
