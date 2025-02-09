@@ -60,12 +60,12 @@ module.exports.getFullSchedule = async (req, res) => {
 
     //
     const result = schedules.map((schedule) => {
-      const { Ad, Device, ...data } = schedule.dataValues;
+      const { Ad, DeviceGroup, ...data } = schedule.dataValues;
 
       return {
         ...data,
         ad_name: Ad.name,
-        device_location: Device.location,
+        group_name: DeviceGroup.name,
       };
     });
 
