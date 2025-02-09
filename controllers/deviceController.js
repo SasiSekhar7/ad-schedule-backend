@@ -211,7 +211,7 @@ module.exports.syncDevice = async (req, res) => {
     const today = new Date(getCustomUTCDateTime()); 
 
     // Construct the start and end times in ISO format
-    const startOfDay = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 6, 0, 0, 0)).toISOString(); // 6 AM UTC
+    const startOfDay = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 5, 0, 0, 0)).toISOString(); // 6 AM UTC
     const endOfDay = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 22, 0, 0, 0)).toISOString(); // 10 PM UTC
     
     const scheduledAds = await Schedule.findAll({
