@@ -59,7 +59,18 @@ router.post('/ads/file/edit/:ad_id', validateToken,  upload.single('file'),chang
 router.post('/user/add', validateToken,  addUser)
 router.get('/user/data', validateToken,  getUserData)
 
-router.get('/trigger',  pushToGroupQueue(["838fb86d-2bfd-4948-9496-25a7467dea52	"]))
+router.get('/trigger',  async(req, res)=>{
+    try {
+        console.log('got req ')
+        await pushToGroupQueue(["838fb86d-2bfd-4948-9496-25a7467dea52"])
+    
+        res.send("success")
+    } catch (error) {
+        res.status(500).send("failure", error)
+        
+    }
+
+})
 
 
 
