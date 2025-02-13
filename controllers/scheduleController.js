@@ -1,6 +1,7 @@
 const { Op, where } = require("sequelize");
 const { Ad, Schedule, Device } = require("../models");
 const { parseISO, isBefore, setHours, setMinutes, formatISO, addDays } = require("date-fns");
+const { pushToGroupQueue } = require("./queueController");
 
 module.exports.scheduleAd2 = async (req, res)=>{
         try {
@@ -112,8 +113,9 @@ module.exports.scheduleAd = async (req, res)=>{
         }
         
         const createdSchedules = await Schedule.bulkCreate(schedules);
-        // return schedules;
-    
+        
+        await pushToGroupQueue(groups);
+        
         return res.json({ message: "Schedules Added Successfully" , schedules: createdSchedules});
     } catch (error) {
         console.error(error);
