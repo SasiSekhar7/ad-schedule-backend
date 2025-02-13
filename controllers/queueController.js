@@ -81,7 +81,7 @@ module.exports.pushToGroupQueue = async (groups) => {
               ad_id: schedule.Ad.ad_id,
               name: schedule.Ad.name,
               url,
-              total_plays: schedule.duration,
+              total_plays: schedule.total_duration,
               start_time: schedule.start_time,
             };
           } catch (urlError) {
