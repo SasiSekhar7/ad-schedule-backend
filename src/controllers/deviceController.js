@@ -3,7 +3,7 @@ const { getCustomUTCDateTime, getUTCDate } = require("../helpers");
 const { Ad, Device, Schedule, sequelize, DeviceGroup, ScrollText } = require("../models");
 const { addHours, setHours, setMinutes, formatISO } = require("date-fns");
 const { getBucketURL } = require("./s3Controller");
-const { Op } = require("sequelize");
+const { Op, literal, fn } = require("sequelize");
 module.exports.getFullScheduleCalendar = async (req, res) => {
   try {
     // Extract device_id from query params
@@ -314,15 +314,40 @@ module.exports.createGroup = async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 };
-
 module.exports.fetchGroups = async (req, res) => {
   try {
+    const today = new Date(getCustomUTCDateTime());
+
+    // Construct the start and end times in ISO format
+    const startOfDay = new Date(
+      Date.UTC(
+        today.getUTCFullYear(),
+        today.getUTCMonth(),
+        today.getUTCDate(),
+        6,
+        0,
+        0,
+        0
+      )
+    ).toISOString(); // 6 AM UTC
+    const endOfDay = new Date(
+      Date.UTC(
+        today.getUTCFullYear(),
+        today.getUTCMonth(),
+        today.getUTCDate(),
+        22,
+        0,
+        0,
+        0
+      )
+    ).toISOString(); // 10 PM UTC
+
     const groups = await DeviceGroup.findAll({
       attributes: [
         "group_id",
         "name",
         [
-          sequelize.fn("COUNT", sequelize.col("Devices.device_id")),
+          fn("COUNT", sequelize.col("Devices.device_id")),
           "device_count",
         ],
       ],
@@ -333,21 +358,44 @@ module.exports.fetchGroups = async (req, res) => {
         },
         {
           model: ScrollText,
-          attributes: ["message"], // Fetch only the message from ScrollText
+          attributes: ["message"],
+        },
+        {
+          model: Schedule,
+          attributes: ["total_duration"],
+          required: false, // <-- Allows groups without schedules to be included
+          where: {
+            start_time: {
+              [Op.between]: [startOfDay, endOfDay],
+            },
+          },
         },
       ],
-      group: ["DeviceGroup.group_id", "ScrollText.scrolltext_id"], // Include ScrollText ID in the group clause to avoid issues
+      group: ["DeviceGroup.group_id", "ScrollText.scrolltext_id"],
       raw: true,
-      nest: true, // Ensures nested objects instead of flat results
+      nest: true,
     });
 
-    // Format response to return `null` if no message exists
-    const formattedGroups = groups.map((group) => ({
-      group_id: group.group_id,
-      name: group.name,
-      device_count: group.device_count,
-      message: group.ScrollText ? group.ScrollText.message : null,
-    }));
+    // Process and format the groups
+    const formattedGroups = groups.map((group) => {
+      const schedules = group.Schedule || []; // Default to empty array if no schedules exist
+      const total720 = schedules.filter(s => s.total_duration === 720).length;
+      const total360 = schedules.filter(s => s.total_duration === 360).length;
+      const totalDuration = total720 * 720 + total360 * 360; // Sum of all ad play durations
+      const maxCapacity = 8 * 720; // 8 full schedules of 720-play ads
+
+      const batteryLevel = totalDuration > 0 ? ((totalDuration / maxCapacity) * 100).toFixed(2) : "0"; // Default to 0% if empty
+
+      return {
+        group_id: group.group_id,
+        name: group.name,
+        device_count: group.device_count,
+        message: group.ScrollText ? group.ScrollText.message : null,
+        total_schedules: total720 + total360,
+        battery_percentage: batteryLevel + "%", // e.g., "75%"
+        battery_fill: parseFloat(batteryLevel), // Number for frontend bar width
+      };
+    });
 
     return res.status(200).json({ groups: formattedGroups });
   } catch (error) {
@@ -355,7 +403,6 @@ module.exports.fetchGroups = async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 };
-
 
 
 // controllers/scrollTextController.js
