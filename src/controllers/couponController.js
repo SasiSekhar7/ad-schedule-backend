@@ -1,4 +1,4 @@
-const { Client, Coupon, Campaign } = require("../models");
+const { Client, Coupon, Campaign, SiteUser, CampaignInteraction } = require("../models");
 
 module.exports.createClient = async (req, res) => {
   try {
@@ -176,6 +176,45 @@ module.exports.allCampaigns = async (req,res) => {
 };
 
 // Call the function (Example Usage)
+
+
+module.exports.fetchCampaignInteractions = async (req, res) => {
+  try {
+    const interactions = await CampaignInteraction.findAll({
+      attributes: ["interaction_id", "count", "created_at"],
+      include: [
+        {
+          model: Campaign,
+          attributes: ["campaign_id", "name", "description"],
+        },
+        {
+          model: SiteUser,
+          attributes: ["id", "phone_number"],
+        },
+      ],
+      raw: true, // Flattens the result
+      nest: false, // Ensures no nesting occurs
+    });
+
+    // Transform data into a fully flat structure
+    const formattedInteractions = interactions.map((interaction) => ({
+      interaction_id: interaction.interaction_id,
+      count: interaction.count,
+      created_at: interaction.created_at,
+      campaign_id: interaction["Campaign.campaign_id"], // Flattened
+      campaign_name: interaction["Campaign.name"], // Flattened
+      campaign_description: interaction["Campaign.description"], // Flattened
+      user_id: interaction["SiteUser.id"], // Flattened
+      phone_number: interaction["SiteUser.phone_number"], // Flattened
+    }));
+
+    return res.status(200).json({ interactions: formattedInteractions });
+  } catch (error) {
+    console.error("Fetch Campaign Interactions Error:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 
 module.exports.getCampaign = async (req, res) => {
   try {

@@ -12,7 +12,7 @@ const { uploadFile, changeFile, addAd, deleteAd } = require('../controllers/s3Co
 const {validateToken, validateDeviceToken} = require('../middleware/auth');
 const { pushToGroupQueue } = require('../controllers/queueController');
 const { sendOtp, verifyOtp } = require('../controllers/otpController');
-const { createCampaign, addCoupon, getCampaign, allCampaigns, upsertCampaign, updateCampaignWithCoupons, deleteCampaign, getCampaignCode } = require('../controllers/couponController');
+const { createCampaign, addCoupon, getCampaign, allCampaigns, upsertCampaign, updateCampaignWithCoupons, deleteCampaign, getCampaignCode, fetchCampaignInteractions } = require('../controllers/couponController');
 
 router.post('/device/register', registerDevice) // takes group id and location input 
 
@@ -74,6 +74,9 @@ router.post('/campaign/create/:client_id', validateToken, createCampaign)
 
 router.post('/campaign/update/', validateToken, updateCampaignWithCoupons)
 router.post('/campaign/delete/:campaign_id', validateToken, deleteCampaign)
+
+router.get('/campaign/interactions', validateToken, fetchCampaignInteractions)
+
 
 
 // router.post('/campaign/add-coupon/:campaign_id', validateToken, addCoupon)
