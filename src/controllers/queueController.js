@@ -1,6 +1,6 @@
 const { Op } = require("sequelize");
 const { getCustomUTCDateTime } = require("../helpers");
-const { Schedule, Ad, ScrollText } = require("../models");
+const { Schedule, Ad, ScrollText, Device } = require("../models");
 const { getBucketURL } = require("./s3Controller");
 const { default: mqtt } = require("mqtt");
 
@@ -151,20 +151,16 @@ mqttClient.on("message", async (topic, message) => {
     try {
       // Parse the JSON message
       const payload = JSON.parse(message.toString());
-      const { android_id, last_synced } = payload;
+      const { android_id } = payload;
 
-      // Convert last_synced to a Date object if needed
-      const parsedLastSynced = new Date(last_synced);
-
-      // Update the device record(s) with the matching android_id
       const [updatedCount] = await Device.update(
-        { last_synced: parsedLastSynced },
+        { last_synced: getCustomUTCDateTime() },
         { where: { android_id } }
       );
 
       if (updatedCount > 0) {
         console.log(
-          `Device with android_id ${android_id} updated with last_synced ${parsedLastSynced}`
+          `Device with android_id ${android_id} updated with last_synced ${getCustomUTCDateTime}`
         );
       } else {
         console.warn(`No device found with android_id ${android_id} to update.`);
