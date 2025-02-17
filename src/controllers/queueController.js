@@ -131,13 +131,14 @@ module.exports.pushToGroupQueue = async (groups) => {
         ads:validAds
       }
       // if (validAds.length > 0) {
-        mqttClient.publish(topic, JSON.stringify(jsonToSend), (err) => {
+        mqttClient.publish(topic, JSON.stringify(jsonToSend), { qos: 2, retain: true }, (err) => {
           if (err) {
             console.error(`❌ Failed to publish to ${topic}:`, err);
           } else {
-            console.log(`📡 Successfully published ads to ${topic}`);
+            console.log(`📡 Successfully published ads to ${topic} with QoS 2 and retain flag`);
           }
         });
+        
       // } else {
       //   console.log(`⚠️ No valid ads to publish for group ${group_id}`);
       // }
