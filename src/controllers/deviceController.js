@@ -270,17 +270,17 @@ module.exports.syncDevice = async (req, res) => {
 
       ads.push(url)
     }
-      let scrollingMessage;
-      scrollingMessage = await ScrollText.findAll({
-        where: {
-          group_id,
-        },
-        attributes:['message']
-      });
-      if(!scrollingMessage){
-        scrollingMessage="AdUp By demokrito Contact 98987687876";
-      }
-
+    let scrollingMessage;
+    const message = await ScrollText.findOne({
+      where: {
+        group_id,
+      },
+      attributes: ['message']
+    });
+    
+    // Extract the message if found, otherwise set a default value
+    scrollingMessage = message ? message.message : "AdUp By demokrito Contact 98987687876";
+    
      
       // Remove null ads (failed URL fetch)
       const validAds = ads.filter((ad) => ad !== null);
