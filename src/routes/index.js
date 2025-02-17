@@ -40,8 +40,8 @@ router.post('/device/create-group', validateToken,  createGroup); // only takes 
 router.get('/device/fetch-groups', validateToken,  fetchGroups); // only takes name as input 
 
 
-router.post("/scroll-text", addMessage);
-router.post("/scroll-text/delete/:group_id", deleteMessage);
+router.post("/scroll-text", validateToken, addMessage);
+router.post("/scroll-text/delete/:group_id",validateToken, deleteMessage);
 
 router.get("/schedule/calendar", validateToken,  getFullScheduleCalendar);
 router.get("/schedule/all", validateToken,  getFullSchedule);

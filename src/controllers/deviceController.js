@@ -4,6 +4,7 @@ const { Ad, Device, Schedule, sequelize, DeviceGroup, ScrollText } = require("..
 const { addHours, setHours, setMinutes, formatISO } = require("date-fns");
 const { getBucketURL } = require("./s3Controller");
 const { Op, literal, fn } = require("sequelize");
+const { pushToGroupQueue } = require("./queueController");
 module.exports.getFullScheduleCalendar = async (req, res) => {
   try {
     // Extract device_id from query params
@@ -423,10 +424,13 @@ module.exports.addMessage = async (req, res) => {
       // Update the existing message
       scrollText.message = message;
       await scrollText.save();
+      await pushToGroupQueue([group_id])
       return res.status(200).json({ message: "Message updated successfully", scrollText });
     } else {
       // Create a new message record
       scrollText = await ScrollText.create({ group_id, message });
+      await pushToGroupQueue([group_id])
+
       return res.status(201).json({ message: "Message added successfully", scrollText });
     }
   } catch (error) {
@@ -453,6 +457,8 @@ module.exports.deleteMessage = async (req, res) => {
 
     // Delete the record
     await scrollText.destroy();
+    await pushToGroupQueue([group_id])
+
     return res.status(200).json({ message: "Message deleted successfully" });
   } catch (error) {
     console.error("Error in deleteMessage:", error);
