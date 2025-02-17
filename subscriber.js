@@ -13,7 +13,7 @@ const client = mqtt.connect(brokerUrl, options);
 client.on("connect", () => {
   console.log("📡 Subscriber Connected!");
 
-  const topic = "device/sync";
+  const topic = "ads/9e12b008-d713-4157-8ab9-c786159e1d77";
 
   client.subscribe(topic, { qos: 2 }, (err) => {
     if (err) {
