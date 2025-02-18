@@ -28,6 +28,103 @@ mqttClient.on("connect", () => {
 });mqttClient.on("error", (err) => console.error("❌ MQTT Connection Error:", err));
 
 
+module.exports.convertToPushReadyJSON = async (group_id) => {
+  const today = new Date(getCustomUTCDateTime());
+
+  // Construct the start and end times in ISO format
+  const startOfDay = new Date(
+    Date.UTC(
+      today.getUTCFullYear(),
+      today.getUTCMonth(),
+      today.getUTCDate(),
+      6,
+      0,
+      0,
+      0
+    )
+  ).toISOString(); // 6 AM UTC
+  const endOfDay = new Date(
+    Date.UTC(
+      today.getUTCFullYear(),
+      today.getUTCMonth(),
+      today.getUTCDate(),
+      22,
+      0,
+      0,
+      0
+    )
+  ).toISOString(); // 10 PM UTC
+
+  console.log(
+    `📅 Filtering ads between ${startOfDay} and ${endOfDay} for group ${group_id}`
+  );
+
+  const scheduledAds = await Schedule.findAll({
+    where: {
+      group_id,
+      start_time: {
+        [Op.between]: [startOfDay, endOfDay],
+      },
+    },
+    include: [{ model: Ad }],
+  });
+
+  console.log(
+    `📊 Found ${scheduledAds.length} scheduled ads for group ${group_id}`
+  );
+
+  if (scheduledAds.length === 0) {
+    console.log(`⚠️ No ads found for group ${group_id}, skipping.`);
+  }
+
+  // Process ads asynchronously
+  const ads = await Promise.all(
+    scheduledAds.map(async (schedule) => {
+      console.log(`📦 Processing ad: ${JSON.stringify(schedule.Ad)}`);
+      try {
+        const url = await getBucketURL(schedule.Ad.url);
+        console.log(`🔗 Resolved URL for ad ${schedule.Ad.ad_id}: ${url}`);
+        return {
+          ad_id: schedule.Ad.ad_id,
+          name: schedule.Ad.name,
+          url,
+          duration: schedule.Ad.duration,
+          total_plays: schedule.total_duration,
+          start_time: schedule.start_time,
+        };
+      } catch (urlError) {
+        console.error(
+          `❌ Error fetching URL for ad ${schedule.Ad.ad_id}:`,
+          urlError
+        );
+        return null; // Skip this ad
+      }
+    })
+  );
+  let scrollingMessage;
+  const message = await ScrollText.findOne({
+    where: {
+      group_id,
+    },
+    attributes: ['message']
+  });
+  
+  // Extract the message if found, otherwise set a default value
+  scrollingMessage = message ? message.message : "AdUp By demokrito Contact 98987687876";
+  
+  // Remove null ads (failed URL fetch)
+  const validAds = ads.filter((ad) => ad !== null);
+  console.log(
+    `✅ Ready to publish ${validAds.length} ads for group ${group_id}`
+  );
+
+  const jsonToSend = {
+    rcs: scrollingMessage,
+    ads:validAds
+  }
+ return jsonToSend;
+}
+
 module.exports.pushToGroupQueue = async (groups) => {
   try {
     console.log(`🔄 Processing groups: ${JSON.stringify(groups)}`);
@@ -36,108 +133,16 @@ module.exports.pushToGroupQueue = async (groups) => {
       console.log(`📌 Processing group: ${group_id}`);
 
       const topic = `ads/${group_id}`;
-      const today = new Date(getCustomUTCDateTime());
 
-      // Construct the start and end times in ISO format
-      const startOfDay = new Date(
-        Date.UTC(
-          today.getUTCFullYear(),
-          today.getUTCMonth(),
-          today.getUTCDate(),
-          6,
-          0,
-          0,
-          0
-        )
-      ).toISOString(); // 6 AM UTC
-      const endOfDay = new Date(
-        Date.UTC(
-          today.getUTCFullYear(),
-          today.getUTCMonth(),
-          today.getUTCDate(),
-          22,
-          0,
-          0,
-          0
-        )
-      ).toISOString(); // 10 PM UTC
-
-      console.log(
-        `📅 Filtering ads between ${startOfDay} and ${endOfDay} for group ${group_id}`
-      );
-
-      const scheduledAds = await Schedule.findAll({
-        where: {
-          group_id,
-          start_time: {
-            [Op.between]: [startOfDay, endOfDay],
-          },
-        },
-        include: [{ model: Ad }],
-      });
-
-      console.log(
-        `📊 Found ${scheduledAds.length} scheduled ads for group ${group_id}`
-      );
-
-      if (scheduledAds.length === 0) {
-        console.log(`⚠️ No ads found for group ${group_id}, skipping.`);
-        continue;
-      }
-
-      // Process ads asynchronously
-      const ads = await Promise.all(
-        scheduledAds.map(async (schedule) => {
-          console.log(`📦 Processing ad: ${JSON.stringify(schedule.Ad)}`);
-          try {
-            const url = await getBucketURL(schedule.Ad.url);
-            console.log(`🔗 Resolved URL for ad ${schedule.Ad.ad_id}: ${url}`);
-            return {
-              ad_id: schedule.Ad.ad_id,
-              name: schedule.Ad.name,
-              url,
-              duration: schedule.Ad.duration,
-              total_plays: schedule.total_duration,
-              start_time: schedule.start_time,
-            };
-          } catch (urlError) {
-            console.error(
-              `❌ Error fetching URL for ad ${schedule.Ad.ad_id}:`,
-              urlError
-            );
-            return null; // Skip this ad
-          }
-        })
-      );
-      let scrollingMessage;
-      const message = await ScrollText.findOne({
-        where: {
-          group_id,
-        },
-        attributes: ['message']
-      });
-      
-      // Extract the message if found, otherwise set a default value
-      scrollingMessage = message ? message.message : "AdUp By demokrito Contact 98987687876";
-      
-      // Remove null ads (failed URL fetch)
-      const validAds = ads.filter((ad) => ad !== null);
-      console.log(
-        `✅ Ready to publish ${validAds.length} ads for group ${group_id}`
-      );
-
-      const jsonToSend = {
-        rcs: scrollingMessage,
-        ads:validAds
-      }
+      const jsonToSend = await this.convertToPushReadyJSON(group_id);
       // if (validAds.length > 0) {
-        mqttClient.publish(topic, JSON.stringify(jsonToSend), { qos: 2, retain: true }, (err) => {
+      mqttClient.publish(topic, JSON.stringify(jsonToSend), { qos: 2, retain: true }, (err) => {
           if (err) {
             console.error(`❌ Failed to publish to ${topic}:`, err);
           } else {
             console.log(`📡 Successfully published ads to ${topic} with QoS 2 and retain flag`);
           }
-        });
+    });
         
       // } else {
       //   console.log(`⚠️ No valid ads to publish for group ${group_id}`);
@@ -151,8 +156,13 @@ mqttClient.on("message", async (topic, message) => {
   if (topic === "device/sync") {
     try {
       // Parse the JSON message
+      console.log('just raw message ', message);
+
       const payload = JSON.parse(message.toString());
+      console.log('------payload---------', payload)
+
       const { android_id } = payload;
+      console.log('------payload---------', payload)
 
       const [updatedCount] = await Device.update(
         { last_synced: getCustomUTCDateTime() },

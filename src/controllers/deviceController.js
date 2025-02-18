@@ -4,7 +4,7 @@ const { Ad, Device, Schedule, sequelize, DeviceGroup, ScrollText } = require("..
 const { addHours, setHours, setMinutes, formatISO } = require("date-fns");
 const { getBucketURL } = require("./s3Controller");
 const { Op, literal, fn } = require("sequelize");
-const { pushToGroupQueue } = require("./queueController");
+const { pushToGroupQueue, convertToPushReadyJSON } = require("./queueController");
 module.exports.getFullScheduleCalendar = async (req, res) => {
   try {
     // Extract device_id from query params
@@ -198,102 +198,13 @@ module.exports.syncDevice = async (req, res) => {
       return res.status(400).json({ error: "Group ID is required" });
     }
       console.log(`📌 Processing group: ${group_id}`);
-
-      const today = new Date(getCustomUTCDateTime());
-
-      // Construct the start and end times in ISO format
-      const startOfDay = new Date(
-        Date.UTC(
-          today.getUTCFullYear(),
-          today.getUTCMonth(),
-          today.getUTCDate(),
-          6,
-          0,
-          0,
-          0
-        )
-      ).toISOString(); // 6 AM UTC
-      const endOfDay = new Date(
-        Date.UTC(
-          today.getUTCFullYear(),
-          today.getUTCMonth(),
-          today.getUTCDate(),
-          22,
-          0,
-          0,
-          0
-        )
-      ).toISOString(); // 10 PM UTC
-
-      console.log(
-        `📅 Filtering ads between ${startOfDay} and ${endOfDay} for group ${group_id}`
-      );
-
-      const scheduledAds = await Schedule.findAll({
-        where: {
-          group_id,
-          start_time: {
-            [Op.between]: [startOfDay, endOfDay],
-          },
-        },
-        include: [{ model: Ad }],
-      });
-
-      let ads = [];
-      // Process ads asynchronously
-      if(scheduledAds.length>0 ){
-        ads = await Promise.all(
-        scheduledAds.map(async (schedule) => {
-          console.log(`📦 Processing ad: ${JSON.stringify(schedule.Ad)}`);
-          try {
-            const url = await getBucketURL(schedule.Ad.url);
-            console.log(`🔗 Resolved URL for ad ${schedule.Ad.ad_id}: ${url}`);
-            return {
-              ad_id: schedule.Ad.ad_id,
-              name: schedule.Ad.name,
-              url,
-              duration: schedule.Ad.duration,
-              total_plays: schedule.total_duration,
-              start_time: schedule.start_time,
-            };
-          } catch (urlError) {
-            console.error(
-              `❌ Error fetching URL for ad ${schedule.Ad.ad_id}:`,
-              urlError
-            );
-            return null; // Skip this ad
-          }
-        })
-      );
-    }else{
-      const url = await getBucketURL("placeholder.jpg");
-
-      ads.push(url)
-    }
-    let scrollingMessage;
-    const message = await ScrollText.findOne({
-      where: {
-        group_id,
-      },
-      attributes: ['message']
-    });
-    
-    // Extract the message if found, otherwise set a default value
-    scrollingMessage = message ? message.message : "AdUp By demokrito Contact 98987687876";
-    
-     
-      // Remove null ads (failed URL fetch)
-      const validAds = ads.filter((ad) => ad !== null);
-      console.log(
-        `✅ Ready to publish ${validAds.length} ads for group ${group_id}`
-      );
+      const jsonToSend = await convertToPushReadyJSON(group_id)
+      
     return res.json({
       device_id,
       last_sync: getCustomUTCDateTime(),
-      ads: validAds,
-      rcs: scrollingMessage,
-
-    });
+      ...jsonToSend
+  });
   } catch (error) {
     console.error("Sync error:", error);
     return res.status(500).json({ error: "Internal server error" });
