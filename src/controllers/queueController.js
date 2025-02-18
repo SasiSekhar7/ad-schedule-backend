@@ -158,7 +158,7 @@ mqttClient.on("message", async (topic, message) => {
       // Parse the JSON message
       console.log('just raw message ', message);
 
-      const payload = JSON.parse(message.toString());
+      const payload = JSON.parse(message);
       console.log('------payload---------', payload)
 
       const { android_id } = payload;
