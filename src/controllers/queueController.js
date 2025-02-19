@@ -4,10 +4,10 @@ const { Schedule, Ad, ScrollText, Device } = require("../models");
 const { getBucketURL } = require("./s3Controller");
 const { default: mqtt } = require("mqtt");
 
-const brokerUrl = "mqtt://console.adup.live:1883";
+const brokerUrl = process.env.MQTT_URL;
 const options = {
-  username: "myuser",
-  password: "adup_2025",
+  username: process.env.MQTT_USER,
+  password: process.env.MQTT_PASSWORD,
 };
 
 // Debug MQTT connection
@@ -155,14 +155,9 @@ module.exports.pushToGroupQueue = async (groups) => {
 mqttClient.on("message", async (topic, message) => {
   if (topic === "device/sync") {
     try {
-      // Parse the JSON message
-      console.log('just raw message ', message);
-
       const payload = JSON.parse(message);
-      console.log('------payload---------', payload)
-
       const { android_id } = payload;
-      console.log('------payload---------', payload)
+
 
       const [updatedCount] = await Device.update(
         { last_synced: getCustomUTCDateTime() },
@@ -171,13 +166,13 @@ mqttClient.on("message", async (topic, message) => {
 
       if (updatedCount > 0) {
         console.log(
-          `Device with android_id ${android_id} updated with last_synced ${getCustomUTCDateTime}`
+          `Device with android_id ${android_id} updated with last_synced ${getCustomUTCDateTime()}`
         );
       } else {
         console.warn(`No device found with android_id ${android_id} to update.`);
       }
     } catch (error) {
-      console.error("Error processing device/sync message:", error);
+      console.error("Error processing device/sync message:", error);  
     }
   }
 });

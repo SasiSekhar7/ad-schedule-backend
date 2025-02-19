@@ -96,6 +96,20 @@ module.exports.getDeviceList = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
+module.exports.updateGroupSchedule = async (req, res) => {
+  try {
+    const {group_id} = req.params;
+
+    await pushToGroupQueue([group_id])
+   
+    res.json({message: `Successfully updated group schedule`});
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
 module.exports.registerDevice = async (req, res) => {
   try {
     const { location, group_id, android_id } = req.body;

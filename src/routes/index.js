@@ -3,7 +3,7 @@ const { createClient, getAllClients, updateClient, deleteClient, getAllAds, getA
 const { Client, Ad, Schedule, Device } = require('../models');
 const { sendAdFile, sendAdDetails } = require('../controllers/adController');
 const { scheduleAd, deleteSchedule, updateSchedule } = require('../controllers/scheduleController');
-const { getFullSchedule, syncDevice, registerDevice, createGroup, getDeviceList, fetchGroups, getFullScheduleCalendar, addOrUpdateScrollText, addMessage, deleteMessage } = require('../controllers/deviceController');
+const { getFullSchedule, syncDevice, registerDevice, createGroup, getDeviceList, fetchGroups, getFullScheduleCalendar, addOrUpdateScrollText, addMessage, deleteMessage, updateGroupSchedule } = require('../controllers/deviceController');
 const { addUser, getUserData } = require('../controllers/userController');
 const { login } = require('../controllers/authController');
 const router = express.Router();
@@ -31,6 +31,9 @@ router.post('/login',  login)
 router.post('/device/update/:id', validateToken,  registerDevice)
 router.post('/device/delete/:id', validateToken,  registerDevice)
 router.get('/device/all', validateToken,  getDeviceList)
+
+router.post('/device/update-schedule/:group_id', validateToken,  updateGroupSchedule)
+
 
 
 router.get('/dashboard', validateToken,  getAllDetails)
