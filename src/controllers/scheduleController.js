@@ -136,15 +136,31 @@ module.exports.updateSchedule = async (req, res) =>{
         res.status(500).json({ message: "Internal Server Error" });
     }
 }
-module.exports.deleteSchedule =  async (req, res) => {
+module.exports.deleteSchedule = async (req, res) => {
     try {
-        if(!req.params){
-            return res.status(400).json({ error: "Missing required parameters" });
+        const { id } = req.params;
+        
+        if (!id) {
+            return res.status(400).json({ error: "Missing required parameter: id" });
         }
-        await Schedule.destroy({ where: { schedule_id: req.params.id } });
-        res.json({ message: "Ad removed from schedule." });
+
+        // Find the schedule entry first
+        const schedule = await Schedule.findOne({ where: { schedule_id: id } });
+
+        if (!schedule) {
+            return res.status(404).json({ error: "Schedule not found" });
+        }
+
+        // Extract group_id if needed
+        const { group_id } = schedule;
+
+        await pushToGroupQueue([group_id])
+        // Now delete the schedule
+        await Schedule.destroy({ where: { schedule_id: id } });
+
+        res.json({ message: "Schedule deleted successfully", group_id });
     } catch (error) {
-        console.error(error);
+        console.error("Error deleting schedule:", error);
         res.status(500).json({ message: "Internal Server Error" });
     }
-}
+};
