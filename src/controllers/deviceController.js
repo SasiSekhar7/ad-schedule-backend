@@ -97,6 +97,16 @@ module.exports.getDeviceList = async (req, res) => {
   }
 };
 
+
+module.exports.getApkUrl = async (req, res) => {
+  try {
+    const url = await getBucketURL('adupPlayer.apk')
+    res.json({message: `Download URL`, url});
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
 module.exports.updateGroupSchedule = async (req, res) => {
   try {
     const {group_id} = req.params;
