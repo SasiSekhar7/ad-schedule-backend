@@ -1,4 +1,4 @@
-const { Op, where } = require("sequelize");
+const { Op, } = require("sequelize");
 const { Ad, Schedule, Device } = require("../models");
 const { parseISO, isBefore, setHours, setMinutes, formatISO, addDays } = require("date-fns");
 const { pushToGroupQueue } = require("./queueController");
