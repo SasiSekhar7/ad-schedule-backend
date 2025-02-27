@@ -13,7 +13,7 @@ async function dailySchedulePush() {
 }
 
 // Schedule the task to run every day at 6 AM
-cron.schedule('05 21 * * *', async() => {
+cron.schedule('00 06 * * *', async() => {
     await dailySchedulePush();
     console.log('cron called')
 
