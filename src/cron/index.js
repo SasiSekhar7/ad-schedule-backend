@@ -4,6 +4,7 @@ const { pushToGroupQueue } = require('../controllers/queueController');
 
 // Function to be executed at 6 AM daily
 async function dailySchedulePush() {
+    console.log('func called')
     const groups = await DeviceGroup.findAll({attributes:['group_id']})
 
     const groupIds = groups.map(grp=>grp.group_id);
@@ -12,8 +13,10 @@ async function dailySchedulePush() {
 }
 
 // Schedule the task to run every day at 6 AM
-cron.schedule('0 21 * * *', async() => {
+cron.schedule('05 21 * * *', async() => {
     await dailySchedulePush();
+    console.log('cron called')
+
 }, {
     scheduled: true,
     timezone: "Asia/Kolkata" // India timezone
