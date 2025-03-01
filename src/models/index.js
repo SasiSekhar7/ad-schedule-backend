@@ -113,6 +113,10 @@ const DeviceGroup = sequelize.define("DeviceGroup", {
     type: DataTypes.STRING,
     allowNull: false, // Name is optional
   },
+  last_pushed: {
+    type: DataTypes.DATE,
+    allowNull:true,
+  },
   created_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,

@@ -80,17 +80,28 @@ module.exports.getFullSchedule = async (req, res) => {
 module.exports.getDeviceList = async (req, res) => {
   try {
     const devices = await Device.findAll({
-      include: { model: DeviceGroup, attributes: ["name"] },
+      include: {
+        model: DeviceGroup,
+        attributes: ["name", "last_pushed"], // Include last_pushed to determine status
+      },
       raw: true,
       nest: true,
     });
 
-    // Flatten the Client name field
-    const flattenedDevices = devices.map((device) => ({
-      ...device,
-      group_name: device.DeviceGroup?.name || null, // Extracts 'name' from 'Client' and puts it in 'client_name'
-    }));
-    res.json({ devices: flattenedDevices });
+    // Add status to each device
+    const deviceList = devices.map((device) => {
+      const last_synced = device.last_synced;
+      const last_pushed = device.DeviceGroup?.last_pushed || null;
+      const group_name = device.DeviceGroup?.name || null;
+
+      return {
+        ...device,
+        group_name,
+        status: last_pushed && last_synced < last_pushed ? "offline" : "active",
+      };
+    });
+
+    res.json({ devices: deviceList });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Internal Server Error" });
