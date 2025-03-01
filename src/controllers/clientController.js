@@ -1,5 +1,6 @@
 const { fn, col } = require("sequelize");
 const { Client, Ad, Schedule, Device, DeviceGroup } = require("../models");
+const { getBucketURL } = require("./s3Controller");
 
 module.exports.createClient = async(req, res) =>{
     try {
@@ -25,10 +26,13 @@ module.exports.getAllAds = async(req, res) =>{
           });
           
           // Flatten the Client name field
-          const flattenedAds = ads.map((ad) => ({
-            ...ad,
-            client_name: ad.Client?.name || null, // Extracts 'name' from 'Client' and puts it in 'client_name'
-          }));
+          const flattenedAds = await Promise.all(
+            ads.map(async (ad) => ({
+              ...ad,
+              url: await getBucketURL(ad.url),
+              client_name: ad.Client?.name || null, // Extracts 'name' from 'Client' and puts it in 'client_name'
+            }))
+          );
           
         //   console.log(flattenedAds);
         return res.status(200).json({ads:flattenedAds})
