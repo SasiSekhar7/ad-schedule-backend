@@ -1,8 +1,8 @@
 const { Op } = require("sequelize");
 const { getCustomUTCDateTime } = require("../helpers");
 const { Schedule, Ad, ScrollText, Device, DeviceGroup } = require("../models");
-const { getBucketURL } = require("./s3Controller");
 const { default: mqtt } = require("mqtt");
+const { getBucketURL } = require("./s3Controller");
 
 const brokerUrl = process.env.MQTT_URL;
 const options = {
