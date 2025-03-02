@@ -2,7 +2,7 @@ const { Op } = require("sequelize");
 const { getCustomUTCDateTime } = require("../helpers");
 const { Schedule, Ad, ScrollText, Device, DeviceGroup } = require("../models");
 const { default: mqtt } = require("mqtt");
-const { getBucketURL } = require("./s3Controller");
+// const { getBucketURL } = require("./s3Controller");
 
 const brokerUrl = process.env.MQTT_URL;
 const options = {
@@ -84,6 +84,8 @@ module.exports.convertToPushReadyJSON = async (group_id, placeholder= null) => {
     scheduledAds.map(async (schedule) => {
       console.log(`📦 Processing ad: ${JSON.stringify(schedule.Ad)}`);
       try {
+        const { getBucketURL } = require("./s3Controller"); // Require inside function
+        console.log(getBucketURL)
         const url = await getBucketURL(schedule.Ad.url);
         console.log(`🔗 Resolved URL for ad ${schedule.Ad.ad_id}: ${url}`);
         return {
