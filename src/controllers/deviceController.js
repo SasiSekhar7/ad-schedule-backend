@@ -51,28 +51,35 @@ module.exports.getFullScheduleCalendar = async (req, res) => {
 };
 module.exports.getFullSchedule = async (req, res) => {
   try {
-    const schedules = await Schedule.findAll({
+    let { page = 1, limit = 10, date } = req.query; 
+    page = parseInt(page);
+    limit = parseInt(limit);
+    
+    const whereClause = {};
+    
+    if (date) {
+      whereClause.start_time = {
+        [Op.between]: [`${date} 00:00:00`, `${date} 23:59:59`]
+      };
+    }
+
+    const { count, rows: schedules } = await Schedule.findAndCountAll({
+      where: whereClause,
       include: [
         { model: Ad, attributes: ["name"] },
         { model: DeviceGroup, attributes: ["name"] },
       ],
       order: [["start_time", "DESC"]],
+      limit,
+      offset: (page - 1) * limit
     });
 
-    //   console.log(schedules)
-
-    //
     const result = schedules.map((schedule) => {
       const { Ad, DeviceGroup, ...data } = schedule.dataValues;
-
-      return {
-        ...data,
-        ad_name: Ad.name,
-        group_name: DeviceGroup.name,
-      };
+      return { ...data, ad_name: Ad.name, group_name: DeviceGroup.name };
     });
 
-    res.json({ schedules: result });
+    res.json({ schedules: result, total: count, page, limit });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Internal Server Error" });
