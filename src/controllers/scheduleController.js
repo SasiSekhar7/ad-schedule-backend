@@ -2,6 +2,7 @@ const { Op, } = require("sequelize");
 const { Ad, Schedule, Device } = require("../models");
 const { parseISO, isBefore, setHours, setMinutes, formatISO, addDays } = require("date-fns");
 const { pushToGroupQueue } = require("./queueController");
+const { getBucketURL } = require("./s3Controller");
 
 module.exports.scheduleAd2 = async (req, res)=>{
         try {
@@ -164,3 +165,15 @@ module.exports.deleteSchedule = async (req, res) => {
         res.status(500).json({ message: "Internal Server Error" });
     }
 };
+
+module.exports.getPlaceholder = async (req, res) => {
+    try {
+        const url = await getBucketURL('placeholder.jpg')
+        res.json({url});
+    } catch (error) {
+        console.error("Error fetching placeholder:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+};
+
+

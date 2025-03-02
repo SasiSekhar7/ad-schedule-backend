@@ -2,17 +2,18 @@ const express =  require('express');
 const { createClient, getAllClients, updateClient, deleteClient, getAllAds, getAllDetails } = require('../controllers/clientController');
 const { Client, Ad, Schedule, Device } = require('../models');
 const { sendAdFile, sendAdDetails } = require('../controllers/adController');
-const { scheduleAd, deleteSchedule, updateSchedule } = require('../controllers/scheduleController');
+const { scheduleAd, deleteSchedule, updateSchedule, getPlaceholder } = require('../controllers/scheduleController');
 const { getFullSchedule, syncDevice, registerDevice, createGroup, getDeviceList, fetchGroups, getFullScheduleCalendar, addOrUpdateScrollText, addMessage, deleteMessage, updateGroupSchedule, getApkUrl } = require('../controllers/deviceController');
 const { addUser, getUserData } = require('../controllers/userController');
 const { login } = require('../controllers/authController');
 const router = express.Router();
-const upload = require('../middleware/s3multer');
-const { uploadFile, changeFile, addAd, deleteAd } = require('../controllers/s3Controller');
+const {upload, uploadMiddleware} = require('../middleware/s3multer');
+const { changeFile, addAd, deleteAd, changePlaceholder } = require('../controllers/s3Controller');
 const {validateToken, validateDeviceToken} = require('../middleware/auth');
 const { pushToGroupQueue } = require('../controllers/queueController');
 const { sendOtp, verifyOtp } = require('../controllers/otpController');
-const { createCampaign, addCoupon, getCampaign, allCampaigns, upsertCampaign, updateCampaignWithCoupons, deleteCampaign, getCampaignCode, fetchCampaignInteractions } = require('../controllers/couponController');
+const { createCampaign, getCampaign, allCampaigns, updateCampaignWithCoupons, deleteCampaign, getCampaignCode, fetchCampaignInteractions } = require('../controllers/couponController');
+const { default: axios } = require('axios');
 
 router.post('/device/register', registerDevice) // takes group id and location input 
 
@@ -55,6 +56,10 @@ router.get("/schedule/all", validateToken,  getFullSchedule);
 router.post("/schedule/add", validateToken,  scheduleAd)
 router.post("/schedule/update/:id",updateSchedule)
 router.post("/schedule/delete/:id", validateToken,  deleteSchedule)
+
+router.get("/schedule/placeholder", validateToken,  getPlaceholder)
+router.post("/schedule/change-placeholder", validateToken, uploadMiddleware, changePlaceholder)
+
 
 router.get('/ads/clients', validateToken,  getAllClients )
 router.get('/ads/all', validateToken,  getAllAds )
@@ -135,6 +140,110 @@ router.get('/1', async(req, res)=>{
 })
 
 
+const API_KEY = '7cc20d69-5e4c-403b-98a1-629d2d3e482f'; // Replace with your actual API key
+const TOURNAMENT_ID = '49fc7a37-da67-435e-bf5f-00da233e9ff4'; // ICC Champions Trophy series ID
 
+// Helper function to get country flags
+async function getCountryFlag(countryName) {
+  try {
+    const response = await axios.get('https://api.cricapi.com/v1/countries', {
+      params: { apikey: API_KEY, search: countryName }
+    });
+    return response.data.data[0]?.genericFlag || '';
+  } catch (error) {
+    console.error('Error fetching flag:', error);
+    return '';
+  }
+}
 
+// Process match data
+async function processMatch(match) {
+  const flags = await Promise.all(match.teams.map(team => getCountryFlag(team)));
+
+  // Check if the scorecard is available
+  const scorecardAvailable = match.score && match.score.length > 0;
+
+  return {
+    id: match.id,
+    name: match.name,
+    status: match.status,
+    date: match.date,
+    venue: match.venue,
+    teams: match.teams.map((team, index) => ({
+      name: team,
+      flag: flags[index]
+    })),
+    score: scorecardAvailable ? match.score : [{ inning: 'Scorecard not available', r: 0, w: 0, o: 0 }],
+    matchType: match.matchType,
+    series_id: match.series_id
+  };
+}
+
+function findLastCompletedMatch(matchList) {
+    // Filter out TBC matches and matches without a valid result
+    const validMatches = matchList.filter(match => 
+      !match.teams.includes('Tbc') && 
+      (match.status.toLowerCase().includes('won') || 
+       match.status.toLowerCase().includes('completed')) &&
+      match.matchEnded
+    );
+  
+    // Sort by date in descending order
+    validMatches.sort((a, b) => new Date(b.dateTimeGMT) - new Date(a.dateTimeGMT));
+  
+    // Return the most recent match
+    return validMatches[0];
+  }
+  
+// Main API endpoint
+router.get('/tournament-data', async (req, res) => {
+  try {
+    // Get tournament data
+    const seriesResponse = await axios.get('https://api.cricapi.com/v1/series_info', {
+      params: { apikey: API_KEY, id: TOURNAMENT_ID }
+    });
+
+    const allMatches = seriesResponse.data.data.matchList;
+
+    const lastCompletedMatch = findLastCompletedMatch(allMatches)
+    // Log raw match data for debugging
+    console.log('Raw match data:', JSON.stringify(allMatches, null, 2));
+
+    // Find current match (first match that's not completed)
+    const currentMatch = allMatches.find(match => 
+      !match.status.toLowerCase().includes('won') && 
+      !match.status.toLowerCase().includes('completed')
+    );
+
+    // Find completed matches (status includes "won" or "completed")
+    const completedMatches = allMatches.filter(match => 
+      match.status.toLowerCase().includes('won') || 
+      match.status.toLowerCase().includes('completed')
+    );
+
+    // Get upcoming fixtures (matches after current date)
+    const now = new Date();
+    const upcomingMatches = allMatches.filter(match => 
+      new Date(match.dateTimeGMT) > now
+    );
+
+    // Process data
+    // const responseData = {
+    //   match: currentMatch ? await processMatch(currentMatch) : null,
+    //   completed_matches: await Promise.all(completedMatches.map(processMatch)),
+    //   scrolling_data: {
+    //     tournament: seriesResponse.data.data.info.name,
+    //     fixtures: await Promise.all(upcomingMatches.map(processMatch))
+    //   }
+    // };
+    const responseData = {
+        match: lastCompletedMatch
+      };
+
+    res.json(responseData);
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ error: 'Failed to fetch tournament data' });
+  }
+});
 module.exports = router;  

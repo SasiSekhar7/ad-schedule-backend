@@ -109,6 +109,10 @@ const DeviceGroup = sequelize.define("DeviceGroup", {
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true,
   },
+  reg_code: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
   name: {
     type: DataTypes.STRING,
     allowNull: false, // Name is optional

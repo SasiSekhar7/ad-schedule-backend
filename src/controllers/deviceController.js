@@ -77,29 +77,53 @@ module.exports.getFullSchedule = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+const fetch = require("node-fetch");
+
+async function getAddressFromCoordinates(lat, lon) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    return data.display_name || "Unknown Location";
+  } catch (error) {
+    console.error("Error fetching location:", error);
+    return "Unknown Location";
+  }
+}
+
 module.exports.getDeviceList = async (req, res) => {
   try {
     const devices = await Device.findAll({
       include: {
         model: DeviceGroup,
-        attributes: ["name", "last_pushed"], // Include last_pushed to determine status
+        attributes: ["name", "last_pushed"],
       },
       raw: true,
       nest: true,
     });
 
-    // Add status to each device
-    const deviceList = devices.map((device) => {
-      const last_synced = device.last_synced;
-      const last_pushed = device.DeviceGroup?.last_pushed || null;
-      const group_name = device.DeviceGroup?.name || null;
+    // Process each device and add status + location
+    const deviceList = await Promise.all(
+      devices.map(async (device) => {
+        const last_synced = device.last_synced;
+        const last_pushed = device.DeviceGroup?.last_pushed || null;
+        const group_name = device.DeviceGroup?.name || null;
 
-      return {
-        ...device,
-        group_name,
-        status: last_pushed && last_synced < last_pushed ? "offline" : "active",
-      };
-    });
+        // Extract coordinates
+        let location = "Unknown Location";
+        if (device.location) {
+          const [lat, lon] = device.location.split(",").map(Number);
+          location = await getAddressFromCoordinates(lat, lon);
+        }
+
+        return {
+          ...device,
+          group_name,
+          location, // Add readable address
+          status: last_pushed && last_synced < last_pushed ? "offline" : "active",
+        };
+      })
+    );
 
     res.json({ devices: deviceList });
   } catch (error) {
@@ -107,6 +131,7 @@ module.exports.getDeviceList = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
 
 
 module.exports.getApkUrl = async (req, res) => {
@@ -133,8 +158,19 @@ module.exports.updateGroupSchedule = async (req, res) => {
 
 module.exports.registerDevice = async (req, res) => {
   try {
-    const { location, group_id, android_id } = req.body;
-    console.log("andorid id", android_id, location, group_id);
+    const { location, reg_code, android_id } = req.body;
+
+    const groupExists = await DeviceGroup.findOne({
+        attributes: ['group_id'],
+        where: { reg_code } // Ensure `reg_code` is the actual column name
+    });
+    
+    if (!groupExists) {
+        return res.status(400).json({ message: "Invalid License Key" });
+    }
+    
+    const group_id = groupExists.group_id; // Safe to access since we checked if it exists
+    
     const deviceExists = await Device.findOne({
       where: {
         android_id,
@@ -249,18 +285,25 @@ module.exports.syncDevice = async (req, res) => {
 
 module.exports.createGroup = async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, reg_code } = req.body;
 
-    const group = await DeviceGroup.create({ name });
+    // Check if reg_code already exists
+    const groupExists = await DeviceGroup.findOne({ where: { reg_code } });
 
-    return res
-      .status(201)
-      .json({ message: "group created succesfully", group });
+    if (groupExists) {
+      return res.status(400).json({ message: "License key already in use." });
+    }
+
+    // Create the group
+    const group = await DeviceGroup.create({ name, reg_code });
+
+    return res.status(201).json({ message: "Group created successfully", group });
   } catch (error) {
-    console.error("Sync error:", error);
+    console.error("Error creating group:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 };
+
 module.exports.fetchGroups = async (req, res) => {
   try {
     const today = new Date(getCustomUTCDateTime());
@@ -293,6 +336,7 @@ module.exports.fetchGroups = async (req, res) => {
       attributes: [
         "group_id",
         "name",
+        "reg_code",
         [
           fn("COUNT", sequelize.col("Devices.device_id")),
           "device_count",
@@ -336,6 +380,7 @@ module.exports.fetchGroups = async (req, res) => {
       return {
         group_id: group.group_id,
         name: group.name,
+        reg_code: group.reg_code,
         device_count: group.device_count,
         message: group.ScrollText ? group.ScrollText.message : null,
         total_schedules: total720 + total360,

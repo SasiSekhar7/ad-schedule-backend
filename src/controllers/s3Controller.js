@@ -1,7 +1,8 @@
 const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
 const path = require('path');
-const { Ad } = require("../models");
+const { Ad, DeviceGroup } = require("../models");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+const { pushToGroupQueue } = require("./queueController");
 
 
 const region = process.env.AWS_BUCKET_REGION;
@@ -81,7 +82,30 @@ module.exports.getBucketURL = async (fileName) => {
         return res.status(500).json({ message: "Internal Server Error!" });
     }
 };
+module.exports.changePlaceholder = async (req, res) => {
+    try {
+         const uploadParams = {
+                    Bucket: bucketName,
+                    Key: 'placeholder.jpg',
+                    Body: req.file.buffer,
+                    ContentType: req.file.mimetype,
+                };
+        
+                const uploadCommand = new PutObjectCommand(uploadParams);
+                await s3.send(uploadCommand);
 
+                const groups = await DeviceGroup.findAll({attributes:['group_id']})
+
+                const groupIds = groups.map(grp=>grp.group_id);
+                const placeholder = await this.getBucketURL('placeholder.jpg');
+                await pushToGroupQueue(groupIds, placeholder );
+                
+        res.json({message: "Placeholder Changed successfully"});
+    } catch (error) {
+        console.error("Error changing placeholder:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+};
 module.exports.addAd = async(req, res)=>{
     try {
         const {client_id, name, duration } = req.body;
@@ -140,3 +164,4 @@ module.exports.deleteAd = async(req, res)=>{
 
     }
 }
+

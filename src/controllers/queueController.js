@@ -1,6 +1,6 @@
 const { Op } = require("sequelize");
 const { getCustomUTCDateTime } = require("../helpers");
-const { Schedule, Ad, ScrollText, Device } = require("../models");
+const { Schedule, Ad, ScrollText, Device, DeviceGroup } = require("../models");
 const { getBucketURL } = require("./s3Controller");
 const { default: mqtt } = require("mqtt");
 
@@ -25,10 +25,12 @@ mqttClient.on("connect", () => {
       console.log("Subscribed to device/sync topic.");
     }
   });
-});mqttClient.on("error", (err) => console.error("❌ MQTT Connection Error:", err));
+});
+mqttClient.on("error", (err) =>
+  console.error("❌ MQTT Connection Error:", err)
+);
 
-
-module.exports.convertToPushReadyJSON = async (group_id) => {
+module.exports.convertToPushReadyJSON = async (group_id, placeholder= null) => {
   const today = new Date(getCustomUTCDateTime());
 
   // Construct the start and end times in ISO format
@@ -106,12 +108,14 @@ module.exports.convertToPushReadyJSON = async (group_id) => {
     where: {
       group_id,
     },
-    attributes: ['message']
+    attributes: ["message"],
   });
-  
+
   // Extract the message if found, otherwise set a default value
-  scrollingMessage = message ? message.message : "AdUp By demokrito Contact 98987687876";
-  
+  scrollingMessage = message
+    ? message.message
+    : "AdUp By demokrito Contact 98987687876";
+
   // Remove null ads (failed URL fetch)
   const validAds = ads.filter((ad) => ad !== null);
   console.log(
@@ -120,12 +124,13 @@ module.exports.convertToPushReadyJSON = async (group_id) => {
 
   const jsonToSend = {
     rcs: scrollingMessage,
-    ads:validAds
-  }
- return jsonToSend;
-}
+    ads: validAds,
+    placeholder,
+  };
+  return jsonToSend;
+};
 
-module.exports.pushToGroupQueue = async (groups) => {
+module.exports.pushToGroupQueue = async (groups, placeholder = null) => {
   try {
     console.log(`🔄 Processing groups: ${JSON.stringify(groups)}`);
 
@@ -134,16 +139,30 @@ module.exports.pushToGroupQueue = async (groups) => {
 
       const topic = `ads/${group_id}`;
 
-      const jsonToSend = await this.convertToPushReadyJSON(group_id);
+      const jsonToSend = await this.convertToPushReadyJSON(group_id, placeholder);
       // if (validAds.length > 0) {
-      mqttClient.publish(topic, JSON.stringify(jsonToSend), { qos: 2, retain: true }, (err) => {
+      mqttClient.publish(
+        topic,
+        JSON.stringify(jsonToSend),
+        { qos: 2, retain: true },
+        (err) => {
           if (err) {
             console.error(`❌ Failed to publish to ${topic}:`, err);
           } else {
-            console.log(`📡 Successfully published ads to ${topic} with QoS 2 and retain flag`);
+            console.log(
+              `📡 Successfully published ads to ${topic} with QoS 2 and retain flag`
+            );
           }
-    });
-        
+        }
+      );
+
+      await DeviceGroup.update({
+        last_pushed: getCustomUTCDateTime(),
+       },{
+        where:{
+          group_id
+        }
+       })
       // } else {
       //   console.log(`⚠️ No valid ads to publish for group ${group_id}`);
       // }
@@ -158,7 +177,6 @@ mqttClient.on("message", async (topic, message) => {
       const payload = JSON.parse(message);
       const { android_id } = payload;
 
-
       const [updatedCount] = await Device.update(
         { last_synced: getCustomUTCDateTime() },
         { where: { android_id } }
@@ -169,10 +187,12 @@ mqttClient.on("message", async (topic, message) => {
           `Device with android_id ${android_id} updated with last_synced ${getCustomUTCDateTime()}`
         );
       } else {
-        console.warn(`No device found with android_id ${android_id} to update.`);
+        console.warn(
+          `No device found with android_id ${android_id} to update.`
+        );
       }
     } catch (error) {
-      console.error("Error processing device/sync message:", error);  
+      console.error("Error processing device/sync message:", error);
     }
   }
 });
