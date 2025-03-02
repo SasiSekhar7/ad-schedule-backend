@@ -4,6 +4,7 @@ const { Ad, Device, Schedule, sequelize, DeviceGroup, ScrollText } = require("..
 const { addHours, setHours, setMinutes, formatISO } = require("date-fns");
 const { getBucketURL } = require("./s3Controller");
 const { Op, literal, fn } = require("sequelize");
+
 const { pushToGroupQueue, convertToPushReadyJSON } = require("./queueController");
 module.exports.getFullScheduleCalendar = async (req, res) => {
   try {
@@ -77,7 +78,6 @@ module.exports.getFullSchedule = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
-const fetch = require("node-fetch");
 
 async function getAddressFromCoordinates(lat, lon) {
   try {
