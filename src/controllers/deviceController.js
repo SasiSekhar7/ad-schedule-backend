@@ -120,7 +120,6 @@ module.exports.getDeviceList = async (req, res) => {
         return {
           ...device,
           group_name,
-          location, // Add readable address
           status: last_pushed && last_synced < last_pushed ? "offline" : "active",
         };
       })
