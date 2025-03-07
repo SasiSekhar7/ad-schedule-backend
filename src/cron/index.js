@@ -30,4 +30,4 @@ cron.schedule('00 08 * * *', async() => {
     timezone: "Asia/Kolkata" // India timezone
 });
 
-fetchAndScheduleMatches()
+// fetchAndScheduleMatches()
