@@ -130,6 +130,7 @@ const DeviceGroup = sequelize.define("DeviceGroup", {
     defaultValue: DataTypes.NOW,
   },
 });
+
 const ScrollText = sequelize.define("ScrollText", {
   scrolltext_id: {
     type: DataTypes.UUID,

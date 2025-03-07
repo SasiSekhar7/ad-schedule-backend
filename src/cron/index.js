@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const { DeviceGroup } = require('../models');
 const { pushToGroupQueue } = require('../controllers/queueController');
+const { fetchAndScheduleMatches } = require('../controllers/scheduleController');
 
 // Function to be executed at 6 AM daily
 async function dailySchedulePush() {
@@ -20,3 +21,13 @@ cron.schedule('00 06 * * *', async() => {
     timezone: "Asia/Kolkata" // India timezone
 });
 
+
+cron.schedule('00 08 * * *', async() => {
+    await dailySchedulePush();
+
+}, {
+    scheduled: true,
+    timezone: "Asia/Kolkata" // India timezone
+});
+
+fetchAndScheduleMatches()
