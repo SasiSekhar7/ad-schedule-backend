@@ -110,7 +110,7 @@ module.exports.getDeviceList = async (req, res) => {
     });
 
     // Process each device and add status + location
-    const deviceList = 
+    const deviceList = await Promise.all(
       devices.map(async (device) => {
         const last_synced = device.last_synced;
         const last_pushed = device.DeviceGroup?.last_pushed || null;
@@ -123,7 +123,8 @@ module.exports.getDeviceList = async (req, res) => {
           location, // Add readable address
           status: last_pushed && last_synced < last_pushed ? "offline" : "active",
         };
-      });
+      })
+    );
 
     res.json({ devices: deviceList });
   } catch (error) {
