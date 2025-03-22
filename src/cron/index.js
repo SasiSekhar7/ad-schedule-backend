@@ -61,4 +61,4 @@ cron.schedule('30 15 * * *', async() => {
 
 // fetchAndScheduleMatches()
 
-// startLiveMatchStreaming();
+startLiveMatchStreaming();

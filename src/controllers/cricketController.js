@@ -167,6 +167,7 @@ async function sendUpdate() {
               "filter[season_id]": 1689,
           }
       });
+      console.log(response.data)
       const match = response.data.data[0];
       if (!match) {
           console.log('❌ No match data available');
