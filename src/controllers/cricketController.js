@@ -174,7 +174,7 @@ async function sendUpdate() {
       }
       
       const runs = match.runs;
-      let homeTeam, awayTeam, homeScore, awayScore;
+      let homeTeam, awayTeam, homeScore, awayScore, note;
 
       if (!runs || runs.length === 0) {
           // Match hasn't started, assign local team as inning_1 and visitor team as inning_2
@@ -182,6 +182,7 @@ async function sendUpdate() {
           awayTeam = match.visitorteam;
           homeScore = { score: 0, wickets: 0, overs: 0 };
           awayScore = { score: 0, wickets: 0, overs: 0 };
+          note = "Match not started";
       } else {
           // Find teams based on innings if match has started
           const firstInning = runs.find(run => run.inning === 1);
@@ -197,6 +198,7 @@ async function sendUpdate() {
 
           homeScore = firstInning || { score: 0, wickets: 0, overs: 0 };
           awayScore = secondInning || { score: 0, wickets: 0, overs: 0 };
+          note = match.note;
       }
 
       const dataToSend = {
@@ -218,7 +220,7 @@ async function sendUpdate() {
               wickets: awayScore.wickets,
               overs: awayScore.overs
           },
-          note: match.note,
+          note: note,
           status: match.status
       };
 

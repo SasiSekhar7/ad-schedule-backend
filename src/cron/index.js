@@ -49,14 +49,14 @@ cron.schedule('30 15 * * *', async() => {
     timezone: "Asia/Kolkata" // India timezone
 });
 
-cron.schedule('30 19 * * *', async() => {
-    // await updateUpcomingMatches();
-    await startLiveMatchStreaming();
+// cron.schedule('30 19 * * *', async() => {
+//     // await updateUpcomingMatches();
+//     await startLiveMatchStreaming();
 
-}, {
-    scheduled: true,
-    timezone: "Asia/Kolkata" // India timezone
-});
+// }, {
+//     scheduled: true,
+//     timezone: "Asia/Kolkata" // India timezone
+// });
 // fetchAndScheduleMatches("bedf8bb2-7a5b-4812-bd50-2ce0a468ffb9");
 
 // fetchAndScheduleMatches()
