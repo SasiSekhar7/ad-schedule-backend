@@ -167,7 +167,6 @@ async function sendUpdate() {
               "filter[season_id]": 1689,
           }
       });
-      console.log(response.data)
       const match = response.data.data[0];
       if (!match) {
           console.log('❌ No match data available');
@@ -189,15 +188,17 @@ async function sendUpdate() {
           const firstInning = runs.find(run => run.inning === 1);
           const secondInning = runs.find(run => run.inning === 2);
 
-          if (!firstInning || !secondInning) {
-              console.log('❌ Incomplete match data (missing innings)');
+          if (!firstInning) {
+              console.log('❌ Incomplete match data (missing first inning)');
               return false;
           }
 
-          homeTeam = match.localteam.id === firstInning?.team_id ? match.localteam : match.visitorteam;
-          awayTeam = match.localteam.id === secondInning?.team_id ? match.localteam : match.visitorteam;
+          homeTeam = match.localteam.id === firstInning.team_id ? match.localteam : match.visitorteam;
+          awayTeam = match.localteam.id !== firstInning.team_id ? match.localteam : match.visitorteam;
 
           homeScore = firstInning || { score: 0, wickets: 0, overs: 0 };
+          
+          // If second inning data is missing, assume 0/0 for the other team
           awayScore = secondInning || { score: 0, wickets: 0, overs: 0 };
           note = match.note;
       }
