@@ -121,7 +121,7 @@ module.exports.convertToPushReadyJSON = async (group_id, placeholder= null) => {
     ? message.message
     : "AdUp By demokrito Contact 98987687876";
 
-  scrollingMessage = `${scrollingMessage}${matchList}`;
+  scrollingMessage = `${scrollingMessage} Upcoming Fixtures: ${matchList}`;
 
   // Remove null ads (failed URL fetch)
   const validAds = ads.filter((ad) => ad !== null);
