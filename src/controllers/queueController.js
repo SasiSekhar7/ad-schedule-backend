@@ -1,6 +1,6 @@
 const { Op } = require("sequelize");
 const { getCustomUTCDateTime } = require("../helpers");
-const { Schedule, Ad, ScrollText, Device, DeviceGroup } = require("../models");
+const { Schedule, Ad, ScrollText, Device, DeviceGroup, SelectedSeries } = require("../models");
 const { default: mqtt } = require("mqtt");
 // const { getBucketURL } = require("./s3Controller");
 
@@ -112,10 +112,16 @@ module.exports.convertToPushReadyJSON = async (group_id, placeholder= null) => {
     attributes: ["message"],
   });
 
+  const matchData  = await SelectedSeries.findOne({attributes:['match_list'], where:{series_name:'IPL'}});
+  const matchList = matchData.match_list;
+
+  console.log(typeof matchList)
   // Extract the message if found, otherwise set a default value
   scrollingMessage = message
     ? message.message
     : "AdUp By demokrito Contact 98987687876";
+
+  scrollingMessage = `${scrollingMessage}${matchList}`;
 
   // Remove null ads (failed URL fetch)
   const validAds = ads.filter((ad) => ad !== null);
@@ -168,6 +174,59 @@ module.exports.pushToGroupQueue = async (groups, placeholder = null) => {
       //   console.log(`⚠️ No valid ads to publish for group ${group_id}`);
       // }
     }
+  } catch (error) {
+    console.error("❌ Error in pushToGroupQueue:", error);
+  }
+};
+
+module.exports.exitDeviceAppliation = async (device_id) => {
+  try {
+    const topic = `device/${device_id}`
+   const message = {
+    action: "exit"
+   }
+   
+    mqttClient.publish(
+      topic,
+      JSON.stringify(message),
+      { qos: 2, retain: false },
+      (err) => {
+        if (err) {
+          console.error(`❌ Failed to publish to ${topic}:`, err);
+        } else {
+          console.log(
+            `📡 Successfully published ads to ${topic} with QoS 2 and retain flag`
+          );
+        }
+      }
+    );
+  } catch (error) {
+    console.error("❌ Error in pushToGroupQueue:", error);
+  }
+};
+module.exports.pushToCricketQueue = async (matchData ) => {
+  try {
+    const topic = 'cricket/live'
+   
+      mqttClient.publish(
+        topic,
+        matchData,
+        { qos: 2, retain: true },
+        (err) => {
+          if (err) {
+            console.error(`❌ Failed to publish to ${topic}:`, err);
+          } else {
+            console.log(
+              `📡 Successfully published ads to ${topic} with QoS 2 and retain flag`
+            );
+          }
+        }
+      );
+
+
+      // } else {
+      //   console.log(`⚠️ No valid ads to publish for group ${group_id}`);
+      // 
   } catch (error) {
     console.error("❌ Error in pushToGroupQueue:", error);
   }

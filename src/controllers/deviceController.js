@@ -5,7 +5,7 @@ const { addHours, setHours, setMinutes, formatISO } = require("date-fns");
 const { getBucketURL } = require("./s3Controller");
 const { Op, literal, fn } = require("sequelize");
 
-const { pushToGroupQueue, convertToPushReadyJSON } = require("./queueController");
+const { pushToGroupQueue, convertToPushReadyJSON, exitDeviceAppliation } = require("./queueController");
 module.exports.getFullScheduleCalendar = async (req, res) => {
   try {
     // Extract device_id from query params
@@ -275,6 +275,22 @@ module.exports.syncDevice = async (req, res) => {
       device_id,
       last_sync: getCustomUTCDateTime(),
       ...jsonToSend
+  });
+  } catch (error) {
+    console.error("Sync error:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+module.exports.exitDevice = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ error: "Device ID is required" });
+    }
+    
+    await exitDeviceAppliation(id);
+    return res.json({
+      message:"Successfully Sent Event"
   });
   } catch (error) {
     console.error("Sync error:", error);

@@ -1,0 +1,327 @@
+const { default: axios } = require("axios");
+const { pushToCricketQueue } = require("./queueController");
+const cheerio = require("cheerio");
+const { SelectedSeries } = require("../models");
+module.exports.fetchAllSeries = async (req, res) => {
+  try {
+    const response = await axios.get("https://api.cricapi.com/v1/series", {
+      params: { apikey: process.env.CRICKET_API_KEY },
+    });
+
+    const data = response.data.data;
+
+    //   console.log(flattenedAds);
+    return res.status(200).json({ data });
+  } catch (error) {
+    console.log(error);
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+};
+
+module.exports.updateSeries = async (req, res) => {
+  try {
+    const { series_id } = req.query;
+    if (!series_id)
+      return res.status(400).json({ message: "Missing Parameters!" });
+    const matches = this.fetchAndScheduleMatches(series_id);
+
+    //   console.log(flattenedAds);
+    return res.status(200).json({ matches });
+  } catch (error) {
+    console.log(error);
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+};
+
+module.exports.fetchAndScheduleMatches = async (TOURNAMENT_ID) => {
+  try {
+    const response = await axios.get("https://api.cricapi.com/v1/series_info", {
+      params: { apikey: process.env.CRICKET_API_KEY, id: TOURNAMENT_ID },
+    });
+    const matches = response.data.data.matchList;
+
+    const now = new Date();
+    const today = now.toISOString().split("T")[0]; // Get today's date (YYYY-MM-DD)
+
+    let todaysMatches = [];
+    let upcomingMatches = [];
+
+    for (const match of matches) {
+      const matchTime = new Date(match.dateTimeGMT);
+
+      if (matchTime.toISOString().split("T")[0] === today) {
+        // Match is today
+        todaysMatches.push(match);
+
+        const reminderTime = matchTime.getTime() - 15 * 60 * 1000; // 15 min before match
+        if (reminderTime > now.getTime()) {
+          const delay = reminderTime - now.getTime();
+          console.log(
+            `Scheduled live updates for ${match.name} at ${new Date(
+              reminderTime
+            )}`
+          );
+
+          // setTimeout(() => startLiveUpdates(match.id), delay);
+        } else {
+          console.log(
+            `Match ${match.name} already started or missed scheduling.`
+          );
+        }
+      } else if (matchTime > now) {
+        // Future match
+        upcomingMatches.push(match);
+      }
+
+      //    startLiveUpdates('1f4c12c3-a844-4874-ba24-2e118e2dfd71')
+    }
+
+    // Limit upcoming matches to 10
+    upcomingMatches = upcomingMatches.slice(0, 10);
+
+    console.log("\n📅 Today's Matches:");
+    console.table(
+      todaysMatches.map((m) => ({ Name: m.name, Time: m.dateTimeGMT }))
+    );
+
+    console.log("\n⏳ Upcoming Matches:");
+    console.table(
+      upcomingMatches.map((m) => ({ Name: m.name, Time: m.dateTimeGMT }))
+    );
+
+    return { todaysMatches, upcomingMatches };
+  } catch (error) {
+    console.error("Error fetching matches:", error.message);
+  }
+};
+
+module.exports.updateUpcomingMatches = async () => {
+  const url =
+    "https://www.cricbuzz.com/cricket-schedule/upcoming-series/league";
+
+  try {
+    // Fetch the HTML content
+    const { data } = await axios.get(url, {
+      httpsAgent: new (require("https").Agent)({ rejectUnauthorized: false }),
+    });
+    const $ = cheerio.load(data);
+
+    const matches = [];
+
+    // Find all match containers
+    $(".cb-ovr-flo.cb-col-60.cb-col.cb-mtchs-dy-vnu.cb-adjst-lst").each(
+      (_, element) => {
+        const match = $(element).find("a").text().trim();
+        if (match) {
+          matches.push(match);
+        }
+      }
+    );
+
+    const scrollingText = ` • ${matches.splice(0, 5).join("  •  ")} • `;
+    await SelectedSeries.update({
+      match_list: scrollingText,
+      live_match_id: "1",
+    },{
+        where:{
+            series_name:'IPL'
+        }
+    });
+  } catch (err) {
+    console.log("Upcoming Matches Not Available", err);
+  }
+};
+module.exports.startLiveMatchStreaming = async () => {
+    try {
+        console.log("🚀 Starting live match streaming...");
+
+        const interval = setInterval(async () => {
+            const matchIsLive = await sendUpdate();
+            
+            if (!matchIsLive) {
+                console.log("⏹️ Match has ended. Stopping live updates...");
+                clearInterval(interval);
+            }
+        }, 20 * 1000);
+
+    } catch (error) {
+        console.error("❌ Error in live match streaming:", error);
+    }
+};
+
+
+
+// Fetch and publish score updates
+async function sendUpdate() {
+    try {
+        const response = await axios.get(`${process.env.CRICKET_API_URL}/livescores`, {
+            params: {
+                api_token: process.env.CRICKET_API_KEY,
+                include: "localTeam,visitorTeam,runs",
+                "filter[league_id]": 1,
+                "fields[object]": "note,localTeam,visitorTeam,runs",
+                "filter[season_id]": 1689,
+            }
+        });
+        const match = response.data.data[0];
+        if (!match) {
+            console.log('❌ No match data available');
+            return false;
+        }
+        const runs = match.runs;
+
+        // Find teams based on innings
+        const firstInning = runs.find(run => run.inning === 1);
+        const secondInning = runs.find(run => run.inning === 2);
+
+        // if (!firstInning || !secondInning) {
+        //     console.log('❌ Incomplete match data (missing innings)');
+        //     return false;
+        // }
+
+        // The team batting first (1st inning) is the home team
+        const homeTeam = match.localteam.id === firstInning?.team_id ? match.localteam : match.visitorteam;
+        const awayTeam = match.localteam.id === secondInning?.team_id ? match.localteam : match.visitorteam;
+
+        // Get scores
+        const homeScore = firstInning || { score: 0, wickets: 0, overs: 0 };
+        const awayScore = secondInning || { score: 0, wickets: 0, overs: 0 };
+
+        const dataToSend = {
+            inning_1: {
+                id: homeTeam.id,
+                name: homeTeam.name,
+                code: homeTeam.code,
+                image_path: homeTeam.image_path,
+                score: homeScore.score,
+                wickets: homeScore.wickets,
+                overs: homeScore.overs
+            },
+            inning_2: {
+                id: awayTeam.id,
+                name: awayTeam.name,
+                code: awayTeam.code,
+                image_path: awayTeam.image_path,
+                score: awayScore.score,
+                wickets: awayScore.wickets,
+                overs: awayScore.overs
+            },
+            note: match.note,
+            status: match.status
+        };
+
+        const message = JSON.stringify(dataToSend);
+
+        await pushToCricketQueue(message);
+
+
+        if(match.status === "Finished") return false;
+
+
+        return true;
+
+    } catch (error) {
+        console.error('❌ Error fetching match data:', error);
+        return false;
+    }
+}
+
+
+// module.exports.fetchAndScheduleMatches = async () => {
+//   try {
+//     const response = await axios.get(
+//       "https://api.cricapi.com/v1/series_info",
+//       {
+//         params: { apikey: process.env.CRICKET_API_KEY, id: TOURNAMENT_ID },
+//       }
+//     );
+
+//     const matches = response.data.data.matchList;
+
+//     const today = new Date().toISOString().split("T")[0]; // Get today's date (YYYY-MM-DD)
+//     const todaysMatches = matches.filter((match) => match.date === today);
+
+//     for (const match of todaysMatches) {
+//       const matchTime = new Date(match.dateTimeGMT).getTime();
+//       const now = Date.now();
+//       const reminderTime = matchTime - 15 * 60 * 1000; // 15 minutes before match starts
+
+//       if (reminderTime > now) {
+//         const delay = reminderTime - now;
+//         console.log(
+//           `Scheduled live updates for ${match.name} at ${new Date(
+//             reminderTime
+//           )}`
+//         );
+
+//         setTimeout(() => startLiveUpdates(match.id), delay);
+//       } else {
+//         console.log(
+//           `Match ${match.name} already started or missed scheduling.`
+//         );
+//       }
+//     }
+
+//     console.log(matches)
+//   } catch (error) {
+//     console.error("Error fetching matches:", error.message);
+//   }
+// };
+
+let liveMatches = {}; // Store active matches
+
+async function getCountryFlag(countryName) {
+  try {
+    const response = await axios.get("https://api.cricapi.com/v1/countries", {
+      params: { apikey: process.env.CRICKET_API_KEY, search: countryName },
+    });
+    return response.data.data[0]?.genericFlag || "";
+  } catch (error) {
+    console.error("Error fetching flag:", error);
+    return "";
+  }
+}
+async function startLiveUpdates(matchId) {
+  console.log(`Starting live updates for match ID: ${matchId}`);
+
+  liveMatches[matchId] = setInterval(async () => {
+    try {
+      const response = await axios.get(
+        `https://api.cricapi.com/v1/match_info`,
+        {
+          params: { apikey: process.env.CRICKET_API_KEY, id: matchId },
+        }
+      );
+      const matchData = response.data.data;
+
+      if (matchData.matchEnded) {
+        console.log(
+          `Match ended: ${matchData.name}, Winner: ${matchData.matchWinner}`
+        );
+        clearInterval(liveMatches[matchId]); // Stop polling
+        delete liveMatches[matchId];
+      } else {
+        console.log(`Live Score Update: ${matchData.name}`);
+        console.log(matchData.score);
+        // TODO: Send data to MQTT devices here
+        const flags = await Promise.all(
+          matchData.teams.map((team) => getCountryFlag(team))
+        );
+
+        pushToCricketQueue({
+          ...matchData,
+          teams: matchData.teams.map((team, index) => ({
+            name: team,
+            flag: flags[index],
+          })),
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching match details:", error.message);
+    }
+  }, 20 * 1000); // Every minute
+}

@@ -437,6 +437,26 @@ const CampaignInteraction = sequelize.define("CampaignInteraction", {
   },
 });
 
+const SelectedSeries = sequelize.define("SelectedSeries", {
+  series_id: {
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
+    primaryKey: true,
+  },
+  series_name:{
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  match_list:{
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  live_match_id:{
+    type: DataTypes.UUID,
+    allowNull: true
+  }
+});
+
 // Define Associations
 Client.hasMany(Campaign, { foreignKey: "client_id" });
 Campaign.belongsTo(Client, { foreignKey: "client_id" });
@@ -495,4 +515,5 @@ module.exports = {
   Campaign,
   Coupon,
   CampaignInteraction,
+  SelectedSeries
 };
