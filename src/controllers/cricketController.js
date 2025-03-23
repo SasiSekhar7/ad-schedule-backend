@@ -201,6 +201,7 @@ async function sendUpdate() {
           // If second inning data is missing, assume 0/0 for the other team
           awayScore = secondInning || { score: 0, wickets: 0, overs: 0 };
           note = match.note;
+          console.log(match)
       }
 
       const dataToSend = {
