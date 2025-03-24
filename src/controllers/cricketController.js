@@ -135,110 +135,207 @@ module.exports.updateUpcomingMatches = async () => {
     console.log("Upcoming Matches Not Available", err);
   }
 };
+// Global variable to store the streaming match id
+global.streamingMatchId = null;
+
 module.exports.startLiveMatchStreaming = async () => {
     try {
         console.log("🚀 Starting live match streaming...");
-
+        let currentMatchId = null;
+        
         const interval = setInterval(async () => {
-            const matchIsLive = await sendUpdate();
+            // sendUpdate returns either a match id (when live) or false (when finished or error)
+            const result = await sendUpdate();
             
-            if (!matchIsLive) {
+            // If we get a match id and haven't stored it locally yet, save it
+            if (result && !currentMatchId) {
+                currentMatchId = result;
+                console.log(`🎥 Started streaming match id: ${currentMatchId}`);
+            }
+            
+            if (!result) {
                 console.log("⏹️ Match has ended. Stopping live updates...");
                 clearInterval(interval);
+                // If we have a valid match id, notify the other API about the match ending
+                if (currentMatchId) {
+                    await notifyMatchEnded(currentMatchId);
+                }
             }
-        }, 20 * 1000);
+        }, 3 * 1000);
 
     } catch (error) {
         console.error("❌ Error in live match streaming:", error);
     }
 };
 
-
-
-// Fetch and publish score updates
+// Fetch and publish score updates, and return match id when streaming starts
 async function sendUpdate() {
-  try {
-      const response = await axios.get(`${process.env.CRICKET_API_URL}/livescores`, {
-          params: {
-              api_token: process.env.CRICKET_API_KEY,
-              include: "localTeam,visitorTeam,runs",
-              "filter[league_id]": 1,
-              "fields[object]": "note,localTeam,visitorTeam,runs",
-              "filter[season_id]": 1689,
-          }
-      });
-      const match = response.data.data[0];
-      if (!match) {
-          console.log('❌ No match data available');
-          return false;
-      }
-      
-      const runs = match.runs;
-      let homeTeam, awayTeam, homeScore, awayScore, note;
+    try {
+        const response = await axios.get(`${process.env.CRICKET_API_URL}/livescores`, {
+            params: {
+                api_token: process.env.CRICKET_API_KEY,
+                include: "localTeam,visitorTeam,runs",
+                "filter[league_id]": 1,
+                "fields[object]": "note,localTeam,visitorTeam,runs",
+                "filter[season_id]": 1689,
+            }
+        });
+        
+        console.log(response.data);
+        const match = response.data.data[0];
+        if (!match) {
+            console.log('❌ No match data available');
+            return false;
+        }
+        
+        // Set global match id if not already set
+        if (!global.streamingMatchId) {
+            global.streamingMatchId = match.id;
+        }
+        
+        const runs = match.runs;
+        let homeTeam, awayTeam, homeScore, awayScore, note;
 
-      if (!runs || runs.length === 0) {
-          // Match hasn't started, assign local team as inning_1 and visitor team as inning_2
-          homeTeam = match.localteam;
-          awayTeam = match.visitorteam;
-          homeScore = { score: 0, wickets: 0, overs: 0 };
-          awayScore = { score: 0, wickets: 0, overs: 0 };
-          note = "Match not started";
-      } else {
-          // Find teams based on innings if match has started
-          const firstInning = runs.find(run => run.inning === 1);
-          const secondInning = runs.find(run => run.inning === 2);
+        if (!runs || runs.length === 0) {
+            // Match hasn't started: assign default scores
+            homeTeam = match.localteam;
+            awayTeam = match.visitorteam;
+            homeScore = { score: 0, wickets: 0, overs: 0 };
+            awayScore = { score: 0, wickets: 0, overs: 0 };
+            note = "Match not started";
+        } else {
+            // Process match data based on innings
+            const firstInning = runs.find(run => run.inning === 1);
+            const secondInning = runs.find(run => run.inning === 2);
 
-          if (!firstInning) {
-              console.log('❌ Incomplete match data (missing first inning)');
-              return false;
-          }
+            if (!firstInning) {
+                console.log('❌ Incomplete match data (missing first inning)');
+                return false;
+            }
 
-          homeTeam = match.localteam.id === firstInning.team_id ? match.localteam : match.visitorteam;
-          awayTeam = match.localteam.id !== firstInning.team_id ? match.localteam : match.visitorteam;
+            homeTeam = match.localteam.id === firstInning.team_id ? match.localteam : match.visitorteam;
+            awayTeam = match.localteam.id !== firstInning.team_id ? match.localteam : match.visitorteam;
+            homeScore = firstInning || { score: 0, wickets: 0, overs: 0 };
+            awayScore = secondInning || { score: 0, wickets: 0, overs: 0 };
+            note = match.note;
+            console.log(match);
+        }
 
-          homeScore = firstInning || { score: 0, wickets: 0, overs: 0 };
-          
-          // If second inning data is missing, assume 0/0 for the other team
-          awayScore = secondInning || { score: 0, wickets: 0, overs: 0 };
-          note = match.note;
-          console.log(match)
-      }
+        const dataToSend = {
+            inning_1: {
+                id: homeTeam.id,
+                name: homeTeam.name,
+                code: homeTeam.code,
+                image_path: homeTeam.image_path,
+                score: homeScore.score,
+                wickets: homeScore.wickets,
+                overs: homeScore.overs
+            },
+            inning_2: {
+                id: awayTeam.id,
+                name: awayTeam.name,
+                code: awayTeam.code,
+                image_path: awayTeam.image_path,
+                score: awayScore.score,
+                wickets: awayScore.wickets,
+                overs: awayScore.overs
+            },
+            note: note,
+            status: match.status
+        };
 
-      const dataToSend = {
-          inning_1: {
-              id: homeTeam.id,
-              name: homeTeam.name,
-              code: homeTeam.code,
-              image_path: homeTeam.image_path,
-              score: homeScore.score,
-              wickets: homeScore.wickets,
-              overs: homeScore.overs
-          },
-          inning_2: {
-              id: awayTeam.id,
-              name: awayTeam.name,
-              code: awayTeam.code,
-              image_path: awayTeam.image_path,
-              score: awayScore.score,
-              wickets: awayScore.wickets,
-              overs: awayScore.overs
-          },
-          note: note,
-          status: match.status
-      };
+        const message = JSON.stringify(dataToSend);
+        await pushToCricketQueue(message);
 
-      const message = JSON.stringify(dataToSend);
+        // When the match is finished, return false
+        if (match.status === "Finished") return false;
 
-      await pushToCricketQueue(message);
-
-      if (match.status === "Finished") return false;
-
-      return true;
-  } catch (error) {
-      console.error('❌ Error fetching match data:', error);
-      return false;
-  }
+        // Otherwise, return the match id (indicating the stream is live)
+        return global.streamingMatchId;
+    } catch (error) {
+        console.error('❌ Error fetching match data:', error);
+        return false;
+    }
 }
+
+// Function to notify another API when the match ends
+async function notifyMatchEnded(matchId) {
+    try {
+      const response = await axios.get(`${process.env.CRICKET_API_URL}/fixtures/${matchId}`, {
+        params: {
+            api_token: process.env.CRICKET_API_KEY,
+            include: "localTeam,visitorTeam,runs",
+            // "filter[league_id]": 1,
+            // "fields[object]": "note,localTeam,visitorTeam,runs",
+            // "filter[season_id]": 1689,
+        }
+      });
+    
+        const match = response.data.data[0];
+        if (!match) {
+            console.log('❌ No match data available');
+            return false;
+        }
+
+        const runs = match.runs;
+        let homeTeam, awayTeam, homeScore, awayScore, note;
+
+        if (!runs || runs.length === 0) {
+            // Match hasn't started: assign default scores
+            homeTeam = match.localteam;
+            awayTeam = match.visitorteam;
+            homeScore = { score: 0, wickets: 0, overs: 0 };
+            awayScore = { score: 0, wickets: 0, overs: 0 };
+            note = "Match not started";
+        } else {
+            // Process match data based on innings
+            const firstInning = runs.find(run => run.inning === 1);
+            const secondInning = runs.find(run => run.inning === 2);
+
+            if (!firstInning) {
+                console.log('❌ Incomplete match data (missing first inning)');
+                return false;
+            }
+
+            homeTeam = match.localteam.id === firstInning.team_id ? match.localteam : match.visitorteam;
+            awayTeam = match.localteam.id !== firstInning.team_id ? match.localteam : match.visitorteam;
+            homeScore = firstInning || { score: 0, wickets: 0, overs: 0 };
+            awayScore = secondInning || { score: 0, wickets: 0, overs: 0 };
+            note = match.note;
+            console.log(match);
+        }
+
+        const dataToSend = {
+            inning_1: {
+                id: homeTeam.id,
+                name: homeTeam.name,
+                code: homeTeam.code,
+                image_path: homeTeam.image_path,
+                score: homeScore.score,
+                wickets: homeScore.wickets,
+                overs: homeScore.overs
+            },
+            inning_2: {
+                id: awayTeam.id,
+                name: awayTeam.name,
+                code: awayTeam.code,
+                image_path: awayTeam.image_path,
+                score: awayScore.score,
+                wickets: awayScore.wickets,
+                overs: awayScore.overs
+            },
+            note: note,
+            status: match.status
+        };
+        const message = JSON.stringify(dataToSend);
+        await pushToCricketQueue(message);
+
+        console.log(`✅ Notified match end for match id: ${matchId}`);
+    } catch (error) {
+        console.error('❌ Error notifying match end:', error);
+    }
+}
+
 
 
 

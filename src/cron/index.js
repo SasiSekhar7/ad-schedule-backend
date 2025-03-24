@@ -40,7 +40,7 @@ cron.schedule('55 19 * * *', async() => {
     scheduled: true,
     timezone: "Asia/Kolkata" // India timezone
 });
-cron.schedule('31 21 * * *', async() => {
+cron.schedule('55 21 * * *', async() => {
     // await updateUpcomingMatches();
     await startLiveMatchStreaming();
 
@@ -61,4 +61,4 @@ cron.schedule('31 21 * * *', async() => {
 
 // fetchAndScheduleMatches()
 
-// startLiveMatchStreaming();
+startLiveMatchStreaming();
