@@ -161,7 +161,7 @@ module.exports.startLiveMatchStreaming = async () => {
                     await notifyMatchEnded(currentMatchId);
                 }
             }
-        }, 3 * 1000);
+        }, 20 * 1000);
 
     } catch (error) {
         console.error("❌ Error in live match streaming:", error);
