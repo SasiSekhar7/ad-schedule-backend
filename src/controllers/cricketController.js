@@ -271,7 +271,7 @@ async function notifyMatchEnded(matchId) {
         }
       });
     
-        const match = response.data.data[0];
+        const match = response.data.data;
         if (!match) {
             console.log('❌ No match data available');
             return false;
@@ -337,7 +337,7 @@ async function notifyMatchEnded(matchId) {
 }
 
 
-
+notifyMatchEnded(65546)
 
 // module.exports.fetchAndScheduleMatches = async () => {
 //   try {

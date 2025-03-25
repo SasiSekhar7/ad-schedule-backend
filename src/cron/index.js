@@ -23,7 +23,7 @@ cron.schedule('00 06 * * *', async() => {
     timezone: "Asia/Kolkata" // India timezone
 });
 
-cron.schedule('15 15 * * *', async() => {
+cron.schedule('30 15 * * *', async() => {
     // await updateUpcomingMatches();
     await startLiveMatchStreaming();
 
@@ -32,7 +32,7 @@ cron.schedule('15 15 * * *', async() => {
     timezone: "Asia/Kolkata" // India timezone
 });
 
-cron.schedule('55 19 * * *', async() => {
+cron.schedule('30 19 * * *', async() => {
     // await updateUpcomingMatches();
     await startLiveMatchStreaming();
 
@@ -40,25 +40,3 @@ cron.schedule('55 19 * * *', async() => {
     scheduled: true,
     timezone: "Asia/Kolkata" // India timezone
 });
-cron.schedule('58 21 * * *', async() => {
-    // await updateUpcomingMatches();
-    await startLiveMatchStreaming();
-
-}, {
-    scheduled: true,
-    timezone: "Asia/Kolkata" // India timezone
-});
-
-// cron.schedule('30 19 * * *', async() => {
-//     // await updateUpcomingMatches();
-//     await startLiveMatchStreaming();
-
-// }, {
-//     scheduled: true,
-//     timezone: "Asia/Kolkata" // India timezone
-// });
-// fetchAndScheduleMatches("bedf8bb2-7a5b-4812-bd50-2ce0a468ffb9");
-
-// fetchAndScheduleMatches()
-
-// startLiveMatchStreaming();
