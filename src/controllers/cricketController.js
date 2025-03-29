@@ -159,6 +159,8 @@ module.exports.startLiveMatchStreaming = async () => {
                 // If we have a valid match id, notify the other API about the match ending
                 if (currentMatchId) {
                     await notifyMatchEnded(currentMatchId);
+                    let currentMatchId = null;
+                    global.streamingMatchId = null;
                 }
             }
         }, 20 * 1000);
@@ -181,7 +183,6 @@ async function sendUpdate() {
             }
         });
         
-        console.log(response.data);
         const match = response.data.data[0];
         if (!match) {
             console.log('❌ No match data available');
@@ -218,7 +219,6 @@ async function sendUpdate() {
             homeScore = firstInning || { score: 0, wickets: 0, overs: 0 };
             awayScore = secondInning || { score: 0, wickets: 0, overs: 0 };
             note = match.note;
-            console.log(match);
         }
 
         const dataToSend = {
