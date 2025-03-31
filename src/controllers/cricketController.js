@@ -168,16 +168,7 @@ function getDateFilter() {
 
 async function sendUpdate() {
     try {
-        // const response = await axios.get(`https://cricket.sportmonks.com/api/v2.0/fixtures`, {
-        //     params: {
-        //         api_token: "epfFaFM6cGCtJLVJRmbWiOQQhI1jKM4267HEcMEedRtjMuvPnIUEn3EOp9A6",
-        //         include: "localTeam,visitorTeam,runs",
-        //         "filter[league_id]": 1,
-        //         "fields[object]": "note,localTeam,visitorTeam,runs",
-        //         "filter[season_id]": 1689,
-        //         "filter[starts_between]": getDateFilter()
-        //     }
-        // });
+
         
         const response = await axios.get(`${process.env.CRICKET_API_URL}/fixtures`, {
           params: {
