@@ -157,14 +157,13 @@ module.exports.startLiveMatchStreaming = async () => {
     }
 };
 
-const { format, addDays } = require('date-fns');
+const { format, addDays, differenceInMinutes, parseISO } = require('date-fns');
 
 function getDateFilter() {
-    const today = format(new Date(), 'yyyy-MM-dd');
-    const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd');
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd');
     return `${today},${tomorrow}`;
 }
-
 
 async function sendUpdate() {
     try {
@@ -183,17 +182,23 @@ async function sendUpdate() {
       });
       
         const data = response.data.data;
-        let match = data.find(m => m.status !== "Finished");
+        const now = new Date();
         
-        if (!match && global.streamingMatchId) {
-            // If no new match is found but the last match was being streamed, send a final update
+        let match;
+        
+        if (global.streamingMatchId) {
             match = data.find(m => m.id === global.streamingMatchId);
         }
         
         if (!match) {
-            console.log('❌ No match data available');
+            match = data.find(m => m.status !== "Finished" && differenceInMinutes(parseISO(m.starting_at), now) <= 60);
+        }
+        
+        if (!match) {
+            console.log('❌ No match available for broadcasting');
             return false;
         }
+        
         
         // Update global streaming match ID
         global.streamingMatchId = match.id;
@@ -432,7 +437,7 @@ async function notifyMatchEnded(matchId) {
 }
 
 
-notifyMatchEnded(65546)
+// notifyMatchEnded(65546)
 
 // module.exports.fetchAndScheduleMatches = async () => {
 //   try {
