@@ -289,8 +289,11 @@ module.exports.exitDevice = async (req, res) => {
     }
     
     await exitDeviceAppliation(id);
+
+    await Device.destroy({where:{device_id: id}});
+
     return res.json({
-      message:"Successfully Sent Event"
+      message:"Successfully Deleted record"
   });
   } catch (error) {
     console.error("Sync error:", error);

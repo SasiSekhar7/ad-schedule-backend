@@ -33,8 +33,7 @@ router.post('/login',  login)
 router.get('/download-apk',  getApkUrl)
 
 router.post('/device/update/:id', validateToken,  registerDevice)
-router.post('/device/delete/:id', validateToken,  registerDevice)
-router.post('/device/exit/:id',  exitDevice)
+router.post('/device/delete/:id', validateToken,  exitDevice)
 
 router.get('/device/all', validateToken,  getDeviceList)
 
