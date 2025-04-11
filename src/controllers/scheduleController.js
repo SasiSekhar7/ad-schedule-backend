@@ -184,9 +184,12 @@ module.exports.deleteSchedule = async (req, res) => {
     // Extract group_id if needed
     const { group_id } = schedule;
 
+
+    await Schedule.destroy({ where: { schedule_id: id } });
+
+
     await pushToGroupQueue([group_id]);
     // Now delete the schedule
-    await Schedule.destroy({ where: { schedule_id: id } });
 
     res.json({ message: "Schedule deleted successfully", group_id });
   } catch (error) {
