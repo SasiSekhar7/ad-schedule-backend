@@ -1,6 +1,7 @@
 const express = require('express');
 const app = express();
 require('dotenv').config(); // Load environment variables from .env
+const path = require('path')
 
 
 const bodyParser = require('body-parser');
@@ -16,7 +17,6 @@ app.use(cors({corsOptions}))
 
 
 app.use('/api', router)
-
 
 
 

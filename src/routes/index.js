@@ -3,7 +3,7 @@ const { createClient, getAllClients, updateClient, deleteClient, getAllAds, getA
 const { Client, Ad, Schedule, Device } = require('../models');
 const { sendAdFile, sendAdDetails } = require('../controllers/adController');
 const { scheduleAd, deleteSchedule, updateSchedule, getPlaceholder } = require('../controllers/scheduleController');
-const { getFullSchedule, syncDevice, registerDevice, createGroup, getDeviceList, fetchGroups, getFullScheduleCalendar, addOrUpdateScrollText, addMessage, deleteMessage, updateGroupSchedule, getApkUrl, exitDevice, getWgtUrl } = require('../controllers/deviceController');
+const { getFullSchedule, syncDevice, registerDevice, createGroup, getDeviceList, fetchGroups, getFullScheduleCalendar, addOrUpdateScrollText, addMessage, deleteMessage, updateGroupSchedule, getApkUrl, exitDevice, getWgtUrl, getWgt } = require('../controllers/deviceController');
 const { addUser, getUserData } = require('../controllers/userController');
 const { login } = require('../controllers/authController');
 const router = express.Router();
@@ -15,7 +15,6 @@ const { sendOtp, verifyOtp } = require('../controllers/otpController');
 const { createCampaign, getCampaign, allCampaigns, updateCampaignWithCoupons, deleteCampaign, getCampaignCode, fetchCampaignInteractions } = require('../controllers/couponController');
 const { default: axios } = require('axios');
 const { fetchAllSeries, updateSeries, fetchUpcomingMatchesCricB } = require('../controllers/cricketController');
-
 router.post('/device/register', registerDevice) // takes group id and location input 
 
 
@@ -32,6 +31,10 @@ router.post('/login',  login)
 
 router.get('/download-apk',  getApkUrl)
 router.get('/download-wgt',  getWgtUrl)
+
+router.get('/wgt',  getWgt)
+
+
 
 
 router.post('/device/update/:id', validateToken,  registerDevice)

@@ -4,7 +4,7 @@ const { Ad, Device, Schedule, sequelize, DeviceGroup, ScrollText } = require("..
 const { addHours, setHours, setMinutes, formatISO } = require("date-fns");
 const { getBucketURL } = require("./s3Controller");
 const { Op, literal, fn } = require("sequelize");
-
+const path = require('path')
 const { pushToGroupQueue, convertToPushReadyJSON, exitDeviceAppliation } = require("./queueController");
 module.exports.getFullScheduleCalendar = async (req, res) => {
   try {
@@ -153,6 +153,28 @@ module.exports.getWgtUrl = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+const fs = require("fs");
+
+module.exports.getWgt = async (req, res) => {
+  try {
+    const filePath = path.join(__dirname, "..", "..", "assets", "adupPlayer.wgt");
+
+    // Check if file exists before sending
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: "File not found" });
+    }
+
+    // Optional: force download rather than displaying in browser
+    res.download(filePath, "adupPlayer.wgt"); // second argument sets the filename for the client
+
+    // Or if you prefer streaming it without download prompt:
+    // res.sendFile(filePath);
+  } catch (error) {
+    console.error("Error serving .wgt file:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
 module.exports.updateGroupSchedule = async (req, res) => {
   try {
     const {group_id} = req.params;
