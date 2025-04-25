@@ -109,6 +109,10 @@ const DeviceGroup = sequelize.define("DeviceGroup", {
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true,
   },
+  client_id: {
+    type: DataTypes.UUIDV4,
+    allowNull: false,
+  },
   reg_code: {
     type: DataTypes.STRING,
     allowNull: false,
@@ -475,6 +479,9 @@ Coupon.belongsTo(Campaign, { foreignKey: "campaign_id" });
 // A Client can have many Ads
 Client.hasMany(Ad, { foreignKey: "client_id" });
 Ad.belongsTo(Client, { foreignKey: "client_id" });
+
+Client.hasMany(DeviceGroup, { foreignKey: "client_id" });
+DeviceGroup.belongsTo(Client, { foreignKey: "client_id" });
 
 // An Ad can be scheduled on multiple Devices
 Ad.hasMany(Schedule, { foreignKey: "ad_id" });

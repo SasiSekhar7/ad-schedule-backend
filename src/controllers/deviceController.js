@@ -1,7 +1,7 @@
 const jwt = require("jsonwebtoken");
 const { getCustomUTCDateTime, getUTCDate } = require("../helpers");
 const { Ad, Device, Schedule, sequelize, DeviceGroup, ScrollText } = require("../models");
-const { addHours, setHours, setMinutes, formatISO } = require("date-fns");
+const { addHours, setHours, setMinutes, formatISO, addMinutes } = require("date-fns");
 const { getBucketURL } = require("./s3Controller");
 const { Op, literal, fn } = require("sequelize");
 const path = require('path')
@@ -213,6 +213,7 @@ console.log('device Exists',deviceExists)
     if (deviceExists) {
       await Device.update(
         {
+          group_id,
           location,
           status: "active",
           last_synced: getCustomUTCDateTime(),
@@ -336,7 +337,7 @@ module.exports.exitDevice = async (req, res) => {
 
 module.exports.createGroup = async (req, res) => {
   try {
-    const { name, reg_code } = req.body;
+    const { name, reg_code,  } = req.body;
 
     // Check if reg_code already exists
     const groupExists = await DeviceGroup.findOne({ where: { reg_code } });

@@ -17,30 +17,35 @@ module.exports.createClient = async(req, res) =>{
         return res.status(500).json({message: "Internal Server Error", error: error.message})
     }
 }
-module.exports.getAllAds = async(req, res) =>{
-    try {   
+
+module.exports.getAllAds = async (req, res) => {
+    try {
+        const whereClause = req.user && req.user.role === 'Client' && req.user.client_id
+            ? { client_id: req.user.client_id }
+            : {}; // Empty where clause for Admin to fetch all
+
         const ads = await Ad.findAll({
+            where: whereClause,
             include: { model: Client, attributes: ["name"] },
             raw: true,
             nest: true,
-          });
-          
-          // Flatten the Client name field
-          const flattenedAds = await Promise.all(
+        });
+
+        // Flatten the Client name field and get the bucket URL
+        const flattenedAds = await Promise.all(
             ads.map(async (ad) => ({
-              ...ad,
-              url: await getBucketURL(ad.url),
-              client_name: ad.Client?.name || null, // Extracts 'name' from 'Client' and puts it in 'client_name'
+                ...ad,
+                url: await getBucketURL(ad.url),
+                client_name: ad.Client?.name || null, // Extracts 'name' from 'Client'
             }))
-          );
-          
-        //   console.log(flattenedAds);
-        return res.status(200).json({ads:flattenedAds})
+        );
+
+        return res.status(200).json({ ads: flattenedAds });
     } catch (error) {
-        console.log(error);
-        return res.status(500).json({message: "Internal Server Error", error: error.message})
+        console.error("Error fetching ads:", error);
+        return res.status(500).json({ message: "Internal Server Error", error: error.message });
     }
-}
+};
 module.exports.getAllClients = async(req, res) =>{
     try {   
         const clients = await Client.findAll({

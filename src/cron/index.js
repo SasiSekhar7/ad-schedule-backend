@@ -1,7 +1,7 @@
 const cron = require('node-cron');
 const { DeviceGroup } = require('../models');
 const { pushToGroupQueue } = require('../controllers/queueController');
-const {updateUpcomingMatches, startLiveMatchStreaming } = require('../controllers/cricketController');
+const {updateUpcomingMatches } = require('../controllers/cricketController');
 
 // Function to be executed at 6 AM daily
 async function dailySchedulePush() {
@@ -23,20 +23,20 @@ cron.schedule('00 06 * * *', async() => {
     timezone: "Asia/Kolkata" // India timezone
 });
 
-cron.schedule('15 15 * * *', async() => {
-    // await updateUpcomingMatches();
-    await startLiveMatchStreaming();
+// cron.schedule('15 15 * * *', async() => {
+//     // await updateUpcomingMatches();
+//     await startLiveMatchStreaming();
 
-}, {
-    scheduled: true,
-    timezone: "Asia/Kolkata" // India timezone
-});
+// }, {
+//     scheduled: true,
+//     timezone: "Asia/Kolkata" // India timezone
+// });
 
-cron.schedule('15 19 * * *', async() => {
-    // await updateUpcomingMatches();
-    await startLiveMatchStreaming();
+// cron.schedule('15 19 * * *', async() => {
+//     // await updateUpcomingMatches();
+//     await startLiveMatchStreaming();
 
-}, {
-    scheduled: true,
-    timezone: "Asia/Kolkata" // India timezone
-});
+// }, {
+//     scheduled: true,
+//     timezone: "Asia/Kolkata" // India timezone
+// });

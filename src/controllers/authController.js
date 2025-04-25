@@ -28,7 +28,7 @@ module.exports.login = async (req, res) => {
             { expiresIn:"1d" }
         );
 
-        res.json({ message: "Login successful", token });
+        res.json({ message: "Login successful", token});
 
     } catch (error) {
         console.error(error);
