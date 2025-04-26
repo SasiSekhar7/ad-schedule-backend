@@ -1,9 +1,9 @@
 const jwt = require("jsonwebtoken");
 const { getCustomUTCDateTime, getUTCDate } = require("../helpers");
-const { Ad, Device, Schedule, sequelize, DeviceGroup, ScrollText } = require("../models");
+const { Ad, Device, Schedule, sequelize, DeviceGroup, ScrollText, Client } = require("../models");
 const { addHours, setHours, setMinutes, formatISO, addMinutes } = require("date-fns");
 const { getBucketURL } = require("./s3Controller");
-const { Op, literal, fn } = require("sequelize");
+const { Op, literal, fn, col } = require("sequelize");
 const path = require('path')
 const { pushToGroupQueue, convertToPushReadyJSON, exitDeviceAppliation } = require("./queueController");
 module.exports.getFullScheduleCalendar = async (req, res) => {
@@ -51,23 +51,28 @@ module.exports.getFullScheduleCalendar = async (req, res) => {
 };
 module.exports.getFullSchedule = async (req, res) => {
   try {
-    let { page = 1, limit = 10, date } = req.query; 
+    let { page = 1, limit = 10, date } = req.query;
     page = parseInt(page);
     limit = parseInt(limit);
-    
+
     const whereClause = {};
-    
+
     if (date) {
       whereClause.start_time = {
         [Op.between]: [`${date} 00:00:00`, `${date} 23:59:59`]
       };
     }
 
+    // Add client_id filter if the user is a Client
+    if (req.user && req.user.role === 'Client' && req.user.client_id) {
+      whereClause['$DeviceGroup.client_id$'] = req.user.client_id;
+    }
+
     const { count, rows: schedules } = await Schedule.findAndCountAll({
       where: whereClause,
       include: [
         { model: Ad, attributes: ["name"] },
-        { model: DeviceGroup, attributes: ["name"] },
+        { model: DeviceGroup, attributes: ["name", "client_id"] }, // Include client_id from DeviceGroup
       ],
       order: [["start_time", "DESC"]],
       limit,
@@ -76,7 +81,7 @@ module.exports.getFullSchedule = async (req, res) => {
 
     const result = schedules.map((schedule) => {
       const { Ad, DeviceGroup, ...data } = schedule.dataValues;
-      return { ...data, ad_name: Ad.name, group_name: DeviceGroup.name };
+      return { ...data, ad_name: Ad.name, group_name: DeviceGroup.name, client_id: DeviceGroup.client_id }; // Include client_id in the result
     });
 
     res.json({ schedules: result, total: count, page, limit });
@@ -100,30 +105,33 @@ async function getAddressFromCoordinates(lat, lon) {
 
 module.exports.getDeviceList = async (req, res) => {
   try {
+    const whereClause = req.user && req.user.role === 'Client' && req.user.client_id
+      ? { client_id: req.user.client_id }
+      : {}; // Empty where clause for Admin to fetch all
+
     const devices = await Device.findAll({
       include: {
         model: DeviceGroup,
         attributes: ["name", "last_pushed"],
+        where: whereClause, // Apply the whereClause to DeviceGroup
+        required: true, // Only include devices that belong to a group matching the whereClause
       },
       raw: true,
       nest: true,
     });
 
     // Process each device and add status + location
-    const deviceList = await Promise.all(
-      devices.map(async (device) => {
-        const last_synced = device.last_synced;
-        const last_pushed = device.DeviceGroup?.last_pushed || null;
-        const group_name = device.DeviceGroup?.name || null;
+    const deviceList = devices.map((device) => {
+      const last_synced = device.last_synced;
+      const last_pushed = device.DeviceGroup?.last_pushed || null;
+      const group_name = device.DeviceGroup?.name || null;
 
-
-        return {
-          ...device,
-          group_name,
-          status: last_pushed && last_synced < last_pushed ? "offline" : "active",
-        };
-      })
-    );
+      return {
+        ...device,
+        group_name,
+        status: last_pushed && last_synced < last_pushed ? "offline" : "active",
+      };
+    });
 
     res.json({ devices: deviceList });
   } catch (error) {
@@ -131,7 +139,6 @@ module.exports.getDeviceList = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
-
 
 
 module.exports.getApkUrl = async (req, res) => {
@@ -337,17 +344,21 @@ module.exports.exitDevice = async (req, res) => {
 
 module.exports.createGroup = async (req, res) => {
   try {
-    const { name, reg_code,  } = req.body;
+    let { name, reg_code, client_id } = req.body;
+
+    if(req.user.role != 'Admin') {
+      client_id = req.user.client_id;
+    }
 
     // Check if reg_code already exists
-    const groupExists = await DeviceGroup.findOne({ where: { reg_code } });
+    const groupExists = await DeviceGroup.findOne({ where: { reg_code, client_id } });
 
     if (groupExists) {
       return res.status(400).json({ message: "License key already in use." });
     }
 
     // Create the group
-    const group = await DeviceGroup.create({ name, reg_code });
+    const group = await DeviceGroup.create({ name, reg_code , client_id });
 
     return res.status(201).json({ message: "Group created successfully", group });
   } catch (error) {
@@ -356,7 +367,78 @@ module.exports.createGroup = async (req, res) => {
   }
 };
 
+/**
+ * @typedef {object} Group
+ * @property {string} group_id
+ * @property {string} name
+ * @property {string} reg_code
+ * @property {number} device_count
+ * @property {string|null} message
+ * @property {object|null} Client - The associated Client object
+ * @property {string} Client.client_id
+ * @property {string} Client.name - The name of the client
+ * // Add other Client properties as needed
+ */
+
 module.exports.fetchGroups = async (req, res) => {
+  try {
+    const whereClause = req.user && req.user.role === 'Client' && req.user.client_id
+      ? { client_id: req.user.client_id }
+      : {}; // Empty where clause for Admin to fetch all
+
+    const groups = await DeviceGroup.findAll({
+      attributes: [
+        "group_id",
+        "name",
+        "reg_code",
+        "client_id", // Include client_id from DeviceGroup
+        [fn("COUNT", col("Devices.device_id")), "device_count"],
+      ],
+      where: whereClause,
+      include: [
+        {
+          model: Device,
+          attributes: [],
+        },
+        {
+          model: ScrollText,
+          attributes: ["message"],
+          required: false,
+        },
+        {
+          model: Client,
+          attributes: ["client_id", "name"], // Include client_id and name from Client
+          required: false, // Make Client association optional
+        },
+      ],
+      group: ["DeviceGroup.group_id", "ScrollText.scrolltext_id", "Client.client_id"], // Include Client.client_id in the group by
+      raw: true,
+      nest: true,
+    });
+
+    /** @type {Group[]} */
+    const formattedGroups = groups.map((group) => ({
+      group_id: group.group_id,
+      name: group.name,
+      reg_code: group.reg_code,
+      device_count: parseInt(group.device_count, 10),
+      message: group.ScrollText ? group.ScrollText.message : null,
+      Client: group.Client
+        ? {
+            client_id: group.Client.client_id,
+            name: group.Client.name,
+            // Add other Client properties here if needed
+          }
+        : null,
+    }));
+
+    return res.status(200).json({ groups: formattedGroups });
+  } catch (error) {
+    console.error("Error fetching groups:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+module.exports.fetchGroupsOld = async (req, res) => {
   try {
     const today = new Date(getCustomUTCDateTime());
 
@@ -394,6 +476,7 @@ module.exports.fetchGroups = async (req, res) => {
           "device_count",
         ],
       ],
+
       include: [
         {
           model: Device,
@@ -408,6 +491,7 @@ module.exports.fetchGroups = async (req, res) => {
           attributes: ["total_duration"],
           required: false, // <-- Allows groups without schedules to be included
           where: {
+
             start_time: {
               [Op.between]: [startOfDay, endOfDay],
             },
