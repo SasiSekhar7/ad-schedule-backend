@@ -1,4 +1,4 @@
-const { User } = require("../models");
+const { User,Client } = require("../models");
 const bcrypt = require("bcrypt");
 
 const saltRounds = 10;
@@ -27,6 +27,48 @@ module.exports.addUser = async (req, res) => {
   }
 };
 
+module.exports.getAllusers = async (req, res) => {
+  try {
+    const users = await User.findAll({
+      attributes: ['user_id', 'name', 'email', 'role', 'phone_number'], 
+      include: [
+        {
+          model: Client,
+          attributes: ['name'],
+        },
+      ],
+    });
+    const formattedUsers = users.map(user => ({
+      ...user.toJSON(),
+      client_name: user.Client?.name || '',
+    }));
+
+    res.json({ users: formattedUsers });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+module.exports.deleteUser = async (req, res) => {
+  try {
+    const userId = req.params.user_id;
+
+    const user = await User.findOne({ where: { user_id: userId } });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    await User.destroy({ where: { user_id: userId } });
+
+    return res.json({ message: "User deleted successfully." });
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
 module.exports.getUserData = async (req, res) => {
   try {
     const { user_id } = req.user;
@@ -42,6 +84,14 @@ module.exports.getUserData = async (req, res) => {
 
     // Define nav structures
     const navMainAdmin = [
+      {
+        title:"Users",
+        url: "/users",
+        icon: "Users",
+        items: [
+          { title: "All", url: "/user/all" }
+        ]
+      },
       {
         title: "Devices ",
         url: "/devices",

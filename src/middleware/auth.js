@@ -32,3 +32,11 @@ module.exports.validateDeviceToken = (req, res, next) => {
         return res.status(403).json({ message: "Forbidden: Invalid or expired token" });
     }
 };
+
+module.exports.validateAdmin = (req, res, next) => {
+    if (req.user.role !== 'Admin') {
+        return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
+    next();
+};
+
