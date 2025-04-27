@@ -157,7 +157,8 @@ module.exports.getUserData = async (req, res) => {
         url: "/schedule",
         icon: "BookOpen",
         items: [
-          { title: "View", url: "/schedule" }
+          { title: "All", url: "/schedule" },
+          { title: "Add", url: "/schedule/add" },
         ]
       }
     ];
