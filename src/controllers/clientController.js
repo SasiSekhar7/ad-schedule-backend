@@ -1,4 +1,4 @@
-const { fn, col } = require("sequelize");
+const { Op, fn, col } = require("sequelize");
 const { Client, Ad, Schedule, Device, DeviceGroup } = require("../models");
 const { getBucketURL } = require("./s3Controller");
 
@@ -105,27 +105,57 @@ module.exports.deleteClient = async(req, res) =>{
 }
 
 
-module.exports.getAllDetails = async(req, res) =>{
+module.exports.getAllDetails = async (req, res) => {
     try {
-        const devicesCount = await Device.count();
-        const deviceGroupsCount = await DeviceGroup.count();
-        const adsCount = await Ad.count();
-        const clientsCount = await Client.count();
-        const schedulesCount = await Schedule.count();
-        
-        const response = {
-          devices: devicesCount,
-          deviceGroups: deviceGroupsCount,
-          ads: adsCount,
-          clients: clientsCount,
-          schedules: schedulesCount,
-        };
-        
-        console.log(response);
-        
-        return res.status(200).json({message: "Client Deleted Successfully ", data: response})
+      const whereClause = req.user && req.user.role === 'Client' && req.user.client_id
+        ? { client_id: req.user.client_id }
+        : {};
+  
+      const devicesCount = await Device.count({
+        include: [{
+          model: DeviceGroup,
+          where: whereClause,
+          attributes: [], 
+        }]
+      });
+  
+      const deviceGroupsCount = await DeviceGroup.count({ where: whereClause });
+
+      const adsCount = await Ad.count({ where: whereClause });
+      const schedulesCount = await Schedule.count({
+        include: [{
+          model: DeviceGroup,
+          where: whereClause,
+          attributes: [], 
+        }]
+      });
+      
+  
+      let clientsCount = 0;
+      if (req.user.role === "Admin") {
+        clientsCount = await Client.count();
+      }
+  
+      const response = {
+        devices: devicesCount,
+        deviceGroups: deviceGroupsCount,
+        ads: adsCount,
+        clients: clientsCount,
+        schedules: schedulesCount,
+      };
+  
+      console.log(response);
+  
+      return res.status(200).json({
+        message: "Dashboard data fetched successfully",
+        data: response
+      });
     } catch (error) {
-        console.log(error);
-        return res.status(500).json({message: "Internal Server Error", error: error.message})
+      console.error(error);
+      return res.status(500).json({ message: "Internal Server Error", error: error.message });
     }
-}
+  };
+  
+
+  
+

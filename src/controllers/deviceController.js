@@ -327,6 +327,26 @@ module.exports.exitDevice = async (req, res) => {
     if (!id) {
       return res.status(400).json({ error: "Device ID is required" });
     }
+    if (req.user.role != 'Admin') {
+      const device = await Device.findOne({ 
+        include: { 
+          model: DeviceGroup,
+          attributes: ["group_id","client_id"],
+
+           // Ensure the group_id matches the client's ID
+        },
+
+        where: { device_id: id }
+      }
+  )
+      if (!device) {
+        return res.status(404).json({ error: "Device not found or not authorized" });
+      }
+      if (device.DeviceGroup.client_id != req.user.client_id) {
+        return res.status(403).json({ error: "Unauthorized access" });
+      }
+    }
+
     
     await exitDeviceAppliation(id);
 
