@@ -113,15 +113,15 @@ module.exports.convertToPushReadyJSON = async (group_id, placeholder= null) => {
   });
 
   const matchData  = await SelectedSeries.findOne({attributes:['match_list'], where:{series_name:'IPL'}});
-  const matchList = matchData.match_list;
+  const matchList = matchData?.match_list;
 
-  console.log(typeof matchList)
-  // Extract the message if found, otherwise set a default value
   scrollingMessage = message
     ? message.message
     : "AdUp By demokrito Contact 98987687876";
 
-  scrollingMessage = `${scrollingMessage} | Upcoming Fixtures: ${matchList}`;
+  if(matchList){
+    scrollingMessage = `${scrollingMessage} | Upcoming Fixtures: ${matchList}`;
+  }
 
   // Remove null ads (failed URL fetch)
   const validAds = ads.filter((ad) => ad !== null);
