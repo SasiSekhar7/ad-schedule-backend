@@ -106,10 +106,32 @@ module.exports.changePlaceholder = async (req, res) => {
         res.status(500).json({ message: "Internal Server Error" });
     }
 };
-module.exports.addAd = async(req, res)=>{
+module.exports.addAd = async (req, res) => {
     try {
-        const {client_id, name, duration } = req.body;
-       
+        let { client_id, name, duration } = req.body;
+
+        // If client_id is missing and user is a Client, use their client_id
+        if (!client_id && req.user.role === 'Client') {
+            client_id = req.user.client_id;
+        }
+
+        // General validation
+        if (!client_id) {
+            return res.status(400).json({ message: "client_id is required." });
+        }
+
+        if (!name || typeof name !== 'string' || name.trim() === '') {
+            return res.status(400).json({ message: "Valid name is required." });
+        }
+
+        if (!duration || isNaN(duration) || Number(duration) <= 0) {
+            return res.status(400).json({ message: "Valid duration (positive number) is required." });
+        }
+
+        if (!req.file) {
+            return res.status(400).json({ message: "File is required." });
+        }
+
         const newKey = `ad-${Date.now()}${path.extname(req.file.originalname)}`;
         const uploadParams = {
             Bucket: bucketName,
@@ -121,22 +143,20 @@ module.exports.addAd = async(req, res)=>{
         const uploadCommand = new PutObjectCommand(uploadParams);
         await s3.send(uploadCommand);
 
-        
         const ad = await Ad.create({
             client_id,
             name,
-            url:newKey,
+            url: newKey,
             duration,
-        })
+        });
 
-        return res.status(200).json({message: "Ad Created Successfully ", ad})
+        return res.status(200).json({ message: "Ad Created Successfully", ad });
 
     } catch (error) {
-        console.log(error);
-        return res.status(500).json({message: "Internal Server Error dsdsd", error: error.message})
-
+        console.error(error);
+        return res.status(500).json({ message: "Internal Server Error", error: error.message });
     }
-}
+};
 
 module.exports.deleteAd = async(req, res)=>{
     try {
