@@ -7,10 +7,11 @@ const {
   setMinutes,
   formatISO,
   addDays,
+  format,
 } = require("date-fns");
 const { pushToGroupQueue } = require("./queueController");
 const { getBucketURL } = require("./s3Controller");
-const { default: axios } = require("axios");
+const { updateImpressionsTable } = require('../services/impressionCalculator'); // Adjust path
 
 module.exports.scheduleAd2 = async (req, res) => {
   try {
@@ -98,8 +99,7 @@ module.exports.scheduleAd2 = async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 };
-
-module.exports.scheduleAd = async (req, res) => {
+module.exports.scheduleAd_alt = async (req, res) => {
   try {
     const { ad_id, start_time, end_time, total_duration, priority, groups } =
       req.body;
@@ -153,6 +153,100 @@ module.exports.scheduleAd = async (req, res) => {
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+// controllers/scheduleController.js (example path)
+// Assume pushToGroupQueue is defined elsewhere
+
+module.exports.scheduleAd = async (req, res) => {
+  try {
+    const { ad_id, start_time, end_time, total_duration, priority, groups } =
+      req.body;
+
+      if (
+        !ad_id ||
+        !start_time ||
+        !end_time ||
+        !total_duration ||
+        !priority ||
+        !groups
+      ) {
+        return res.status(400).json({ error: "Missing required parameters" });
+      }
+
+    const overallStartDate = parseISO(start_time);
+    const overallEndDate = parseISO(end_time);
+
+    let schedules = [];
+    // Store unique dates and groups for summary update
+    const affectedDates = new Set();
+    const affectedGroupIds = new Set(groups); // Use Set for unique group IDs
+
+    let tempCurrentDay = new Date(overallStartDate); // Use a temp var for schedule generation loop
+
+    // --- [Loop to generate schedule entries as before] ---
+    while (
+      isBefore(tempCurrentDay, overallEndDate) ||
+      tempCurrentDay.toDateString() === overallEndDate.toDateString()
+    ) {
+      const dayStart = setHours(setMinutes(new Date(tempCurrentDay), 0), 6); // 6:00 AM
+      const dayEnd = setHours(setMinutes(new Date(tempCurrentDay), 0), 22); // 10:00 PM
+
+      affectedDates.add(format(tempCurrentDay, 'yyyy-MM-dd')); // Add the date string for summary update
+
+      groups.forEach((group_id) => {
+        schedules.push({
+          ad_id,
+          group_id: group_id,
+          start_time: formatISO(dayStart),
+          end_time: formatISO(dayEnd),
+          total_duration: parseInt(total_duration),
+          priority,
+        });
+      });
+      tempCurrentDay = addDays(tempCurrentDay, 1); // Move to next day
+    }
+    // --- [End of schedule generation loop] ---
+
+
+    // ---> Perform the bulkCreate within a transaction if possible, although not strictly necessary here
+    const createdSchedules = await Schedule.bulkCreate(schedules);
+    console.log(`Successfully created ${createdSchedules.length} schedule entries.`);
+
+    // ---> Update the DailyImpressionSummary table
+    console.log(`Triggering impression summary update for ${affectedDates.size} dates and ${affectedGroupIds.size} groups...`);
+    // Iterate through each affected group
+    for (const groupId of affectedGroupIds) {
+        // Iterate through each affected date
+        for (const dateString of affectedDates) {
+             console.log(`Updating summary for group ${groupId} on date ${dateString}...`);
+             try {
+                 // Call the update function for each specific group and date combination
+                 await updateImpressionsTable(dateString, { groupId: groupId });
+             } catch (summaryError) {
+                 // Log error but don't fail the entire request
+                 console.error(`Error updating summary table for group ${groupId} on ${dateString}:`, summaryError);
+                 // Optional: Add more robust error tracking/alerting here
+             }
+        }
+    }
+    console.log('Finished triggering impression summary updates.');
+    // --- [End of summary update section] ---
+
+    // ---> Push to device queue (if needed)
+    // Consider if pushToGroupQueue should happen before or after summary update
+    await pushToGroupQueue(groups);
+
+    return res.json({
+      message: "Schedules Added Successfully",
+      schedules: createdSchedules,
+    });
+  } catch (error) {
+    console.error('Error in scheduleAd endpoint:', error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+// --- Other controller methods ---
 module.exports.updateSchedule = async (req, res) => {
   try {
     if (!req.params || !req.body) {
@@ -166,7 +260,7 @@ module.exports.updateSchedule = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
-module.exports.deleteSchedule = async (req, res) => {
+module.exports.deleteSchedule_alt = async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -197,7 +291,60 @@ module.exports.deleteSchedule = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+// controllers/scheduleController.js (example path)
 
+// ... (imports as before, including updateImpressionsTable and date-fns/format) ...
+
+module.exports.deleteSchedule = async (req, res) => {
+  try {
+    const { id } = req.params; // schedule_id
+
+    if (!id) {
+      return res.status(400).json({ error: "Missing required parameter: id" });
+    }
+
+    // Find the schedule entry first to get its details
+    const scheduleToDelete = await Schedule.findOne({ where: { schedule_id: id } });
+
+    if (!scheduleToDelete) {
+      return res.status(404).json({ error: "Schedule not found" });
+    }
+
+    // ---> Capture necessary info BEFORE deleting
+    const affectedGroupId = scheduleToDelete.group_id;
+    // The start_time of this specific schedule entry represents the affected date
+    const affectedDate = scheduleToDelete.start_time; // This is likely a Date object or ISO string
+    const affectedDateString = format(affectedDate, 'yyyy-MM-dd'); // Format for consistency
+
+    // ---> Now delete the schedule entry
+    await Schedule.destroy({ where: { schedule_id: id } });
+    console.log(`Successfully deleted schedule entry ${id}.`);
+
+
+    // ---> Update the DailyImpressionSummary table for the affected date and group
+    console.log(`Triggering impression summary update for group ${affectedGroupId} on date ${affectedDateString} due to deletion...`);
+    try {
+        await updateImpressionsTable(affectedDateString, { groupId: affectedGroupId });
+        console.log(`Summary update for ${affectedDateString} triggered.`);
+    } catch (summaryError) {
+        // Log error but don't necessarily fail the request
+        console.error(`Error updating summary table for group ${affectedGroupId} on ${affectedDateString} after deletion:`, summaryError);
+        // Optional: Add more robust error tracking/alerting here
+    }
+    // --- [End of summary update section] ---
+
+    // ---> Push to device queue
+    await pushToGroupQueue([affectedGroupId]);
+
+
+    res.json({ message: "Schedule deleted successfully", deleted_schedule_id: id, affected_group_id: affectedGroupId });
+  } catch (error) {
+    console.error("Error deleting schedule:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// --- Other controller methods ---
 module.exports.getPlaceholder = async (req, res) => {
   try {
     const url = await getBucketURL("placeholder.jpg");

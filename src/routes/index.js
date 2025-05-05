@@ -12,6 +12,7 @@ const {validateToken, validateDeviceToken, validateAdmin} = require('../middlewa
 const { sendOtp, verifyOtp } = require('../controllers/otpController');
 const { createCampaign, getCampaign, allCampaigns, updateCampaignWithCoupons, deleteCampaign, getCampaignCode, fetchCampaignInteractions } = require('../controllers/couponController');
 const { updateSeries } = require('../controllers/cricketController');
+const { getAdPerformanceTable, getGroupPerformanceTable, getStats } = require('../controllers/dashboardController');
 
 
 router.post('/device/register', registerDevice) // takes group id and location input 
@@ -53,6 +54,12 @@ router.post('/device/update-schedule/:group_id', validateToken,  updateGroupSche
 
 
 router.get('/dashboard', validateToken,  getAllDetails);
+router.get('/dashboard/stats', validateToken,  getStats);
+
+router.get('/dashboard/ads/table', validateToken,  getAdPerformanceTable);
+
+router.get('/dashboard/groups/table',  validateToken, getGroupPerformanceTable);
+
 
 
 router.post('/device/create-group', validateToken,  createGroup); // only takes name as input 

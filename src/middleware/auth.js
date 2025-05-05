@@ -12,7 +12,8 @@ module.exports.validateToken = (req, res, next) => {
         req.user = decoded; // Attach payload data to req.user
         next(); // Proceed to the next middleware/controller
     } catch (error) {
-        return res.status(403).json({ message: "Forbidden: Invalid or expired token" });
+        console.log(error)
+        return res.status(401).json({ message: "Unauthorized: No token provided" });
     }
 };
 
@@ -29,7 +30,8 @@ module.exports.validateDeviceToken = (req, res, next) => {
         req.device = decoded; // Attach payload data to req.user
         next(); // Proceed to the next middleware/controller
     } catch (error) {
-        return res.status(403).json({ message: "Forbidden: Invalid or expired token" });
+        console.log(error)
+        return res.status(401).json({ message: "Unauthorized: No token provided" });
     }
 };
 

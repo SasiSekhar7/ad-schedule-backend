@@ -123,7 +123,7 @@ const DeviceGroup = sequelize.define("DeviceGroup", {
   },
   last_pushed: {
     type: DataTypes.DATE,
-    allowNull:true,
+    allowNull: true,
   },
   created_at: {
     type: DataTypes.DATE,
@@ -447,19 +447,111 @@ const SelectedSeries = sequelize.define("SelectedSeries", {
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true,
   },
-  series_name:{
+  series_name: {
     type: DataTypes.STRING,
-    allowNull: false
+    allowNull: false,
   },
-  match_list:{
+  match_list: {
     type: DataTypes.STRING,
-    allowNull: true
+    allowNull: true,
   },
-  live_match_id:{
+  live_match_id: {
     type: DataTypes.UUID,
-    allowNull: true
-  }
+    allowNull: true,
+  },
 });
+
+const DailyImpressionSummary = sequelize.define(
+  "DailyImpressionSummary",
+  {
+    summary_id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    summary_date: {
+      type: DataTypes.DATEONLY, // Important: Stores only the date part (YYYY-MM-DD)
+      allowNull: false,
+      comment: "The date for which impressions are calculated",
+    },
+    group_id: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      comment: "Foreign key to DeviceGroup",
+      references: {
+        // Optional: Define FK relationship if using associations
+        model: "DeviceGroups", // Assumes your DeviceGroup model's table name is 'DeviceGroups'
+        key: "group_id",
+      },
+    },
+    ad_id: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      comment: "Foreign key to Ad",
+      references: {
+        // Optional: Define FK relationship
+        model: "Ads", // Assumes your Ad model's table name is 'Ads'
+        key: "ad_id",
+      },
+    },
+    client_id: {
+      type: DataTypes.UUID, // Store client_id directly for easier filtering
+      allowNull: false,
+      comment: "Client associated with the group/ad",
+      references: {
+        // Optional: Define FK relationship
+        model: "Clients", // Assuming you have a Clients table/model
+        key: "client_id",
+      },
+    },
+    device_count: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      comment: "Number of devices in the group active/associated on that day",
+    },
+    total_loop_duration_seconds: {
+      type: DataTypes.INTEGER,
+      allowNull: false, // Or true if a loop could validly have 0 duration (excluding placeholder)
+      comment:
+        "Total duration (in seconds) of one full playlist loop for this group on this day",
+    },
+    loops_per_day: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      comment:
+        "Calculated theoretical loops for the group's playlist on that day (based on 24h)",
+    },
+    impressions: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      comment:
+        "Calculated theoretical impressions (loops_per_day * device_count)",
+    },
+    // Standard Timestamps
+    // created_at and updated_at are added automatically by timestamps: true
+  },
+  {
+    // Sequelize options
+    timestamps: true, // Automatically adds created_at and updated_at
+    tableName: "DailyImpressionSummaries", // Explicit table name
+    indexes: [
+      // Unique constraint to prevent duplicate entries per ad/group/day
+      {
+        unique: true,
+        fields: ["summary_date", "group_id", "ad_id"],
+        name: "daily_group_ad_unique",
+      },
+      // Index for common filtering scenarios
+      { fields: ["summary_date"] },
+      { fields: ["client_id"] },
+      { fields: ["group_id"] },
+      { fields: ["ad_id"] },
+    ],
+  }
+);
+
+DailyImpressionSummary.belongsTo(DeviceGroup, { foreignKey: 'group_id' });
+DailyImpressionSummary.belongsTo(Ad, { foreignKey: 'ad_id' });
 
 // Define Associations
 Client.hasMany(Campaign, { foreignKey: "client_id" });
@@ -473,7 +565,7 @@ Campaign.hasMany(CampaignInteraction, { foreignKey: "campaign_id" });
 CampaignInteraction.belongsTo(Campaign, { foreignKey: "campaign_id" });
 
 // A Campaign has one Coupon (adjust to hasMany if needed)
-Campaign.hasMany(Coupon, { foreignKey: "campaign_id" ,as: "coupons" });
+Campaign.hasMany(Coupon, { foreignKey: "campaign_id", as: "coupons" });
 Coupon.belongsTo(Campaign, { foreignKey: "campaign_id" });
 
 // A Client can have many Ads
@@ -522,5 +614,6 @@ module.exports = {
   Campaign,
   Coupon,
   CampaignInteraction,
-  SelectedSeries
+  SelectedSeries,
+  DailyImpressionSummary
 };
