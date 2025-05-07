@@ -231,28 +231,43 @@ module.exports.pushToCricketQueue = async (matchData ) => {
     console.error("❌ Error in pushToGroupQueue:", error);
   }
 };
-mqttClient.on("message", async (topic, message) => {
+const deviceUpdateQueue = new Map(); // android_id => timestamp
+const BATCH_INTERVAL_MS = 60000;
+
+// Batch processing loop
+setInterval(async () => {
+  if (deviceUpdateQueue.size === 0) return;
+
+  const updates = Array.from(deviceUpdateQueue.entries());
+  deviceUpdateQueue.clear();
+
+  const now = getCustomUTCDateTime(); // or new Date().toISOString()
+
+  const promises = updates.map(([android_id]) =>
+    Device.update(
+      { last_synced: now },
+      { where: { android_id } }
+    ).catch(err => {
+      console.error(`Failed to update ${android_id}:`, err);
+    })
+  );
+
+  await Promise.allSettled(promises);
+  console.log(`Batch update: ${updates.length} devices at ${now}`);
+}, BATCH_INTERVAL_MS);
+
+// On MQTT message
+mqttClient.on("message", (topic, message) => {
   if (topic === "device/sync") {
     try {
       const payload = JSON.parse(message);
       const { android_id } = payload;
 
-      const [updatedCount] = await Device.update(
-        { last_synced: getCustomUTCDateTime() },
-        { where: { android_id } }
-      );
-
-      if (updatedCount > 0) {
-        console.log(
-          `Device with android_id ${android_id} updated with last_synced ${getCustomUTCDateTime()}`
-        );
-      } else {
-        console.warn(
-          `No device found with android_id ${android_id} to update.`
-        );
+      if (android_id) {
+        deviceUpdateQueue.set(android_id, Date.now()); // deduplicated
       }
-    } catch (error) {
-      console.error("Error processing device/sync message:", error);
+    } catch (err) {
+      console.error("Invalid JSON or malformed payload:", err);
     }
   }
 });
