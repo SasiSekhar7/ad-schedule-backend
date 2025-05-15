@@ -32,7 +32,6 @@ router.post('/login',  login)
 router.get('/download-apk',  getApkUrl)
 router.get('/download-wgt',  getWgtUrl)
 
-router.get('/wgt',  getWgt)
 
 
 
