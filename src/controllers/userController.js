@@ -183,6 +183,7 @@ module.exports.getUserData = async (req, res) => {
         items: [
           { title: "All", url: "/schedule" },
           { title: "Add", url: "/schedule/add" },
+          { title: "Placeholder", url: "/schedule/placeholder" }
         ]
       }
     ];
