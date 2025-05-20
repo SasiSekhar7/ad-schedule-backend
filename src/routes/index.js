@@ -3,7 +3,7 @@ const { createClient, getAllClients, updateClient, deleteClient, getAllAds, getA
 const { sendAdFile, sendAdDetails } = require('../controllers/adController');
 const { scheduleAd, deleteSchedule, updateSchedule, getPlaceholder } = require('../controllers/scheduleController');
 const { getFullSchedule, syncDevice, registerDevice, createGroup, getDeviceList, fetchGroups, getFullScheduleCalendar, addMessage, deleteMessage, updateGroupSchedule, getApkUrl, exitDevice, getWgtUrl, getWgt } = require('../controllers/deviceController');
-const { addUser, getUserData , getAllusers , deleteUser } = require('../controllers/userController');
+const { addUser, getUserData , getAllusers , deleteUser, getAccountInfo, updateAccountInfo, resetPass } = require('../controllers/userController');
 const { login } = require('../controllers/authController');
 const router = express.Router();
 const {upload, uploadMiddleware} = require('../middleware/s3multer');
@@ -120,5 +120,7 @@ router.post('/user/add', validateToken,validateAdmin, addUser)
 router.get('/user/data', validateToken, getUserData)
 router.get('/user/all', validateToken,validateAdmin, getAllusers)
 router.delete('/user/:user_id', validateToken,validateAdmin, deleteUser);
-
+router.get('/user/account', validateToken, getAccountInfo);
+router.put('/user/update',validateToken,updateAccountInfo);
+router.post('/user/reset/:userId',validateToken,validateAdmin,resetPass);
 module.exports = router;  

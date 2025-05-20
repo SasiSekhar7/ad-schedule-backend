@@ -1,4 +1,4 @@
-const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
+const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand ,HeadObjectCommand} = require("@aws-sdk/client-s3");
 const path = require('path');
 const { Ad, DeviceGroup } = require("../models");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
@@ -19,24 +19,29 @@ const s3 = new S3Client({
     
  })
 
-module.exports.getBucketURL = async (fileName) => {
-     try {
-         
-             const getParams = {
-                 Bucket: bucketName,
-                 Key: fileName
-             }
 
- 
-             const getCommand = new GetObjectCommand(getParams);
-             const url  = await getSignedUrl(s3, getCommand, {expiresIn:600});
-             return url;
- 
-     } catch (error) {
-         console.error(error);
-         return null;
-     }
- };
+module.exports.getBucketURL = async (fileName) => {
+    try {
+
+        const headParams = {
+            Bucket: bucketName,
+            Key: fileName,
+        };
+
+        await s3.send(new HeadObjectCommand(headParams)); // throws if object doesn't exist
+        const getCommand = new GetObjectCommand(headParams);
+        const url = await getSignedUrl(s3, getCommand, { expiresIn: 600 });
+        return url;
+    } catch (error) {
+        if (error.name === "NotFound" || error.$metadata?.httpStatusCode === 404) {
+            console.warn(`S3 file not found: ${fileName}`);
+        } else {
+            console.error("S3 getBucketURL error:", error.message);
+        }
+        return null;
+    }
+};
+
 
  module.exports.changeFile = async (req, res) => {
     try {
@@ -82,30 +87,51 @@ module.exports.getBucketURL = async (fileName) => {
         return res.status(500).json({ message: "Internal Server Error!" });
     }
 };
+
+
+
 module.exports.changePlaceholder = async (req, res) => {
     try {
-         const uploadParams = {
-                    Bucket: bucketName,
-                    Key: 'placeholder.jpg',
-                    Body: req.file.buffer,
-                    ContentType: req.file.mimetype,
-                };
-        
-                const uploadCommand = new PutObjectCommand(uploadParams);
-                await s3.send(uploadCommand);
+        const clientId = req.user?.client_id;
 
-                const groups = await DeviceGroup.findAll({attributes:['group_id']})
+        if (!clientId) {
+            return res.status(400).json({ message: "client_id not found in request" });
+        }
 
-                const groupIds = groups.map(grp=>grp.group_id);
-                const placeholder = await this.getBucketURL('placeholder.jpg');
-                await pushToGroupQueue(groupIds, placeholder );
-                
-        res.json({message: "Placeholder Changed successfully"});
+        if (!req.file) {
+            return res.status(400).json({ message: "No file uploaded" });
+        }
+
+        // Upload file to client's folder in S3
+        const uploadParams = {
+            Bucket: bucketName,
+            Key: `${clientId}/placeholder.jpg`,
+            Body: req.file.buffer,
+            ContentType: req.file.mimetype,
+        };
+
+        const uploadCommand = new PutObjectCommand(uploadParams);
+        await s3.send(uploadCommand);
+
+        // Find all groups for this client to notify about placeholder change
+        const groups = await DeviceGroup.findAll({ where: { client_id: clientId }, attributes: ['group_id'] });
+        const groupIds = groups.map(grp => grp.group_id);
+
+        // Get the new placeholder URL
+        const placeholderUrl = await getBucketURL(`${clientId}/placeholder.jpg`);
+
+        // Push to group queue with updated placeholder URL
+        await pushToGroupQueue(groupIds, placeholderUrl);
+
+        res.json({ message: "Placeholder changed successfully" });
     } catch (error) {
-        console.error("Error changing placeholder:", error);
+        console.error("Error changing placeholder:", error.message, error.stack);
         res.status(500).json({ message: "Internal Server Error" });
     }
 };
+
+
+
 module.exports.addAd = async (req, res) => {
     try {
         let { client_id, name, duration } = req.body;

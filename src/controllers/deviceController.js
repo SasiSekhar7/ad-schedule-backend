@@ -200,15 +200,17 @@ module.exports.registerDevice = async (req, res) => {
     const { location, reg_code, android_id } = req.body;
 
     const groupExists = await DeviceGroup.findOne({
-        attributes: ['group_id'],
+        attributes: ['group_id','client_id'],
         where: { reg_code } // Ensure `reg_code` is the actual column name
     });
+    console.log('groupExists',groupExists) ;
     
     if (!groupExists) {
         return res.status(400).json({ message: "Invalid License Key" });
     }
     
     const group_id = groupExists.group_id; // Safe to access since we checked if it exists
+    const client_id = groupExists.client_id; // Safe to access since we checked if it exists
     
     const deviceExists = await Device.findOne({
       where: {
@@ -216,7 +218,7 @@ module.exports.registerDevice = async (req, res) => {
         group_id,
       },
     });
-console.log('device Exists',deviceExists)
+    console.log('device Exists',deviceExists)
     if (deviceExists) {
       await Device.update(
         {
@@ -243,7 +245,9 @@ console.log('device Exists',deviceExists)
         expiresIn: "30d",
       });
 
-      const url = await getBucketURL("placeholder.jpg");
+      const fileName = `${client_id}/placeholder.jpg`
+      console.log('fileName',fileName);
+      const url = await getBucketURL(fileName);
 
       return res.json({
         message: "Device Registered Successfully",
@@ -270,8 +274,8 @@ console.log('device Exists',deviceExists)
       process.env.JWT_DEVICE_SECRET,
       { expiresIn: "30d" }
     );
-
-    const url = await getBucketURL("placeholder.jpg");
+    const fileName = `${client_id}/placeholder.jpg`
+    const url = await getBucketURL(fileName);
 
     return res
       .status(201)
