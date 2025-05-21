@@ -28,9 +28,9 @@ module.exports.getBucketURL = async (fileName) => {
             Key: fileName,
         };
 
-        await s3.send(new HeadObjectCommand(headParams)); // throws if object doesn't exist
+        await s3.send(new HeadObjectCommand(headParams)); 
         const getCommand = new GetObjectCommand(headParams);
-        const url = await getSignedUrl(s3, getCommand, { expiresIn: 600 });
+        const url = await getSignedUrl(s3, getCommand, { expiresIn: 86400 });
         return url;
     } catch (error) {
         if (error.name === "NotFound" || error.$metadata?.httpStatusCode === 404) {
@@ -92,20 +92,28 @@ module.exports.getBucketURL = async (fileName) => {
 
 module.exports.changePlaceholder = async (req, res) => {
     try {
-        const clientId = req.user?.client_id;
-
-        if (!clientId) {
-            return res.status(400).json({ message: "client_id not found in request" });
-        }
+        const { role, client_id: clientId } = req.user;
 
         if (!req.file) {
             return res.status(400).json({ message: "No file uploaded" });
         }
 
-        // Upload file to client's folder in S3
+        let s3Key;
+
+        if (role === 'Admin') {
+            s3Key = `placeholder.jpg`;
+        }
+        else if (role === 'Client' && clientId) {
+            s3Key = `${clientId}/placeholder.jpg`;
+        }
+        else {
+            return res.status(403).json({ message: "Unauthorized role or missing client_id" });
+        }
+
+
         const uploadParams = {
             Bucket: bucketName,
-            Key: `${clientId}/placeholder.jpg`,
+            Key: s3Key,
             Body: req.file.buffer,
             ContentType: req.file.mimetype,
         };
@@ -113,15 +121,14 @@ module.exports.changePlaceholder = async (req, res) => {
         const uploadCommand = new PutObjectCommand(uploadParams);
         await s3.send(uploadCommand);
 
-        // Find all groups for this client to notify about placeholder change
-        const groups = await DeviceGroup.findAll({ where: { client_id: clientId }, attributes: ['group_id'] });
-        const groupIds = groups.map(grp => grp.group_id);
 
-        // Get the new placeholder URL
-        const placeholderUrl = await getBucketURL(`${clientId}/placeholder.jpg`);
+        if (role === 'Client') {
+            const groups = await DeviceGroup.findAll({ where: { client_id: clientId }, attributes: ['group_id'] });
+            const groupIds = groups.map(grp => grp.group_id);
 
-        // Push to group queue with updated placeholder URL
-        await pushToGroupQueue(groupIds, placeholderUrl);
+            const placeholderUrl = await this.getBucketURL(s3Key);
+            await pushToGroupQueue(groupIds, placeholderUrl);
+        }
 
         res.json({ message: "Placeholder changed successfully" });
     } catch (error) {
@@ -129,6 +136,7 @@ module.exports.changePlaceholder = async (req, res) => {
         res.status(500).json({ message: "Internal Server Error" });
     }
 };
+
 
 
 

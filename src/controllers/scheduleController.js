@@ -347,24 +347,27 @@ module.exports.deleteSchedule = async (req, res) => {
 module.exports.getPlaceholder = async (req, res) => {
     try {
         const clientId = req.user?.client_id;
-
-        if (!clientId) {
-            return res.status(400).json({ message: "client_id not found in request" });
+        const role = req.user?.role;
+        if (!clientId || !role) {
+            return res.status(400).json({ message: "client_id or role not found in request" });
         }
-
-        const clientKey = `${clientId}/placeholder.jpg`;
-        let url = await getBucketURL(clientKey);
-
-        if (!url) {
+        let key;
+        if (role === "Admin") {
+            key = "placeholder.jpg";
+        } else {
+            key = `${clientId}/placeholder.jpg`;
+        }
+        let url = await getBucketURL(key);
+        if (!url && role !== "Admin") {
             url = await getBucketURL("placeholder.jpg");
         }
-
         res.json({ url });
     } catch (error) {
         console.error("Error fetching placeholder:", error.message, error.stack);
         res.status(500).json({ message: "Internal Server Error" });
     }
 };
+
 
 
 
