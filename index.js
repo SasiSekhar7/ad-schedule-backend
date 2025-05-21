@@ -15,6 +15,8 @@ const corsOptions =["http://localhost:5174", "https://console.adup.live"]
 app.use(cors({corsOptions}))
 
 
+const staticFolder = path.join(__dirname, 'assets');
+app.use('/api/wgt', express.static(staticFolder));  // Serve at /files/*
 
 app.use('/api', router)
 
