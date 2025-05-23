@@ -344,14 +344,35 @@ module.exports.deleteSchedule = async (req, res) => {
   }
 };
 
-// --- Other controller methods ---
 module.exports.getPlaceholder = async (req, res) => {
-  try {
-    const url = await getBucketURL("placeholder.jpg");
-    res.json({ url });
-  } catch (error) {
-    console.error("Error fetching placeholder:", error);
-    res.status(500).json({ message: "Internal Server Error" });
-  }
+    try {
+        const clientId = req.user?.client_id;
+        const role = req.user?.role;
+        if (!clientId || !role) {
+            return res.status(400).json({ message: "client_id or role not found in request" });
+        }
+        let key;
+        if (role === "Admin") {
+            key = "placeholder.jpg";
+        } else {
+            key = `${clientId}/placeholder.jpg`;
+        }
+        let url = await getBucketURL(key);
+        if (!url && role !== "Admin") {
+            url = await getBucketURL("placeholder.jpg");
+        }
+        res.json({ url });
+    } catch (error) {
+        console.error("Error fetching placeholder:", error.message, error.stack);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
 };
+
+
+
+
+
+
+
+
 
