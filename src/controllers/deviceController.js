@@ -67,34 +67,32 @@ module.exports.getFullScheduleCalendar = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
 module.exports.getFullSchedule = async (req, res) => {
   try {
-    let { page = 1, limit = 10, date } = req.query;
-    page = parseInt(page);
-    limit = parseInt(limit);
+    const { from, to } = req.query;
+
 
     const whereClause = {};
 
-    if (date) {
+    if (from && to) {
       whereClause.start_time = {
-        [Op.between]: [`${date} 00:00:00`, `${date} 23:59:59`],
+        [Op.between]: [`${from} 00:00:00`, `${to} 23:59:59`],
       };
     }
 
-    // Add client_id filter if the user is a Client
+
     if (req.user && req.user.role === "Client" && req.user.client_id) {
       whereClause["$DeviceGroup.client_id$"] = req.user.client_id;
     }
 
-    const { count, rows: schedules } = await Schedule.findAndCountAll({
+    const schedules = await Schedule.findAll({
       where: whereClause,
       include: [
         { model: Ad, attributes: ["name"] },
-        { model: DeviceGroup, attributes: ["name", "client_id"] }, // Include client_id from DeviceGroup
+        { model: DeviceGroup, attributes: ["name", "client_id"] },
       ],
       order: [["start_time", "DESC"]],
-      limit,
-      offset: (page - 1) * limit,
     });
 
     const result = schedules.map((schedule) => {
@@ -104,15 +102,16 @@ module.exports.getFullSchedule = async (req, res) => {
         ad_name: Ad.name,
         group_name: DeviceGroup.name,
         client_id: DeviceGroup.client_id,
-      }; // Include client_id in the result
+      };
     });
 
-    res.json({ schedules: result, total: count, page, limit });
+    res.json({ schedules: result, total: result.length });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
 
 async function getAddressFromCoordinates(lat, lon) {
   try {
