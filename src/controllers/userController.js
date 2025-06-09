@@ -148,7 +148,7 @@ module.exports.getUserData = async (req, res) => {
       {
         title: "Version Control",
         url: "/apkVersion",
-        icon: "QrCode",
+        icon: "Bot",
         items: [
           { title: "Android", url: "/apkVersion" },
 
