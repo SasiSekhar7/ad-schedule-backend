@@ -219,3 +219,77 @@ module.exports.deleteAd = async(req, res)=>{
     }
 }
 
+
+/**
+ * Uploads a file to an S3 bucket.
+ * @param {object} fileData - Object containing { Body: Buffer | Stream, Key: string, ContentType: string }.
+ * @returns {Promise<string>} The S3 Key of the uploaded file.
+ * @throws {Error} If the S3 upload fails.
+ */
+module.exports.uploadFileToS3 = async (fileData) => {
+    const uploadParams = {
+        Bucket: bucketName,
+        Key: fileData.Key,
+        Body: fileData.Body,
+        ContentType: fileData.ContentType,
+        // ACL: 'public-read' // Uncomment if you need public read access (use with caution)
+    };
+
+    try {
+        const command = new PutObjectCommand(uploadParams);
+        await s3.send(command);
+        return fileData.Key; // Return the key on success
+    } catch (error) {
+        console.error("S3 uploadFileToS3 error:", error);
+        throw new Error(`Failed to upload file to S3: ${error.message}`);
+    }
+};
+
+/**
+ * Deletes a file from an S3 bucket.
+ * @param {string} key - The S3 Key of the file to delete.
+ * @returns {Promise<void>}
+ * @throws {Error} If the S3 deletion fails.
+ */
+module.exports.deleteFileFromS3 = async (key) => {
+    const deleteParams = {
+        Bucket: bucketName,
+        Key: key,
+    };
+    try {
+        const command = new DeleteObjectCommand(deleteParams);
+        await s3.send(command);
+    } catch (error) {
+        console.error("S3 deleteFileFromS3 error:", error);
+        throw new Error(`Failed to delete file from S3: ${error.message}`);
+    }
+};
+
+/**
+ * Generates a pre-signed URL for a file in S3.
+ * @param {string} fileName - The S3 Key of the file.
+ * @param {number} expiresInSeconds - The expiration time of the URL in seconds.
+ * @returns {Promise<string|null>} The pre-signed URL or null if file not found/error.
+ */
+module.exports.getSignedS3Url = async (fileName, expiresInSeconds) => {
+    try {
+        const headParams = {
+            Bucket: bucketName,
+            Key: fileName,
+        };
+        // Check if object exists (optional, but good for specific error handling)
+        await s3.send(new HeadObjectCommand(headParams)); 
+
+        const getCommand = new GetObjectCommand(headParams);
+        const url = await getSignedUrl(s3, getCommand, { expiresIn: expiresInSeconds });
+        return url;
+    } catch (error) {
+        if (error.name === "NotFound" || error.$metadata?.httpStatusCode === 404) {
+            console.warn(`S3 file not found for signed URL: ${fileName}`);
+        } else {
+            console.error("S3 getSignedS3Url error:", error);
+        }
+        return null;
+    }
+};
+

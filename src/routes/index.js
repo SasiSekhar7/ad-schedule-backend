@@ -6,13 +6,14 @@ const { getFullSchedule, syncDevice, registerDevice, createGroup, getDeviceList,
 const { addUser, getUserData , getAllusers , deleteUser, getAccountInfo, updateAccountInfo, resetPass } = require('../controllers/userController');
 const { login } = require('../controllers/authController');
 const router = express.Router();
-const {upload, uploadMiddleware} = require('../middleware/s3multer');
+const {upload, uploadMiddleware, uploadApk, apkUploadMiddleware} = require('../middleware/s3multer');
 const { changeFile, addAd, deleteAd, changePlaceholder } = require('../controllers/s3Controller');
 const {validateToken, validateDeviceToken, validateAdmin} = require('../middleware/auth');
 const { sendOtp, verifyOtp } = require('../controllers/otpController');
 const { createCampaign, getCampaign, allCampaigns, updateCampaignWithCoupons, deleteCampaign, getCampaignCode, fetchCampaignInteractions } = require('../controllers/couponController');
 const { updateSeries } = require('../controllers/cricketController');
 const { getAdPerformanceTable, getGroupPerformanceTable, getStats } = require('../controllers/dashboardController');
+const { getLatestApkVersion, addApkVersion, updateApkVersion, deleteApkVersion, getAllApkVersions, checkForUpdates } = require('../controllers/apkVersionController');
 
 
 router.post('/device/register', registerDevice) // takes group id and location input 
@@ -123,4 +124,23 @@ router.delete('/user/:user_id', validateToken,validateAdmin, deleteUser);
 router.get('/user/account', validateToken, getAccountInfo);
 router.put('/user/update',validateToken,updateAccountInfo);
 router.post('/user/reset/:userId',validateToken,validateAdmin,resetPass);
+
+
+router.get('/apk_versions/latest',validateToken,validateAdmin, getLatestApkVersion);
+router.get('/apk_versions',validateToken,validateAdmin, getAllApkVersions);
+
+router.get('/apk/check-update', checkForUpdates);
+
+
+
+router.post('/apk_versions',validateToken,validateAdmin, apkUploadMiddleware, addApkVersion );
+router.post('/apk_versions/:id',validateToken,validateAdmin, updateApkVersion );
+
+router.delete('/apk_versions:id',validateToken,validateAdmin, deleteApkVersion );
+
+
+
+
+// router.post('/apk/extract_data',validateToken,validateAdmin, apkUploadMiddleware, uploadTempApk);
+
 module.exports = router;  

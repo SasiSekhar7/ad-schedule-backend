@@ -550,8 +550,65 @@ const DailyImpressionSummary = sequelize.define(
   }
 );
 
+const ApkVersion = sequelize.define('ApkVersion', {
+        id: {
+            type: DataTypes.INTEGER,
+            primaryKey: true,
+            autoIncrement: true,
+            allowNull: false,
+        },
+        version_code: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+            unique: true, // Ensure unique version codes
+        },
+        version_name: {
+            type: DataTypes.STRING,
+            allowNull: false,
+        },
+        file_name: {
+            type: DataTypes.STRING,
+            allowNull: false,
+        },
+        s3_key: {
+            type: DataTypes.STRING,
+            allowNull: false,
+            unique: true, // Each S3 key should ideally be unique per version
+        },
+        file_size_bytes: {
+            type: DataTypes.BIGINT,
+            allowNull: false,
+        },
+        release_notes: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+        },
+        is_mandatory: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: false,
+        },
+        is_active: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: false, // Only one version should typically be active at a time
+        },
+        checksum_sha256: {
+            type: DataTypes.STRING(64), // SHA-256 is 64 characters
+            allowNull: false,
+            unique: true, // Each file should have a unique checksum
+        },
+        uploaded_at: {
+            type: DataTypes.DATE,
+            allowNull: false,
+            defaultValue: DataTypes.NOW,
+        },
+    });
+
+
 DailyImpressionSummary.belongsTo(DeviceGroup, { foreignKey: 'group_id' });
 DailyImpressionSummary.belongsTo(Ad, { foreignKey: 'ad_id' });
+
 
 // Define Associations
 Client.hasMany(Campaign, { foreignKey: "client_id" });
@@ -615,5 +672,6 @@ module.exports = {
   Coupon,
   CampaignInteraction,
   SelectedSeries,
-  DailyImpressionSummary
+  DailyImpressionSummary,
+  ApkVersion
 };
