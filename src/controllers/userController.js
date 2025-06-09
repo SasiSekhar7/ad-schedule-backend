@@ -146,6 +146,15 @@ module.exports.getUserData = async (req, res) => {
         ]
       },
       {
+        title: "Version Control",
+        url: "/apkVersion",
+        icon: "QrCode",
+        items: [
+          { title: "Android", url: "/apkVersion" },
+
+        ]
+      },
+      {
         title: "QR Campaign",
         url: "/campaigns",
         icon: "QrCode",
