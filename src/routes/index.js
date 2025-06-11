@@ -134,9 +134,9 @@ router.get('/apk/check-update', checkForUpdates);
 
 
 router.post('/apk_versions',validateToken,validateAdmin, apkUploadMiddleware, addApkVersion );
-router.post('/apk_versions/:id',validateToken,validateAdmin, updateApkVersion );
+router.put('/apk_versions/:id',validateToken,validateAdmin, updateApkVersion );
 
-router.delete('/apk_versions:id',validateToken,validateAdmin, deleteApkVersion );
+router.delete('/apk_versions/:id',validateToken,validateAdmin, deleteApkVersion );
 
 
 
