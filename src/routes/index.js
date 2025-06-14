@@ -2,11 +2,11 @@ const express =  require('express');
 const { createClient, getAllClients, updateClient, deleteClient, getAllAds, getAllDetails } = require('../controllers/clientController');
 const { sendAdFile, sendAdDetails } = require('../controllers/adController');
 const { scheduleAd, deleteSchedule, updateSchedule, getPlaceholder } = require('../controllers/scheduleController');
-const { getFullSchedule, syncDevice, registerDevice, createGroup, getDeviceList, fetchGroups, getFullScheduleCalendar, addMessage, deleteMessage, updateGroupSchedule, getApkUrl, exitDevice, getWgtUrl } = require('../controllers/deviceController');
+const { getFullSchedule, syncDevice, registerDevice, createGroup, getDeviceList, fetchGroups, getFullScheduleCalendar, addMessage, deleteMessage, updateGroupSchedule, getApkUrl, exitDevice, getWgtUrl, getWgt } = require('../controllers/deviceController');
 const { addUser, getUserData , getAllusers , deleteUser, getAccountInfo, updateAccountInfo, resetPass } = require('../controllers/userController');
 const { login } = require('../controllers/authController');
 const router = express.Router();
-const { uploadMiddleware, apkUploadMiddleware} = require('../middleware/s3multer');
+const {upload, uploadMiddleware, uploadApk, apkUploadMiddleware} = require('../middleware/s3multer');
 const { changeFile, addAd, deleteAd, changePlaceholder } = require('../controllers/s3Controller');
 const {validateToken, validateDeviceToken, validateAdmin} = require('../middleware/auth');
 const { sendOtp, verifyOtp } = require('../controllers/otpController');
@@ -89,14 +89,14 @@ router.post('/ads/create-client', validateToken ,  createClient )
 router.post('/ads/update-client/:id', validateToken,  updateClient )
 router.post('/ads/delete-client:/id', validateToken,  deleteClient )
 
-router.post('/ads/add', validateToken,   uploadMiddleware,addAd)
+router.post('/ads/add', validateToken,   upload.single('file'),addAd)
 router.post('/ads/update', validateToken,  addAd)
 router.post('/ads/delete/:ad_id', validateToken,  deleteAd)
 
 router.get('/ads/:id', validateToken,  sendAdDetails)
 
 router.get('/ads/file/get/:path', validateToken,  sendAdFile)
-router.post('/ads/file/edit/:ad_id', validateToken,  uploadMiddleware,changeFile)
+router.post('/ads/file/edit/:ad_id', validateToken,  upload.single('file'),changeFile)
 
 router.get('/campaign/all', validateToken,validateAdmin, allCampaigns)
 

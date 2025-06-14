@@ -1,10 +1,8 @@
-/* eslint-disable no-undef */
 const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand ,HeadObjectCommand} = require("@aws-sdk/client-s3");
 const path = require('path');
 const { Ad, DeviceGroup } = require("../models");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const { pushToGroupQueue } = require("./queueController");
-const fs = require('fs/promises'); // For async file system operations
 
 
 const region = process.env.AWS_BUCKET_REGION;
@@ -45,18 +43,13 @@ module.exports.getBucketURL = async (fileName) => {
 };
 
 
-module.exports.changeFile = async (req, res) => {
-    let fileBuffer;
+ module.exports.changeFile = async (req, res) => {
     try {
         const { ad_id } = req.params;
         const ad = await Ad.findOne({ where: { ad_id } });
 
         if (!ad) {
             return res.status(404).json({ message: "Ad not found" });
-        }
-
-        if (!req.file) {
-            return res.status(400).json({ message: "New file is required." });
         }
 
         // If an ad URL exists, delete the previous file from S3
@@ -67,23 +60,24 @@ module.exports.changeFile = async (req, res) => {
             };
 
             const deleteCommand = new DeleteObjectCommand(deleteParams);
-            await s3Client.send(deleteCommand);
+            await s3.send(deleteCommand);
         }
-
-        // Read the new file from the temporary disk location
-        fileBuffer = await fs.readFile(req.file.path);
 
         // Upload the new file to S3
         const newKey = `ad-${Date.now()}${path.extname(req.file.originalname)}`;
         const uploadParams = {
             Bucket: bucketName,
             Key: newKey,
-            Body: fileBuffer, // Use the buffer read from disk
+            Body: req.file.buffer,
             ContentType: req.file.mimetype,
         };
 
         const uploadCommand = new PutObjectCommand(uploadParams);
+<<<<<<< HEAD
         await s3.send(uploadCommand); // Assuming s3 is your configured S3 client
+=======
+        await s3.send(uploadCommand);
+>>>>>>> parent of 6ae8fa2 (fixed upload size issues)
 
         // Update database with the new file URL
         await Ad.update(
@@ -91,32 +85,21 @@ module.exports.changeFile = async (req, res) => {
             { where: { ad_id } }
         );
 
-        return res.json({ message: "File uploaded and ad updated successfully." });
+        return res.json({ message: "Video uploaded successfully." });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ message: "Internal Server Error!" });
-    } finally {
-        // IMPORTANT: Delete the temporary file from disk
-        if (req.file && req.file.path) {
-            try {
-                await fs.unlink(req.file.path);
-                console.log(`Successfully deleted temporary file: ${req.file.path}`);
-            } catch (unlinkError) {
-                console.error(`Error deleting temporary file ${req.file.path}:`, unlinkError);
-            }
-        }
     }
 };
 
 
 
 module.exports.changePlaceholder = async (req, res) => {
-    let fileBuffer;
     try {
         const { role, client_id: clientId } = req.user;
 
         if (!req.file) {
-            return res.status(400).json({ message: "No file uploaded. Make sure you're sending the 'file' field." });
+            return res.status(400).json({ message: "No file uploaded" });
         }
 
         let s3Key;
@@ -131,26 +114,27 @@ module.exports.changePlaceholder = async (req, res) => {
             return res.status(403).json({ message: "Unauthorized role or missing client_id" });
         }
 
-        // Read the file from the temporary disk location
-        fileBuffer = await fs.readFile(req.file.path);
 
         const uploadParams = {
             Bucket: bucketName,
             Key: s3Key,
-            Body: fileBuffer,
+            Body: req.file.buffer,
             ContentType: req.file.mimetype,
         };
 
         const uploadCommand = new PutObjectCommand(uploadParams);
+<<<<<<< HEAD
         await s3.send(uploadCommand); // Using your configured S3 client instance
+=======
+        await s3.send(uploadCommand);
+
+>>>>>>> parent of 6ae8fa2 (fixed upload size issues)
 
         if (role === 'Client') {
             const groups = await DeviceGroup.findAll({ where: { client_id: clientId }, attributes: ['group_id'] });
             const groupIds = groups.map(grp => grp.group_id);
 
-            // Using getBucketURL as you normally would
-            const placeholderUrl = await this.getBucketURL(s3Key); // Or getBucketURL(s3Key) if it's an imported function
-
+            const placeholderUrl = await this.getBucketURL(s3Key);
             await pushToGroupQueue(groupIds, placeholderUrl);
         }
 
@@ -158,21 +142,13 @@ module.exports.changePlaceholder = async (req, res) => {
     } catch (error) {
         console.error("Error changing placeholder:", error.message, error.stack);
         res.status(500).json({ message: "Internal Server Error" });
-    } finally {
-        // IMPORTANT: Delete the temporary file from disk
-        if (req.file && req.file.path) {
-            try {
-                await fs.unlink(req.file.path);
-                console.log(`Successfully deleted temporary file: ${req.file.path}`);
-            } catch (unlinkError) {
-                console.error(`Error deleting temporary file ${req.file.path}:`, unlinkError);
-            }
-        }
     }
 };
 
+
+
+
 module.exports.addAd = async (req, res) => {
-    let fileBuffer;
     try {
         let { client_id, name, duration } = req.body;
 
@@ -198,19 +174,20 @@ module.exports.addAd = async (req, res) => {
             return res.status(400).json({ message: "File is required." });
         }
 
-        // Read the file from the temporary disk location
-        fileBuffer = await fs.readFile(req.file.path);
-
         const newKey = `ad-${Date.now()}${path.extname(req.file.originalname)}`;
         const uploadParams = {
             Bucket: bucketName,
             Key: newKey,
-            Body: fileBuffer, // Use the buffer read from disk
+            Body: req.file.buffer,
             ContentType: req.file.mimetype,
         };
 
         const uploadCommand = new PutObjectCommand(uploadParams);
+<<<<<<< HEAD
         await s3.send(uploadCommand); // Assuming s3 is your configured S3 client
+=======
+        await s3.send(uploadCommand);
+>>>>>>> parent of 6ae8fa2 (fixed upload size issues)
 
         const ad = await Ad.create({
             client_id,
@@ -224,16 +201,6 @@ module.exports.addAd = async (req, res) => {
     } catch (error) {
         console.error(error);
         return res.status(500).json({ message: "Internal Server Error", error: error.message });
-    } finally {
-        // IMPORTANT: Delete the temporary file from disk
-        if (req.file && req.file.path) {
-            try {
-                await fs.unlink(req.file.path);
-                console.log(`Successfully deleted temporary file: ${req.file.path}`);
-            } catch (unlinkError) {
-                console.error(`Error deleting temporary file ${req.file.path}:`, unlinkError);
-            }
-        }
     }
 };
 
