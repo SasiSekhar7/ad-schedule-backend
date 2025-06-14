@@ -73,11 +73,9 @@ module.exports.getBucketURL = async (fileName) => {
         };
 
         const uploadCommand = new PutObjectCommand(uploadParams);
-<<<<<<< HEAD
+
         await s3.send(uploadCommand); // Assuming s3 is your configured S3 client
-=======
-        await s3.send(uploadCommand);
->>>>>>> parent of 6ae8fa2 (fixed upload size issues)
+
 
         // Update database with the new file URL
         await Ad.update(
@@ -123,12 +121,8 @@ module.exports.changePlaceholder = async (req, res) => {
         };
 
         const uploadCommand = new PutObjectCommand(uploadParams);
-<<<<<<< HEAD
-        await s3.send(uploadCommand); // Using your configured S3 client instance
-=======
-        await s3.send(uploadCommand);
 
->>>>>>> parent of 6ae8fa2 (fixed upload size issues)
+        await s3.send(uploadCommand); // Using your configured S3 client instance
 
         if (role === 'Client') {
             const groups = await DeviceGroup.findAll({ where: { client_id: clientId }, attributes: ['group_id'] });
@@ -183,11 +177,9 @@ module.exports.addAd = async (req, res) => {
         };
 
         const uploadCommand = new PutObjectCommand(uploadParams);
-<<<<<<< HEAD
+
         await s3.send(uploadCommand); // Assuming s3 is your configured S3 client
-=======
-        await s3.send(uploadCommand);
->>>>>>> parent of 6ae8fa2 (fixed upload size issues)
+
 
         const ad = await Ad.create({
             client_id,
