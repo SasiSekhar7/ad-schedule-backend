@@ -1,9 +1,16 @@
 // services/impressionCalculator.js (or wherever you place such logic)
 
 // Assuming you have configured Sequelize and imported your models
-const { sequelize, Ad, Device, DeviceGroup, Schedule, DailyImpressionSummary } = require('../models'); // Adjust path as needed
-const { Op } = require('sequelize');
-const moment = require('moment'); // Using moment for easy date manipulation
+const {
+  sequelize,
+  Ad,
+  Device,
+  DeviceGroup,
+  Schedule,
+  DailyImpressionSummary,
+} = require("../models"); // Adjust path as needed
+const { Op } = require("sequelize");
+const moment = require("moment"); // Using moment for easy date manipulation
 
 const PLACEHOLDER_DURATION_SECONDS = 10;
 const SECONDS_IN_DAY = 24 * 60 * 60;
@@ -20,9 +27,12 @@ const SECONDS_IN_DAY = 24 * 60 * 60;
  */
 async function updateImpressionsTable(targetDate, options = {}) {
   const { groupId } = options;
-  const summaryDate = moment(targetDate).format('YYYY-MM-DD'); // Ensure DATEONLY format
+  const summaryDate = moment(targetDate).format("YYYY-MM-DD"); // Ensure DATEONLY format
 
-  console.log(`Starting impression update for date: ${summaryDate}` + (groupId ? ` for group: ${groupId}` : ''));
+  console.log(
+    `Starting impression update for date: ${summaryDate}` +
+      (groupId ? ` for group: ${groupId}` : "")
+  );
 
   // Use a transaction for atomicity (delete + create)
   const transaction = await sequelize.transaction();
@@ -36,36 +46,39 @@ async function updateImpressionsTable(targetDate, options = {}) {
     // Find groups (we need their client_id later)
     const targetGroups = await DeviceGroup.findAll({
       where: groupWhereClause,
-      attributes: ['group_id', 'client_id'],
+      attributes: ["group_id", "client_id"],
       transaction, // Run within the transaction
     });
 
     if (!targetGroups.length) {
-      console.log(`No target groups found for ${summaryDate}` + (groupId ? ` and group ${groupId}` : ''));
+      console.log(
+        `No target groups found for ${summaryDate}` +
+          (groupId ? ` and group ${groupId}` : "")
+      );
       await transaction.commit(); // Nothing to do, commit transaction
       return;
     }
 
-    const groupIds = targetGroups.map(g => g.group_id);
+    const groupIds = targetGroups.map((g) => g.group_id);
     // const groupClientMap = targetGroups.reduce((map, group) => {
     //     map[group.group_id] = group.client_id;
     //     return map;
     // }, {});
-
 
     // 2. Delete Existing Entries for the target date/groups
     // This ensures that if an ad is removed from a schedule, its corresponding
     // summary entry for that day is also removed.
     const deleteWhere = {
       summary_date: summaryDate,
-      group_id: { [Op.in]: groupIds } // Only delete for the groups we are processing
+      group_id: { [Op.in]: groupIds }, // Only delete for the groups we are processing
     };
     const deletedRows = await DailyImpressionSummary.destroy({
-        where: deleteWhere,
-        transaction // Run within the transaction
+      where: deleteWhere,
+      transaction, // Run within the transaction
     });
-    console.log(`Deleted ${deletedRows} existing summary rows for ${summaryDate} and target groups.`);
-
+    console.log(
+      `Deleted ${deletedRows} existing summary rows for ${summaryDate} and target groups.`
+    );
 
     // 3. Fetch Data and Calculate Impressions for each group
     const summariesToCreate = [];
@@ -78,14 +91,14 @@ async function updateImpressionsTable(targetDate, options = {}) {
       const activeSchedules = await Schedule.findAll({
         where: {
           group_id: currentGroupId,
-          start_time: { [Op.lte]: moment(summaryDate).endOf('day').toDate() },
-          end_time: { [Op.gte]: moment(summaryDate).startOf('day').toDate() },
+          start_time: { [Op.lte]: moment(summaryDate).endOf("day").toDate() },
+          end_time: { [Op.gte]: moment(summaryDate).startOf("day").toDate() },
         },
-        attributes: ['ad_id'],
+        attributes: ["ad_id"],
         transaction, // Run within the transaction
       });
 
-      const adIdsInPlaylist = [...new Set(activeSchedules.map(s => s.ad_id))]; // Unique ad IDs
+      const adIdsInPlaylist = [...new Set(activeSchedules.map((s) => s.ad_id))]; // Unique ad IDs
 
       if (adIdsInPlaylist.length === 0) {
         // console.log(`No active ads for group ${currentGroupId} on ${summaryDate}`);
@@ -95,20 +108,23 @@ async function updateImpressionsTable(targetDate, options = {}) {
       // b. Fetch Ad Durations
       const ads = await Ad.findAll({
         where: { ad_id: { [Op.in]: adIdsInPlaylist } },
-        attributes: ['ad_id', 'duration'], // duration should be correct (10s for image, Ns for video)
+        attributes: ["ad_id", "duration"], // duration should be correct (10s for image, Ns for video)
         transaction, // Run within the transaction
       });
 
       // c. Calculate Total Loop Duration
       let playlistDurationSeconds = 0;
-      ads.forEach(ad => {
+      ads.forEach((ad) => {
         playlistDurationSeconds += ad.duration; // Use Ad.duration directly as confirmed
       });
-      const totalLoopDurationSeconds = playlistDurationSeconds + PLACEHOLDER_DURATION_SECONDS;
+      const totalLoopDurationSeconds =
+        playlistDurationSeconds + PLACEHOLDER_DURATION_SECONDS;
 
       if (totalLoopDurationSeconds <= 0) {
-         console.warn(`Warning: Total loop duration is ${totalLoopDurationSeconds} for group ${currentGroupId} on ${summaryDate}. Skipping impression calculation.`);
-         continue;
+        console.warn(
+          `Warning: Total loop duration is ${totalLoopDurationSeconds} for group ${currentGroupId} on ${summaryDate}. Skipping impression calculation.`
+        );
+        continue;
       }
 
       // d. Calculate Loops Per Day
@@ -123,7 +139,7 @@ async function updateImpressionsTable(targetDate, options = {}) {
       });
 
       // f. Prepare Summary Data for each ad in the playlist
-      ads.forEach(ad => {
+      ads.forEach((ad) => {
         summariesToCreate.push({
           summary_date: summaryDate,
           group_id: currentGroupId,
@@ -135,9 +151,14 @@ async function updateImpressionsTable(targetDate, options = {}) {
           impressions: loopsPerDay * deviceCount, // Theoretical impressions
         });
       });
-       console.log(`Group ${currentGroupId}: Playlist[${ads.length} ads], LoopDuration=${totalLoopDurationSeconds}s, Loops/Day=${loopsPerDay}, Devices=${deviceCount}, Impressions/Ad=${loopsPerDay * deviceCount}`);
+      console.log(
+        `Group ${currentGroupId}: Playlist[${
+          ads.length
+        } ads], LoopDuration=${totalLoopDurationSeconds}s, Loops/Day=${loopsPerDay}, Devices=${deviceCount}, Impressions/Ad=${
+          loopsPerDay * deviceCount
+        }`
+      );
     } // End loop through groups
-
 
     // 4. Bulk Insert the new summary data
     if (summariesToCreate.length > 0) {
@@ -145,15 +166,16 @@ async function updateImpressionsTable(targetDate, options = {}) {
         transaction, // Run within the transaction
         // No updateOnDuplicate needed because we deleted first
       });
-      console.log(`Successfully inserted ${summariesToCreate.length} summary rows for ${summaryDate}.`);
+      console.log(
+        `Successfully inserted ${summariesToCreate.length} summary rows for ${summaryDate}.`
+      );
     } else {
-       console.log(`No summary rows to insert for ${summaryDate}.`);
+      console.log(`No summary rows to insert for ${summaryDate}.`);
     }
 
     // 5. Commit Transaction
     await transaction.commit();
     console.log(`Impression update finished successfully for ${summaryDate}.`);
-
   } catch (error) {
     // 6. Rollback Transaction on error
     await transaction.rollback();

@@ -1,11 +1,30 @@
-const path = require('path')
-const { Sequelize } = require('sequelize')
+const path = require("path");
+const { Sequelize } = require("sequelize");
+require("dotenv").config(); // Load environment variables from .env
+
+// const config = {
+//     dialect: 'sqlite',
+//     storage: path.resolve(__dirname,'backend_service.db')
+// }
 
 const config = {
-    dialect: 'sqlite',
-    storage: path.resolve(__dirname,'backend_service.db')
-}
+  dialect: process.env.DB_DIALECT || "postgres",
+  host: process.env.DB_HOST || "localhost",
+  port: process.env.DB_PORT || 5432,
+  username: process.env.DB_USER || "postgres",
+  password: process.env.DB_PASSWORD || "Birla@1122",
+  database: process.env.DB_NAME || "testDB",
+  logging: false, // optional
+};
 
-const sequelize = new Sequelize(config)
+console.log("Database configuration:", config);
 
-module.exports = sequelize; 
+// const sequelize = new Sequelize(config);
+const sequelize = new Sequelize(
+  config.database,
+  config.username,
+  config.password,
+  config
+);
+
+module.exports = sequelize;
