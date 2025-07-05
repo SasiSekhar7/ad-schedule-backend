@@ -5,7 +5,7 @@
 # -----------------------------
 
 # CONFIGURATION - customize these
-PG_USER="postgres"
+PG_USER="adupUser"
 PG_PASSWORD="Birla@1122"
 PG_DB="testDB"
 
