@@ -34,9 +34,37 @@ sudo systemctl start postgresql
 echo "🔐 Setting up PostgreSQL user and database..."
 # Run these commands as the postgres user
 sudo -u postgres psql <<EOF
-CREATE USER $PG_USER WITH PASSWORD '$PG_PASSWORD';
-CREATE DATABASE $PG_DB;
+DO \$\$
+BEGIN
+   IF NOT EXISTS (SELECT FROM pg_catalog.pg_user WHERE usename = '$PG_USER') THEN
+      CREATE USER $PG_USER WITH PASSWORD '$PG_PASSWORD';
+   END IF;
+END
+\$\$;
+
+CREATE DATABASE $PG_DB OWNER $PG_USER;
+
+-- Grant full DB-level privileges
 GRANT ALL PRIVILEGES ON DATABASE $PG_DB TO $PG_USER;
+
+-- Connect to the DB and configure schema + object permissions
+\c $PG_DB
+
+-- Make adupuser the owner of public schema
+ALTER SCHEMA public OWNER TO $PG_USER;
+
+-- Grant full access to schema
+GRANT USAGE, CREATE ON SCHEMA public TO $PG_USER;
+
+-- Grant full access to existing tables and sequences
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO $PG_USER;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO $PG_USER;
+
+-- Set default privileges for future tables and sequences
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+GRANT ALL ON TABLES TO $PG_USER;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+GRANT ALL ON SEQUENCES TO $PG_USER;
 EOF
 
 echo "✅ PostgreSQL setup completed"
