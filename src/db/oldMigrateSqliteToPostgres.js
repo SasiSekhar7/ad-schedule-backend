@@ -3,7 +3,7 @@ const { Client } = require("pg");
 const path = require("path");
 
 const sqliteDb = new sqlite3.Database(
-  path.resolve(__dirname, "adup_backend.db")
+  path.resolve(__dirname, "backend_service.db")
 );
 const pgClient = new Client({
   host: process.env.DB_HOST || "localhost",
