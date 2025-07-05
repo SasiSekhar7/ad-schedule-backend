@@ -10,7 +10,7 @@ const pgClient = new Client({
   port: process.env.DB_PORT || 5432,
   user: process.env.DB_USER || "adupuser",
   password: process.env.DB_PASSWORD || "Birla@1122",
-  database: process.env.DB_NAME || "testDB",
+  database: process.env.DB_NAME || "testdb",
   logging: false, // optional
 });
 async function migrateTable(tableName, columns) {
