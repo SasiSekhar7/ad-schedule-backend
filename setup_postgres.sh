@@ -5,9 +5,9 @@
 # -----------------------------
 
 # CONFIGURATION - customize these
-PG_USER="adupUser"
+PG_USER="adupuser"
 PG_PASSWORD="Birla@1122"
-PG_DB="testDB"
+PG_DB="testdb"
 
 echo "🚀 Updating system packages..."
 sudo apt update -y || sudo yum update -y
@@ -45,3 +45,4 @@ echo "   Host: localhost"
 echo "   Port: 5432"
 echo "   User: $PG_USER"
 echo "   DB:   $PG_DB"
+echo "   Password: $PG_PASSWORD"
