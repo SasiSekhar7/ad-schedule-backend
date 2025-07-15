@@ -292,7 +292,7 @@ mqttClient.on("message", (topic, message) => {
 
 module.exports.pushNewDeviceToQueue = async (device, placeholder = null) => {
   try {
-    const topic = `device/register/${device.android_id}`;
+    const topic = `device/register/${device.device_id}`;
     const jsonToSend = await this.convertToPushReadyJSON(
       device.group_id,
       placeholder

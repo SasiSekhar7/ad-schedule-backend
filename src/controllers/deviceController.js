@@ -378,7 +378,7 @@ module.exports.registerNewDevice = async (req, res) => {
         {
           pairing_code: pairing_code,
           registration_status: "pending",
-          location: "Unknown",
+          location: deviceExists.location || "Unknown",
           status: "active",
           group_id: group_id,
           last_synced: getCustomUTCDateTime(),
