@@ -1,5 +1,9 @@
 const jwt = require("jsonwebtoken");
-const { getCustomUTCDateTime, getUTCDate } = require("../helpers");
+const {
+  getCustomUTCDateTime,
+  getUTCDate,
+  generatePairingCode,
+} = require("../helpers");
 const {
   Ad,
   Device,
@@ -21,9 +25,13 @@ const { Op, literal, fn, col } = require("sequelize");
 const path = require("path");
 const {
   pushToGroupQueue,
+  pushNewDeviceToQueue,
   convertToPushReadyJSON,
   exitDeviceAppliation,
+  updateDeviceGroup,
 } = require("./queueController");
+
+const { createGroupWithDummyClient } = require("../db/utils");
 module.exports.getFullScheduleCalendar = async (req, res) => {
   try {
     // Extract device_id from query params
@@ -72,7 +80,6 @@ module.exports.getFullSchedule = async (req, res) => {
   try {
     const { from, to } = req.query;
 
-
     const whereClause = {};
 
     if (from && to) {
@@ -80,7 +87,6 @@ module.exports.getFullSchedule = async (req, res) => {
         [Op.between]: [`${from} 00:00:00`, `${to} 23:59:59`],
       };
     }
-
 
     if (req.user && req.user.role === "Client" && req.user.client_id) {
       whereClause["$DeviceGroup.client_id$"] = req.user.client_id;
@@ -111,7 +117,6 @@ module.exports.getFullSchedule = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
-
 
 async function getAddressFromCoordinates(lat, lon) {
   try {
@@ -272,19 +277,16 @@ module.exports.registerDevice = async (req, res) => {
       const token = jwt.sign(payload, process.env.JWT_DEVICE_SECRET, {
         expiresIn: "30d",
       });
-      let fileName='placeholder.jpg';
+      let fileName = "placeholder.jpg";
       let url;
-      if(role!="Admin"){
+      if (role != "Admin") {
         fileName = `${client_id}/placeholder.jpg`;
         url = await getBucketURL(fileName);
-        if(!url){
-          fileName = 'placeholder.jpg';
+        if (!url) {
+          fileName = "placeholder.jpg";
         }
-
       }
       url = await getBucketURL(fileName);
-
-
 
       return res.json({
         message: "Device Registered Successfully",
@@ -309,17 +311,16 @@ module.exports.registerDevice = async (req, res) => {
     const token = jwt.sign(payload, process.env.JWT_DEVICE_SECRET, {
       expiresIn: "30d",
     });
-      let fileName='placeholder.jpg';
-      let url;
-      if(role!="Admin"){
-        fileName = `${client_id}/placeholder.jpg`;
-        url = await getBucketURL(fileName);
-        if(!url){
-          fileName = 'placeholder.jpg';
-        }
-
-      }
+    let fileName = "placeholder.jpg";
+    let url;
+    if (role != "Admin") {
+      fileName = `${client_id}/placeholder.jpg`;
       url = await getBucketURL(fileName);
+      if (!url) {
+        fileName = "placeholder.jpg";
+      }
+    }
+    url = await getBucketURL(fileName);
 
     return res
       .status(201)
@@ -344,6 +345,283 @@ module.exports.registerDevice = async (req, res) => {
     res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
+  }
+};
+
+module.exports.registerNewDevice = async (req, res) => {
+  try {
+    const { android_id } = req.body;
+
+    const deviceExists = await Device.findOne({
+      where: {
+        android_id,
+      },
+    });
+
+    let group = await DeviceGroup.findOne({
+      where: { group_id: process.env.DUMMY_GROUP_ID || null }, // Ensure `group_id` is the actual column name
+      attributes: ["group_id"],
+    });
+
+    if (!group) {
+      group = await createGroupWithDummyClient(
+        process.env.DUMMY_GROUP_NAME || "Default Group"
+      );
+    }
+
+    const group_id = group.group_id;
+
+    let pairing_code = generatePairingCode();
+
+    if (deviceExists) {
+      await Device.update(
+        {
+          pairing_code: pairing_code,
+          registration_status: "pending",
+          location: deviceExists.location || "Unknown",
+          status: "active",
+          group_id: group_id,
+          last_synced: getCustomUTCDateTime(),
+        },
+        {
+          where: {
+            android_id,
+          },
+        }
+      );
+
+      return res.status(201).json({
+        message: "Device registered successfully",
+        device_id: deviceExists.device_id,
+        pairing_code: pairing_code,
+        android_id: deviceExists.android_id,
+      });
+    }
+
+    const device = await Device.create({
+      android_id,
+      group_id: group_id, // Initially set to null, can be updated later
+      location: "Unknown", // Default location, can be updated later
+      registration_status: "pending", // Default status
+      pairing_code: pairing_code, // Initially set to null
+      status: "active", // Default status
+      last_synced: getCustomUTCDateTime(),
+    });
+
+    return res.status(201).json({
+      message: "Device registered successfully",
+      device_id: device.device_id,
+      pairing_code: pairing_code,
+      android_id: device.android_id,
+    });
+  } catch (error) {
+    console.error("Error registering new device:", error);
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+};
+
+module.exports.getDeviceByPairingCode = async (req, res) => {
+  try {
+    const { pairing_code } = req.params;
+    if (!pairing_code) {
+      return res.status(400).json({ error: "Pairing code is required" });
+    }
+    const device = await Device.findOne({
+      where: { pairing_code, registration_status: "pending" },
+    });
+    if (!device) {
+      return res.status(404).json({ error: "Device not found" });
+    }
+    const response = {
+      device_id: device.device_id,
+      device_name: device.device_name || "Unknown Device",
+      android_id: device.android_id,
+      tags: device.tags || [],
+      pairing_code: device.pairing_code,
+      group_id: device.group_id || null, // Group ID can be null if not paired
+    };
+    return res.status(200).json(response);
+  } catch (error) {
+    console.error("Error fetching device by pairing code:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+module.exports.updateDeviceDetails = async (req, res) => {
+  try {
+    const { device_id } = req.params;
+    const { device_name, tags, group_id } = req.body;
+    if (!device_id) {
+      return res.status(400).json({ error: "Device ID is required" });
+    }
+    if (!device_name && !tags && !group_id) {
+      return res.status(400).json({ error: "At least one field is required" });
+    }
+    const device = await Device.findOne({ where: { device_id } });
+    if (!device) {
+      return res.status(404).json({ error: "Device not found" });
+    }
+    // Update only the fields that are provided
+    if (device_name) {
+      device.device_name = device_name;
+    }
+    if (tags) {
+      device.tags = tags; // Assuming tags is a string or array, adjust as needed
+    }
+    if (group_id) {
+      device.group_id = group_id;
+      device.last_synced = getCustomUTCDateTime();
+      device.status = "active"; // Set status to active when group_id is updated
+    }
+    await device.save();
+    return res.status(200).json({
+      message: "Device details updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating device details:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+module.exports.updateDeviceDetailsAndLaunch = async (req, res) => {
+  try {
+    const { device_id } = req.params;
+    console.log("body", req.body);
+
+    const { location, group_id } = req.body;
+    const role = req.user?.role;
+    if (!device_id) {
+      return res.status(400).json({ error: "Device ID is required" });
+    }
+    if (!location) {
+      return res.status(400).json({ error: "Location is required" });
+    }
+
+    const finalLocation = location.lat + "," + location.lng;
+    const device = await Device.findOne({ where: { device_id } });
+    if (!device) {
+      return res.status(404).json({ error: "Device not found" });
+    }
+
+    console.log("group_id", group_id);
+
+    const groupExists = await DeviceGroup.findOne({
+      where: { group_id }, // Ensure `group_id` is the actual column name
+    });
+    // Update the location field
+    device.location = finalLocation;
+    device.registration_status = "pairing"; // Set status to connected when location is updated
+
+    let fileName = "placeholder.jpg";
+    let url;
+    if (role != "Admin") {
+      fileName = `${groupExists.client_id}/placeholder.jpg`;
+      url = await getBucketURL(fileName);
+      if (!url) {
+        fileName = "placeholder.jpg";
+      }
+    }
+
+    url = await getBucketURL(fileName);
+    console.log("url", url);
+
+    await pushNewDeviceToQueue(device, url);
+
+    await device.save();
+    return res.status(200).json({
+      message: "Device details updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating device location:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+module.exports.updateDeviceMetadata = async (req, res) => {
+  try {
+    const { device_id } = req.params;
+    console.log("body", req.body);
+
+    const { location, group_id } = req.body;
+    const role = req.user?.role;
+    if (!device_id) {
+      return res.status(400).json({ error: "Device ID is required" });
+    }
+    if (!location) {
+      return res.status(400).json({ error: "Location is required" });
+    }
+
+    const finalLocation = location.lat + "," + location.lng;
+    const device = await Device.findOne({ where: { device_id } });
+    if (!device) {
+      return res.status(404).json({ error: "Device not found" });
+    }
+
+    // Update the location field
+    device.location = finalLocation;
+
+    await updateDeviceGroup(device_id, group_id);
+
+    await device.save();
+    return res.status(200).json({
+      message: "Device metadata updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating device location:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+module.exports.completeRegisterNewDevice = async (req, res) => {
+  try {
+    const { device_id } = req.body;
+    if (!device_id) {
+      return res.status(400).json({ error: "Device ID are required" });
+    }
+    const device = await Device.findOne({ where: { device_id } });
+    if (!device) {
+      return res.status(404).json({ error: "Device not found" });
+    }
+
+    device.last_synced = getCustomUTCDateTime();
+    device.status = "active"; // Set status to active when group_id is updated
+    device.registration_status = "connected"; // Set registration status to connected
+    device.pairing_code = null; // Clear pairing code when group_id is set
+    await device.save();
+    return res.status(200).json({
+      message: "Device registered successfully",
+    });
+  } catch (error) {
+    console.error("Error completing device registration:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+module.exports.getGroutpList = async (req, res) => {
+  try {
+    const whereClause =
+      req.user && req.user.role === "Client" && req.user.client_id
+        ? { client_id: req.user.client_id }
+        : {}; // Admins get all groups
+
+    const groups = await DeviceGroup.findAll({
+      where: whereClause, // <<== Apply filter here
+      attributes: ["group_id", "name", "reg_code", "client_id"],
+    });
+
+    const formattedGroups = groups.map((group) => ({
+      group_id: group.group_id,
+      name: group.name,
+      reg_code: group.reg_code,
+      client_id: group.client_id,
+    }));
+
+    return res.status(200).json({ groups: formattedGroups });
+  } catch (error) {
+    console.error("Error fetching groups:", error);
+    return res.status(500).json({ error: "Internal server error" });
   }
 };
 
