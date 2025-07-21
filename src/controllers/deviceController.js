@@ -12,6 +12,7 @@ const {
   DeviceGroup,
   ScrollText,
   Client,
+  ApkVersion,
 } = require("../models");
 const {
   addHours,
@@ -20,7 +21,7 @@ const {
   formatISO,
   addMinutes,
 } = require("date-fns");
-const { getBucketURL } = require("./s3Controller");
+const { getBucketURL, getSignedS3Url } = require("./s3Controller");
 const { Op, literal, fn, col } = require("sequelize");
 const path = require("path");
 const {
@@ -170,7 +171,20 @@ module.exports.getDeviceList = async (req, res) => {
 
 module.exports.getApkUrl = async (req, res) => {
   try {
-    const url = await getBucketURL("adupPlayer.apk");
+         const latestVersion = await ApkVersion.findOne({
+            where: {
+                is_active: true, // Only consider versions marked as active
+            },
+            order: [['version_code', 'DESC']], // Ensure we get the highest version available
+            limit: 1 // We only need one (the latest)
+        });
+        let url;
+        if(latestVersion.S){
+          url= await getSignedS3Url(latestVersion.s3_key, 600);
+          
+        }else{
+          url = await getSignedS3Url("adupPlayer.apk");
+        }
     res.json({ message: `Download URL`, url });
   } catch (error) {
     console.error(error);
