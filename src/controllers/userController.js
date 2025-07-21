@@ -1,4 +1,4 @@
-const { User,Client } = require("../models");
+const { User, Client } = require("../models");
 const bcrypt = require("bcrypt");
 const { Op } = require("sequelize");
 
@@ -13,13 +13,13 @@ module.exports.addUser = async (req, res) => {
     const hash = bcrypt.hashSync(password, saltRounds);
 
     await User.create({
-        name,
-        client_id,
-        email,
-        phone_number,
-        role, 
-        password:hash,
-      });
+      name,
+      client_id,
+      email,
+      phone_number,
+      role,
+      password: hash,
+    });
 
     res.json({ message: "User created successfully." });
   } catch (error) {
@@ -31,17 +31,17 @@ module.exports.addUser = async (req, res) => {
 module.exports.getAllusers = async (req, res) => {
   try {
     const users = await User.findAll({
-      attributes: ['user_id', 'name', 'email', 'role', 'phone_number'], 
+      attributes: ["user_id", "name", "email", "role", "phone_number"],
       include: [
         {
           model: Client,
-          attributes: ['name'],
+          attributes: ["name"],
         },
       ],
     });
-    const formattedUsers = users.map(user => ({
+    const formattedUsers = users.map((user) => ({
       ...user.toJSON(),
-      client_name: user.Client?.name || '',
+      client_name: user.Client?.name || "",
     }));
 
     res.json({ users: formattedUsers });
@@ -50,7 +50,6 @@ module.exports.getAllusers = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
-
 
 module.exports.deleteUser = async (req, res) => {
   try {
@@ -98,8 +97,8 @@ module.exports.getUserData = async (req, res) => {
     const { user_id } = req.user;
 
     const user = await User.findOne({
-      attributes: ['name', 'email', 'role'],
-      where: { user_id }
+      attributes: ["name", "email", "role"],
+      where: { user_id },
     });
 
     if (!user) {
@@ -109,12 +108,10 @@ module.exports.getUserData = async (req, res) => {
     // Define nav structures
     const navMainAdmin = [
       {
-        title:"Users",
+        title: "Users",
         url: "/users",
         icon: "Users",
-        items: [
-          { title: "All", url: "/user/all" }
-        ]
+        items: [{ title: "All", url: "/user/all" }],
       },
       {
         title: "Devices ",
@@ -122,8 +119,8 @@ module.exports.getUserData = async (req, res) => {
         icon: "SquareTerminal",
         items: [
           { title: "All", url: "/devices" },
-          { title: "Device Groups", url: "/devices/groups" }
-        ]
+          { title: "Device Groups", url: "/devices/groups" },
+        ],
       },
       {
         title: "Ads",
@@ -131,8 +128,8 @@ module.exports.getUserData = async (req, res) => {
         icon: "Bot",
         items: [
           { title: "All", url: "/ads" },
-          { title: "Clients", url: "/ads/clients" }
-        ]
+          { title: "Clients", url: "/ads/clients" },
+        ],
       },
       {
         title: "Schedule",
@@ -142,17 +139,14 @@ module.exports.getUserData = async (req, res) => {
           { title: "All", url: "/schedule" },
           { title: "Add", url: "/schedule/add" },
           { title: "Calendar", url: "/schedule/calendar" },
-          { title: "Placeholder", url: "/schedule/placeholder" }
-        ]
+          { title: "Placeholder", url: "/schedule/placeholder" },
+        ],
       },
       {
         title: "Version Control",
         url: "/apkVersion",
         icon: "Bot",
-        items: [
-          { title: "Android", url: "/apkVersion" },
-
-        ]
+        items: [{ title: "Android", url: "/apkVersion" }],
       },
       {
         title: "QR Campaign",
@@ -161,9 +155,9 @@ module.exports.getUserData = async (req, res) => {
         items: [
           { title: "All", url: "/campaigns" },
           { title: "Interactions", url: "/campaigns/interactions" },
-          { title: "New", url: "/campaigns/new" }
-        ]
-      }
+          { title: "New", url: "/campaigns/new" },
+        ],
+      },
     ];
 
     const navMainClient = [
@@ -173,16 +167,14 @@ module.exports.getUserData = async (req, res) => {
         icon: "SquareTerminal",
         items: [
           { title: "All", url: "/devices" },
-          { title: "Device Groups", url: "/devices/groups" }
-        ]
+          { title: "Device Groups", url: "/devices/groups" },
+        ],
       },
       {
         title: "Ads",
         url: "/ads",
         icon: "Bot",
-        items: [
-          { title: "All", url: "/ads" },
-        ]
+        items: [{ title: "All", url: "/ads" }],
       },
 
       {
@@ -192,25 +184,23 @@ module.exports.getUserData = async (req, res) => {
         items: [
           { title: "All", url: "/schedule" },
           { title: "Add", url: "/schedule/add" },
-          { title: "Placeholder", url: "/schedule/placeholder" }
-        ]
-      }
+          { title: "Placeholder", url: "/schedule/placeholder" },
+        ],
+      },
     ];
 
     // Example teams (same for both roles here, but you can customize)
-    const teams = [
-      { name: "AdUp Console", logo: "/logo.png", plan: "Enterprise" }
-    ];
+    const teams = [{ name: "Ad96", logo: "/logo.png", plan: "Enterprise" }];
 
     const userData = {
       user: {
         name: user.name,
         email: user.email,
         role: user.role,
-        avatar: "/avatars/shadcn.jpg"
+        avatar: "/avatars/shadcn.jpg",
       },
       teams,
-      navMain: user.role === "Admin" ? navMainAdmin : navMainClient
+      navMain: user.role === "Admin" ? navMainAdmin : navMainClient,
     };
 
     res.json(userData);
@@ -222,11 +212,18 @@ module.exports.getUserData = async (req, res) => {
 
 module.exports.getAccountInfo = async (req, res) => {
   try {
-    const { user_id } = req.user; 
+    const { user_id } = req.user;
 
     const user = await User.findOne({
       where: { user_id },
-      attributes: ['user_id', 'name', 'email', 'phone_number', 'role', 'createdAt']
+      attributes: [
+        "user_id",
+        "name",
+        "email",
+        "phone_number",
+        "role",
+        "createdAt",
+      ],
     });
 
     if (!user) {
@@ -240,7 +237,7 @@ module.exports.getAccountInfo = async (req, res) => {
       phone_number: user.phone_number,
       role: user.role,
       joined_on: user.createdAt,
-      avatar: "/avatars/shadcn.jpg"
+      avatar: "/avatars/shadcn.jpg",
     };
 
     res.json({ account: accountInfo });
@@ -253,7 +250,8 @@ module.exports.getAccountInfo = async (req, res) => {
 module.exports.updateAccountInfo = async (req, res) => {
   try {
     const { user_id } = req.user;
-    const { name, email, phone_number, newPassword, confirmPassword } = req.body;
+    const { name, email, phone_number, newPassword, confirmPassword } =
+      req.body;
 
     const user = await User.findOne({ where: { user_id } });
 
@@ -285,17 +283,22 @@ module.exports.updateAccountInfo = async (req, res) => {
 
     if (newPassword || confirmPassword) {
       if (!newPassword || !confirmPassword) {
-        return res.status(400).json({ message: "Both new password and confirm password are required" });
+        return res.status(400).json({
+          message: "Both new password and confirm password are required",
+        });
       }
 
       if (newPassword !== confirmPassword) {
-        return res.status(400).json({ message: "New password and confirm password do not match" });
+        return res
+          .status(400)
+          .json({ message: "New password and confirm password do not match" });
       }
 
       const passwordRegex = /^(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
       if (!passwordRegex.test(newPassword)) {
         return res.status(400).json({
-          message: "Password must be at least 8 characters long, contain at least one number and one special character",
+          message:
+            "Password must be at least 8 characters long, contain at least one number and one special character",
         });
       }
 
@@ -321,4 +324,3 @@ module.exports.updateAccountInfo = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
-
