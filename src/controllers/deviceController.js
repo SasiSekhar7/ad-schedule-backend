@@ -179,7 +179,7 @@ module.exports.getApkUrl = async (req, res) => {
             limit: 1 // We only need one (the latest)
         });
         let url;
-        if(latestVersion.S){
+        if(latestVersion.s3_key){
           url= await getSignedS3Url(latestVersion.s3_key, 600);
           
         }else{
