@@ -145,7 +145,7 @@ module.exports.changePlaceholder = async (req, res) => {
     const uploadCommand = new PutObjectCommand(uploadParams);
     await s3.send(uploadCommand); // Using your configured S3 client instance
 
-    if (role === "Client") {
+
       const groups = await DeviceGroup.findAll({
         where: { client_id: clientId },
         attributes: ["group_id"],
@@ -156,7 +156,7 @@ module.exports.changePlaceholder = async (req, res) => {
       const placeholderUrl = await this.getBucketURL(s3Key); // Or getBucketURL(s3Key) if it's an imported function
 
       await pushToGroupQueue(groupIds, placeholderUrl);
-    }
+    
 
     res.json({ message: "Placeholder changed successfully" });
   } catch (error) {
