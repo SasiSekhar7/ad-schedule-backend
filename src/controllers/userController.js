@@ -190,7 +190,9 @@ module.exports.getUserData = async (req, res) => {
     ];
 
     // Example teams (same for both roles here, but you can customize)
-    const teams = [{ name: "Ad96", logo: "/logo.png", plan: "Enterprise" }];
+    const teams = [
+      { name: "Ad96 Console", logo: "/logo.png", plan: "Enterprise" },
+    ];
 
     const userData = {
       user: {
