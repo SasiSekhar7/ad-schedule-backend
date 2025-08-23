@@ -31,6 +31,7 @@ const {
   exitDeviceAppliation,
   updateDeviceGroup,
 } = require("./queueController");
+const moment = require("moment");
 
 const { createGroupWithDummyClient } = require("../db/utils");
 module.exports.getFullScheduleCalendar = async (req, res) => {
@@ -119,6 +120,395 @@ module.exports.getFullSchedule = async (req, res) => {
   }
 };
 
+// module.exports.getFullSchedule_v2 = async (req, res) => {
+//   try {
+//     const { from, to } = req.query;
+//     const whereClause = {};
+
+//     if (from && to) {
+//       whereClause.start_time = {
+//         [Op.between]: [`${from} 00:00:00`, `${to} 23:59:59`],
+//       };
+//     }
+
+//     if (req.user && req.user.role === "Client" && req.user.client_id) {
+//       whereClause["$DeviceGroup.client_id$"] = req.user.client_id;
+//     }
+
+//     // 1. Get filtered schedules (for display)
+//     const schedules = await Schedule.findAll({
+//       where: whereClause,
+//       include: [
+//         { model: Ad, attributes: ["ad_id", "name"] },
+//         { model: DeviceGroup, attributes: ["group_id", "name", "client_id"] },
+//       ],
+//       order: [["start_time", "ASC"]],
+//     });
+
+//     // 2. Get full ranges for each Ad+Group (ignores filter)
+//     const allSchedules = await Schedule.findAll({
+//       include: [
+//         { model: Ad, attributes: ["ad_id", "name"] },
+//         { model: DeviceGroup, attributes: ["group_id", "name", "client_id"] },
+//       ],
+//       order: [["start_time", "ASC"]],
+//     });
+
+//     const fullRanges = {};
+//     allSchedules.forEach((s) => {
+//       const ad = s.Ad;
+//       const group = s.DeviceGroup;
+//       const key = `${ad.ad_id}-${group.group_id}`;
+
+//       if (!fullRanges[key]) {
+//         fullRanges[key] = {
+//           fromDate: moment(s.start_time),
+//           toDate: moment(s.end_time),
+//         };
+//       } else {
+//         fullRanges[key].fromDate = moment.min(
+//           fullRanges[key].fromDate,
+//           moment(s.start_time)
+//         );
+//         fullRanges[key].toDate = moment.max(
+//           fullRanges[key].toDate,
+//           moment(s.end_time)
+//         );
+//       }
+//     });
+
+//     // 3. Group filtered schedules by Ad → Groups
+//     const adsMap = {};
+//     schedules.forEach((s) => {
+//       const ad = s.Ad;
+//       const group = s.DeviceGroup;
+//       const key = `${ad.ad_id}-${group.group_id}`;
+
+//       if (!adsMap[ad.ad_id]) {
+//         adsMap[ad.ad_id] = {
+//           adId: ad.ad_id,
+//           adName: ad.name,
+//           adDuration: ad.duration,
+
+//           groups: {},
+//         };
+//       }
+
+//       if (!adsMap[ad.ad_id].groups[group.group_id]) {
+//         const full = fullRanges[key]; // take true min/max
+//         adsMap[ad.ad_id].groups[group.group_id] = {
+//           groupId: group.group_id,
+//           groupName: group.name,
+//           clientId: group.client_id,
+//           fromDate: full.fromDate,
+//           toDate: full.toDate,
+//         };
+//       }
+//     });
+
+//     // 4. Transform results
+//     const adsWithGroups = Object.values(adsMap).map((ad) => {
+//       const groups = Object.values(ad.groups).map((g) => {
+//         const totalDays = g.toDate.diff(g.fromDate, "days") + 1;
+
+//         const today = moment();
+//         const completedDays = today.isBefore(g.fromDate)
+//           ? 0
+//           : Math.min(today.diff(g.fromDate, "days") + 1, totalDays);
+
+//         const completedPercentage = ((completedDays / totalDays) * 100).toFixed(
+//           2
+//         );
+
+//         return {
+//           groupId: g.groupId,
+//           groupName: g.groupName,
+//           clientId: g.clientId,
+//           fromDate: g.fromDate.format("DD-MM-YYYY"),
+//           toDate: g.toDate.format("DD-MM-YYYY"),
+//           totalDays,
+//           completedDays,
+//           completedPercentage: `${completedPercentage}%`,
+//           lastDate: g.toDate.format("DD-MM-YYYY"),
+//         };
+//       });
+
+//       return { ...ad, groups };
+//     });
+
+//     res.json({ ads: adsWithGroups, total: adsWithGroups.length });
+//   } catch (error) {
+//     console.error("Error in getFullSchedule_v2:", error);
+//     res.status(500).json({ message: "Internal Server Error" });
+//   }
+// };
+
+// module.exports.getFullSchedule_v2 = async (req, res) => {
+//   try {
+//     const { from, to } = req.query;
+//     const whereClause = {};
+
+//     // Today at fixed start time (00:00:00)
+//     const todayStart = moment().startOf("day").format("YYYY-MM-DD HH:mm:ss");
+
+//     // If user provided date range, apply it
+//     if (from && to) {
+//       whereClause.start_time = {
+//         [Op.between]: [`${from} 00:00:00`, `${to} 23:59:59`],
+//       };
+//     }
+
+//     // Always exclude schedules that ended before today (fixed)
+//     whereClause.end_time = { [Op.gte]: todayStart };
+
+//     // Apply client filter if user is a client
+//     if (req.user && req.user.role === "Client" && req.user.client_id) {
+//       whereClause["$DeviceGroup.client_id$"] = req.user.client_id;
+//     }
+
+//     // 1. Get filtered schedules (for display)
+//     const schedules = await Schedule.findAll({
+//       where: whereClause,
+//       include: [
+//         { model: Ad, attributes: ["ad_id", "name", "duration"] },
+//         { model: DeviceGroup, attributes: ["group_id", "name", "client_id"] },
+//       ],
+//       order: [["start_time", "ASC"]],
+//     });
+
+//     // 2. Get full ranges for each Ad+Group (only for ongoing & future schedules)
+//     const allSchedules = await Schedule.findAll({
+//       where: { end_time: { [Op.gte]: todayStart } }, // <-- only active & future
+//       include: [
+//         { model: Ad, attributes: ["ad_id", "name", "duration"] },
+//         { model: DeviceGroup, attributes: ["group_id", "name", "client_id"] },
+//       ],
+//       order: [["start_time", "ASC"]],
+//     });
+
+//     // 3. Build full ranges for Ad+Group combinations
+//     const fullRanges = {};
+//     allSchedules.forEach((s) => {
+//       const ad = s.Ad;
+//       const group = s.DeviceGroup;
+//       const key = `${ad.ad_id}-${group.group_id}`;
+
+//       if (!fullRanges[key]) {
+//         fullRanges[key] = {
+//           fromDate: moment(s.start_time),
+//           toDate: moment(s.end_time),
+//         };
+//       } else {
+//         fullRanges[key].fromDate = moment.min(
+//           fullRanges[key].fromDate,
+//           moment(s.start_time)
+//         );
+//         fullRanges[key].toDate = moment.max(
+//           fullRanges[key].toDate,
+//           moment(s.end_time)
+//         );
+//       }
+//     });
+
+//     // 4. Group filtered schedules by Ad → Groups
+//     const adsMap = {};
+//     schedules.forEach((s) => {
+//       const ad = s.Ad;
+//       const group = s.DeviceGroup;
+//       const key = `${ad.ad_id}-${group.group_id}`;
+
+//       if (!adsMap[ad.ad_id]) {
+//         adsMap[ad.ad_id] = {
+//           adId: ad.ad_id,
+//           adName: ad.name,
+//           adDuration: ad.duration,
+//           groups: {},
+//         };
+//       }
+
+//       if (!adsMap[ad.ad_id].groups[group.group_id]) {
+//         const full = fullRanges[key];
+//         adsMap[ad.ad_id].groups[group.group_id] = {
+//           groupId: group.group_id,
+//           groupName: group.name,
+//           clientId: group.client_id,
+//           fromDate: full.fromDate,
+//           toDate: full.toDate,
+//         };
+//       }
+//     });
+
+//     // 5. Transform results for response
+//     const adsWithGroups = Object.values(adsMap).map((ad) => {
+//       const groups = Object.values(ad.groups).map((g) => {
+//         const totalDays = g.toDate.diff(g.fromDate, "days") + 1;
+
+//         const today = moment();
+//         const completedDays = today.isBefore(g.fromDate)
+//           ? 0
+//           : Math.min(today.diff(g.fromDate, "days") + 1, totalDays);
+
+//         const completedPercentage = ((completedDays / totalDays) * 100).toFixed(
+//           2
+//         );
+
+//         return {
+//           groupId: g.groupId,
+//           groupName: g.groupName,
+//           clientId: g.clientId,
+//           fromDate: g.fromDate.format("DD-MM-YYYY"),
+//           toDate: g.toDate.format("DD-MM-YYYY"),
+//           totalDays,
+//           completedDays,
+//           completedPercentage: `${completedPercentage}%`,
+//           lastDate: g.toDate.format("DD-MM-YYYY"),
+//         };
+//       });
+
+//       return { ...ad, groups };
+//     });
+
+//     res.json({ ads: adsWithGroups, total: adsWithGroups.length });
+//   } catch (error) {
+//     console.error("Error in getFullSchedule_v2:", error);
+//     res.status(500).json({ message: "Internal Server Error" });
+//   }
+// };
+
+module.exports.getFullSchedule_v2 = async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    const whereClause = {};
+    const todayStart = moment().startOf("day").format("YYYY-MM-DD HH:mm:ss");
+
+    if (from && to) {
+      const fromStart = `${from} 00:00:00`;
+      const toEnd = `${to} 23:59:59`;
+
+      // Include schedules that overlap the selected range
+      whereClause[Op.and] = [
+        { start_time: { [Op.lte]: toEnd } }, // starts before "to"
+        { end_time: { [Op.gte]: fromStart } }, // ends after "from"
+      ];
+    } else {
+      // Default: only active and future schedules
+      whereClause.end_time = { [Op.gte]: todayStart };
+    }
+
+    // Apply client filter
+    if (req.user && req.user.role === "Client" && req.user.client_id) {
+      whereClause["$DeviceGroup.client_id$"] = req.user.client_id;
+    }
+
+    // 1. Get filtered schedules (overlapping the date range)
+    const schedules = await Schedule.findAll({
+      where: whereClause,
+      include: [
+        { model: Ad, attributes: ["ad_id", "name", "duration"] },
+        { model: DeviceGroup, attributes: ["group_id", "name", "client_id"] },
+      ],
+      order: [["start_time", "ASC"]],
+    });
+
+    // 2. Get full ranges for each Ad+Group (active & future schedules)
+    const allSchedules = await Schedule.findAll({
+      where: { end_time: { [Op.gte]: todayStart } },
+      include: [
+        { model: Ad, attributes: ["ad_id", "name", "duration"] },
+        { model: DeviceGroup, attributes: ["group_id", "name", "client_id"] },
+      ],
+      order: [["start_time", "ASC"]],
+    });
+
+    // 3. Build full ranges for Ad+Group
+    const fullRanges = {};
+    allSchedules.forEach((s) => {
+      const ad = s.Ad;
+      const group = s.DeviceGroup;
+      const key = `${ad.ad_id}-${group.group_id}`;
+
+      if (!fullRanges[key]) {
+        fullRanges[key] = {
+          fromDate: moment(s.start_time),
+          toDate: moment(s.end_time),
+        };
+      } else {
+        fullRanges[key].fromDate = moment.min(
+          fullRanges[key].fromDate,
+          moment(s.start_time)
+        );
+        fullRanges[key].toDate = moment.max(
+          fullRanges[key].toDate,
+          moment(s.end_time)
+        );
+      }
+    });
+
+    // 4. Group filtered schedules by Ad → Groups
+    const adsMap = {};
+    schedules.forEach((s) => {
+      const ad = s.Ad;
+      const group = s.DeviceGroup;
+      const key = `${ad.ad_id}-${group.group_id}`;
+
+      if (!adsMap[ad.ad_id]) {
+        adsMap[ad.ad_id] = {
+          adId: ad.ad_id,
+          adName: ad.name,
+          adDuration: ad.duration,
+          groups: {},
+        };
+      }
+
+      if (!adsMap[ad.ad_id].groups[group.group_id]) {
+        const full = fullRanges[key];
+        adsMap[ad.ad_id].groups[group.group_id] = {
+          groupId: group.group_id,
+          groupName: group.name,
+          clientId: group.client_id,
+          fromDate: full.fromDate,
+          toDate: full.toDate,
+        };
+      }
+    });
+
+    // 5. Transform for response
+    const adsWithGroups = Object.values(adsMap).map((ad) => {
+      const groups = Object.values(ad.groups).map((g) => {
+        const totalDays = g.toDate.diff(g.fromDate, "days") + 1;
+
+        const today = moment();
+        const completedDays = today.isBefore(g.fromDate)
+          ? 0
+          : Math.min(today.diff(g.fromDate, "days") + 1, totalDays);
+
+        const completedPercentage = ((completedDays / totalDays) * 100).toFixed(
+          2
+        );
+
+        return {
+          groupId: g.groupId,
+          groupName: g.groupName,
+          clientId: g.clientId,
+          fromDate: g.fromDate.format("DD-MM-YYYY"),
+          toDate: g.toDate.format("DD-MM-YYYY"),
+          totalDays,
+          completedDays,
+          completedPercentage: `${completedPercentage}%`,
+          lastDate: g.toDate.format("DD-MM-YYYY"),
+        };
+      });
+
+      return { ...ad, groups };
+    });
+
+    res.json({ ads: adsWithGroups, total: adsWithGroups.length });
+  } catch (error) {
+    console.error("Error in getFullSchedule_v2:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
 async function getAddressFromCoordinates(lat, lon) {
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`;
@@ -171,20 +561,19 @@ module.exports.getDeviceList = async (req, res) => {
 
 module.exports.getApkUrl = async (req, res) => {
   try {
-         const latestVersion = await ApkVersion.findOne({
-            where: {
-                is_active: true, // Only consider versions marked as active
-            },
-            order: [['version_code', 'DESC']], // Ensure we get the highest version available
-            limit: 1 // We only need one (the latest)
-        });
-        let url;
-        if(latestVersion.s3_key){
-          url= await getSignedS3Url(latestVersion.s3_key, 600);
-          
-        }else{
-          url = await getSignedS3Url("adupPlayer.apk");
-        }
+    const latestVersion = await ApkVersion.findOne({
+      where: {
+        is_active: true, // Only consider versions marked as active
+      },
+      order: [["version_code", "DESC"]], // Ensure we get the highest version available
+      limit: 1, // We only need one (the latest)
+    });
+    let url;
+    if (latestVersion.s3_key) {
+      url = await getSignedS3Url(latestVersion.s3_key, 600);
+    } else {
+      url = await getSignedS3Url("adupPlayer.apk");
+    }
     res.json({ message: `Download URL`, url });
   } catch (error) {
     console.error(error);
