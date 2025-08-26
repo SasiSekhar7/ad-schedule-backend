@@ -1,13 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <widget>
     <ver>1.0.0</ver> <!-- Matches your config.xml version -->
-    <size>1122304</size> <!-- Actual size of adupApp.wgt in bytes -->
-    <widgetname>Ad96</widgetname> <!-- Matches <name> from config.xml -->
-    <description>Your Ad Display App</description>
-    <type>webapp</type>
-    <url>index.html</url>
-    <icon>icon.png</icon>
-    <author>Adup Solutions</author>
-    <update>auto</update>
+    <size>1120420</size> <!-- Actual size of adupApp.wgt in bytes -->
+    <widgetname>adupApp</widgetname>
     <widgetid>0lKtwciFfw.ad96</widgetid> <!-- Matches tizen:application id -->
 </widget>
