@@ -3,10 +3,5 @@
     <ver>1.0.0</ver> <!-- Matches your config.xml version -->
     <size>1120420</size> <!-- Actual size of adupApp.wgt in bytes -->
     <widgetname>adupApp</widgetname>
-    <type>webapp</type>
-    <url>index.html</url>
-    <icon>icon.png</icon>
-    <author>Adup Solutions</author>
-    <update>auto</update>
     <widgetid>0lKtwciFfw.ad96</widgetid> <!-- Matches tizen:application id -->
 </widget>
