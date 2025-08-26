@@ -162,8 +162,8 @@ router.post("/scroll-text", validateToken, addMessage);
 router.post("/scroll-text/delete/:group_id", validateToken, deleteMessage);
 
 router.get("/schedule/calendar", validateToken, getFullScheduleCalendar);
-// router.get("/schedule/all", validateToken, getFullSchedule);
-router.get("/schedule/all", validateToken, getFullSchedule_v2);
+router.get("/schedule/all", validateToken, getFullSchedule);
+// router.get("/schedule/all", validateToken, getFullSchedule_v2);
 
 router.post("/schedule/add", validateToken, scheduleAd);
 router.post("/schedule/update/:id", updateSchedule);
