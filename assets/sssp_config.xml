@@ -2,8 +2,7 @@
 <widget>
     <ver>1.0.0</ver> <!-- Matches your config.xml version -->
     <size>1120420</size> <!-- Actual size of adupApp.wgt in bytes -->
-    <widgetname>Ad96</widgetname> <!-- Matches <name> from config.xml -->
-    <description>Your Ad Display App</description>
+    <widgetname>adupApp</widgetname>
     <type>webapp</type>
     <url>index.html</url>
     <icon>icon.png</icon>
