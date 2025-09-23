@@ -386,6 +386,90 @@ const ApkVersion = sequelize.define(
   }
 );
 
+const ProofOfPlayLog = sequelize.define(
+  "ProofOfPlayLog",
+  {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    event_id: { type: DataTypes.UUID, allowNull: false, unique: true },
+    device_id: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: { model: "Devices", key: "device_id" },
+    },
+    ad_id: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: { model: "Ads", key: "ad_id" },
+    },
+    schedule_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: { model: "Schedules", key: "schedule_id" },
+    },
+    start_time: { type: DataTypes.DATE, allowNull: false },
+    end_time: { type: DataTypes.DATE, allowNull: false },
+    duration_played_ms: { type: DataTypes.INTEGER, allowNull: false },
+    ...defaultTimestamps,
+  },
+  { timestamps: false }
+);
+
+const DeviceTelemetryLog = sequelize.define(
+  "DeviceTelemetryLog",
+  {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    device_id: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: { model: "Devices", key: "device_id" },
+    },
+    timestamp: { type: DataTypes.DATE, allowNull: false },
+    cpu_usage: DataTypes.FLOAT,
+    ram_free_mb: DataTypes.INTEGER,
+    storage_free_mb: DataTypes.INTEGER,
+    network_type: DataTypes.STRING,
+    app_version_code: DataTypes.INTEGER,
+    ...defaultTimestamps,
+  },
+  { timestamps: false, indexes: [{ fields: ["device_id", "timestamp"] }] }
+);
+
+const DeviceEventLog = sequelize.define(
+  "DeviceEventLog",
+  {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    event_id: { type: DataTypes.UUID, allowNull: false, unique: true },
+    device_id: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: { model: "Devices", key: "device_id" },
+    },
+    timestamp: { type: DataTypes.DATE, allowNull: false },
+    event_type: { type: DataTypes.STRING, allowNull: false },
+    payload: { type: DataTypes.JSONB, allowNull: false },
+    ...defaultTimestamps,
+  },
+  {
+    timestamps: false,
+    indexes: [
+      { fields: ["device_id", "timestamp"] },
+      { fields: ["event_type"] },
+    ],
+  }
+);
+
 DailyImpressionSummary.belongsTo(DeviceGroup, { foreignKey: "group_id" });
 DailyImpressionSummary.belongsTo(Ad, { foreignKey: "ad_id" });
 
@@ -414,6 +498,24 @@ Schedule.hasOne(AdPlayback, { foreignKey: "schedule_id" });
 User.belongsTo(Client, { foreignKey: "client_id" });
 Client.hasMany(User, { foreignKey: "client_id" });
 
+
+Device.hasMany(ProofOfPlayLog, { foreignKey: 'device_id' });
+Device.hasMany(DeviceTelemetryLog, { foreignKey: 'device_id' });
+Device.hasMany(DeviceEventLog, { foreignKey: 'device_id' });
+
+// Each log entry belongs to a single Device.
+ProofOfPlayLog.belongsTo(Device, { foreignKey: 'device_id' });
+DeviceTelemetryLog.belongsTo(Device, { foreignKey: 'device_id' });
+DeviceEventLog.belongsTo(Device, { foreignKey: 'device_id' });
+
+// An Ad can be part of many Proof of Play logs.
+Ad.hasMany(ProofOfPlayLog, { foreignKey: 'ad_id' });
+ProofOfPlayLog.belongsTo(Ad, { foreignKey: 'ad_id' });
+
+// A Schedule can have many associated Proof of Play logs.
+Schedule.hasMany(ProofOfPlayLog, { foreignKey: 'schedule_id' });
+ProofOfPlayLog.belongsTo(Schedule, { foreignKey: 'schedule_id' });
+
 module.exports = {
   sequelize,
   Client,
@@ -431,4 +533,7 @@ module.exports = {
   SelectedSeries,
   DailyImpressionSummary,
   ApkVersion,
+  ProofOfPlayLog,
+  DeviceTelemetryLog,
+  DeviceEventLog,
 };
