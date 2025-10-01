@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const { v4: uuidv4 } = require("uuid");
 const {
   getCustomUTCDateTime,
   getUTCDate,
@@ -13,6 +14,9 @@ const {
   ScrollText,
   Client,
   ApkVersion,
+  ProofOfPlayLog,
+  DeviceTelemetryLog,
+  DeviceEventLog,
 } = require("../models");
 const {
   addHours,
@@ -1356,5 +1360,306 @@ module.exports.deleteMessage = async (req, res) => {
     return res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
+  }
+};
+
+// Utility: get pagination params with defaults
+const getPagination = (req) => {
+  const page = parseInt(req.query.page, 10) || 1; // default page 1
+  const limit = parseInt(req.query.limit, 10) || 50; // default 50 logs
+  const offset = (page - 1) * limit;
+  return { limit, offset, page };
+};
+
+module.exports.getProofOfPlayLog = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ error: "Device ID is required" });
+    }
+
+    const { limit, offset, page } = getPagination(req);
+
+    const { rows: logs, count } = await ProofOfPlayLog.findAndCountAll({
+      where: { device_id: id },
+      order: [["start_time", "DESC"]],
+      limit,
+      offset,
+    });
+
+    return res.status(200).json({
+      page,
+      limit,
+      total: count,
+      totalPages: Math.ceil(count / limit),
+      data: logs,
+    });
+  } catch (error) {
+    console.error("Error fetching ProofOfPlay logs:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+module.exports.getDeviceTelemetryLog = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ error: "Device ID is required" });
+    }
+
+    const { limit, offset, page } = getPagination(req);
+
+    const { rows: logs, count } = await DeviceTelemetryLog.findAndCountAll({
+      where: { device_id: id },
+      order: [["timestamp", "DESC"]],
+      limit,
+      offset,
+    });
+
+    return res.status(200).json({
+      page,
+      limit,
+      total: count,
+      totalPages: Math.ceil(count / limit),
+      data: logs,
+    });
+  } catch (error) {
+    console.error("Error fetching DeviceTelemetry logs:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+module.exports.getDeviceEventLog = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ error: "Device ID is required" });
+    }
+
+    const { limit, offset, page } = getPagination(req);
+
+    const { rows: logs, count } = await DeviceEventLog.findAndCountAll({
+      where: { device_id: id },
+      order: [["timestamp", "DESC"]],
+      limit,
+      offset,
+    });
+
+    return res.status(200).json({
+      page,
+      limit,
+      total: count,
+      totalPages: Math.ceil(count / limit),
+      data: logs,
+    });
+  } catch (error) {
+    console.error("Error fetching DeviceEvent logs:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+module.exports.addDeviceEvent = async (req, res) => {
+  try {
+    const { deviceId, sentAt, logs } = req.body;
+
+    // Validate deviceId
+    if (!deviceId || typeof deviceId !== "string") {
+      return res.status(400).json({ error: "Valid deviceId is required" });
+    }
+
+    // Validate logs object
+    if (!logs || typeof logs !== "object") {
+      return res.status(400).json({ error: "Logs must be a valid object" });
+    }
+
+    // Track which logs failed (for partial success response)
+    const result = {
+      proofOfPlay: "skipped",
+      telemetry: "skipped",
+      events: "skipped",
+    };
+
+    // Insert Proof of Play logs
+    if (Array.isArray(logs.proofOfPlay) && logs.proofOfPlay.length > 0) {
+      try {
+        await ProofOfPlayLog.bulkCreate(
+          logs.proofOfPlay.map((log) => ({
+            // event_id: log.eventId || null,
+            event_id: uuidv4(),
+            ad_id: log.adId || null,
+            schedule_id: log.scheduleId || null,
+            start_time: log.startTime || null,
+            end_time: log.endTime || null,
+            duration_played_ms: log.durationPlayedMs || 0,
+            device_id: deviceId,
+            sent_at: sentAt || new Date(),
+          }))
+        );
+        result.proofOfPlay = "success";
+      } catch (err) {
+        console.error("Error inserting ProofOfPlay logs:", err);
+        result.proofOfPlay = "failed";
+      }
+    }
+
+    // Insert Telemetry logs
+    if (Array.isArray(logs.telemetry) && logs.telemetry.length > 0) {
+      try {
+        await DeviceTelemetryLog.bulkCreate(
+          logs.telemetry.map((log) => ({
+            timestamp: log.timestamp || new Date(),
+            cpu_usage: log.cpuUsage ?? null,
+            ram_free_mb: log.ramFreeMb ?? null,
+            device_id: deviceId,
+            sent_at: sentAt || new Date(),
+          }))
+        );
+        result.telemetry = "success";
+      } catch (err) {
+        console.error("Error inserting Telemetry logs:", err);
+        result.telemetry = "failed";
+      }
+    }
+
+    // Insert Device Events
+    if (Array.isArray(logs.events) && logs.events.length > 0) {
+      try {
+        await DeviceEventLog.bulkCreate(
+          logs.events.map((log) => ({
+            // event_id: log.eventId || null,
+            event_id: uuidv4(),
+            timestamp: log.timestamp || new Date(),
+            event_type: log.eventType || "unknown",
+            payload: JSON.stringify(log.payload || {}),
+            device_id: deviceId,
+            sent_at: sentAt || new Date(),
+          }))
+        );
+        result.events = "success";
+      } catch (err) {
+        console.error("Error inserting Device Events:", err);
+        result.events = "failed";
+      }
+    }
+
+    return res.json({
+      message: "Logs processed",
+      status: result,
+    });
+  } catch (error) {
+    console.error("Unexpected error in addDeviceEvent:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// module.exports.getDeviceDetails = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     if (!id) {
+//       return res.status(400).json({ error: "Device ID is required" });
+//     }
+
+//     const device = await Device.findOne({
+//       where: { device_id: id },
+//       include: [
+//         {
+//           model: DeviceGroup,
+//           attributes: ["name", "reg_code", "group_id"],
+//         },
+//       ],
+//     });
+
+//     const schedules = await Schedule.findAll({
+//       where: { group_id: device.DeviceGroup.group_id },
+//       include: [{ model: Ad, attributes: ["name"] }],
+//     });
+
+//     if (!device) {
+//       return res.status(404).json({ error: "Device not found" });
+//     }
+
+//     return res.status(200).json({ device, schedules });
+//   } catch (error) {
+//     console.error("Error fetching device details:", error);
+//     return res.status(500).json({ error: "Internal server error" });
+//   }
+// };
+
+// Utility: pagination helper
+const getPaginationDeviceData = (req) => {
+  const page = parseInt(req.query.page, 10) || 1; // default page = 1
+  const limit = parseInt(req.query.limit, 10) || 50; // default 50 schedules
+  const offset = (page - 1) * limit;
+  return { limit, offset, page };
+};
+
+module.exports.getDeviceDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ error: "Device ID is required" });
+    }
+
+    // Get device with group
+    const device = await Device.findOne({
+      where: { device_id: id },
+      include: [
+        {
+          model: DeviceGroup,
+          attributes: ["name", "group_id"],
+        },
+      ],
+    });
+
+    if (!device) {
+      return res.status(404).json({ error: "Device not found" });
+    }
+
+    const { limit, offset, page } = getPaginationDeviceData(req);
+    const { startDate, endDate } = req.query;
+
+    // Build filter for schedules
+    let whereCondition = { group_id: device.DeviceGroup.group_id };
+
+    if (startDate && endDate) {
+      // Filter by given date range
+      whereCondition.start_time = {
+        [Op.between]: [
+          moment(startDate).startOf("day").toDate(),
+          moment(endDate).endOf("day").toDate(),
+        ],
+      };
+    } else {
+      // Default: today's schedules
+      whereCondition.start_time = {
+        [Op.between]: [
+          moment().startOf("day").toDate(),
+          moment().endOf("day").toDate(),
+        ],
+      };
+    }
+
+    // Fetch schedules with pagination
+    const { rows: schedules, count } = await Schedule.findAndCountAll({
+      where: whereCondition,
+      include: [{ model: Ad, attributes: ["name"] }],
+      order: [["start_time", "ASC"]],
+      limit,
+      offset,
+    });
+
+    return res.status(200).json({
+      device,
+      schedules: {
+        page,
+        limit,
+        total: count,
+        totalPages: Math.ceil(count / limit),
+        data: schedules,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching device details:", error);
+    return res.status(500).json({ error: "Internal server error" });
   }
 };

@@ -410,6 +410,7 @@ const ProofOfPlayLog = sequelize.define(
       allowNull: true,
       references: { model: "Schedules", key: "schedule_id" },
     },
+
     start_time: { type: DataTypes.DATE, allowNull: false },
     end_time: { type: DataTypes.DATE, allowNull: false },
     duration_played_ms: { type: DataTypes.INTEGER, allowNull: false },
@@ -498,23 +499,22 @@ Schedule.hasOne(AdPlayback, { foreignKey: "schedule_id" });
 User.belongsTo(Client, { foreignKey: "client_id" });
 Client.hasMany(User, { foreignKey: "client_id" });
 
-
-Device.hasMany(ProofOfPlayLog, { foreignKey: 'device_id' });
-Device.hasMany(DeviceTelemetryLog, { foreignKey: 'device_id' });
-Device.hasMany(DeviceEventLog, { foreignKey: 'device_id' });
+Device.hasMany(ProofOfPlayLog, { foreignKey: "device_id" });
+Device.hasMany(DeviceTelemetryLog, { foreignKey: "device_id" });
+Device.hasMany(DeviceEventLog, { foreignKey: "device_id" });
 
 // Each log entry belongs to a single Device.
-ProofOfPlayLog.belongsTo(Device, { foreignKey: 'device_id' });
-DeviceTelemetryLog.belongsTo(Device, { foreignKey: 'device_id' });
-DeviceEventLog.belongsTo(Device, { foreignKey: 'device_id' });
+ProofOfPlayLog.belongsTo(Device, { foreignKey: "device_id" });
+DeviceTelemetryLog.belongsTo(Device, { foreignKey: "device_id" });
+DeviceEventLog.belongsTo(Device, { foreignKey: "device_id" });
 
 // An Ad can be part of many Proof of Play logs.
-Ad.hasMany(ProofOfPlayLog, { foreignKey: 'ad_id' });
-ProofOfPlayLog.belongsTo(Ad, { foreignKey: 'ad_id' });
+Ad.hasMany(ProofOfPlayLog, { foreignKey: "ad_id" });
+ProofOfPlayLog.belongsTo(Ad, { foreignKey: "ad_id" });
 
 // A Schedule can have many associated Proof of Play logs.
-Schedule.hasMany(ProofOfPlayLog, { foreignKey: 'schedule_id' });
-ProofOfPlayLog.belongsTo(Schedule, { foreignKey: 'schedule_id' });
+Schedule.hasMany(ProofOfPlayLog, { foreignKey: "schedule_id" });
+ProofOfPlayLog.belongsTo(Schedule, { foreignKey: "schedule_id" });
 
 module.exports = {
   sequelize,
