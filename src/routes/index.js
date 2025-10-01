@@ -37,6 +37,11 @@ const {
   getGroutpList,
   completeRegisterNewDevice,
   getFullSchedule_v2,
+  getProofOfPlayLog,
+  getDeviceTelemetryLog,
+  getDeviceEventLog,
+  addDeviceEvent,
+  getDeviceDetails,
 } = require("../controllers/deviceController");
 const {
   addUser,
@@ -272,6 +277,18 @@ router.delete(
   validateAdmin,
   deleteApkVersion
 );
+
+// device logs apis
+
+router.get("/device/:id/proof-of-play-logs", validateToken, getProofOfPlayLog);
+
+router.get("/device/:id/telemetry-logs", validateToken, getDeviceTelemetryLog);
+
+router.get("/device/:id/event-logs", validateToken, getDeviceEventLog);
+
+router.post("/device/events", addDeviceEvent);
+
+router.get("/device/:id", getDeviceDetails);
 
 // router.post('/apk/extract_data',validateToken,validateAdmin, apkUploadMiddleware, uploadTempApk);
 
