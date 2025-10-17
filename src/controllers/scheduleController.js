@@ -1,5 +1,5 @@
 const { Op } = require("sequelize");
-const { Ad, Schedule, Device } = require("../models");
+const { Ad, Schedule, Device, LiveContent } = require("../models");
 const {
   parseISO,
   isBefore,
@@ -469,6 +469,197 @@ module.exports.getPlaceholder = async (req, res) => {
     res.json({ url });
   } catch (error) {
     console.error("Error fetching placeholder:", error.message, error.stack);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// ------------------ LIVE STREAM SCHEDULING ------------------
+
+module.exports.getLiveSchedules = async (req, res) => {
+  try {
+    const schedules = await Schedule.findAll({
+      where: { content_type: "stream" },
+      order: [["start_time", "ASC"]],
+    });
+
+    res.json({ message: "Fetched all live schedules", data: schedules });
+  } catch (error) {
+    console.error("Error fetching live schedules:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// Add a new live stream schedule
+module.exports.addLiveSchedule = async (req, res) => {
+  try {
+    const {
+      content_id,
+      start_time,
+      end_time,
+      start_date,
+      end_date,
+      total_duration,
+      priority,
+      groups,
+    } = req.body;
+
+    if (
+      !content_id ||
+      !start_time ||
+      !end_time ||
+      !total_duration ||
+      !priority ||
+      !groups ||
+      !start_date ||
+      !end_date
+    ) {
+      return res.status(400).json({ error: "Missing required parameters" });
+    }
+
+    const stream = await LiveContent.findOne({
+      where: { stream_id: content_id },
+    });
+    if (!stream) {
+      return res.status(404).json({ error: "Stream not found" });
+    }
+
+    let schedules = [];
+    const startDate = parseISO(start_time);
+    const endDate = parseISO(end_time);
+    let currentDay = new Date(startDate);
+
+    while (
+      isBefore(currentDay, endDate) ||
+      currentDay.toDateString() === endDate.toDateString()
+    ) {
+      const dayStart = setHours(setMinutes(new Date(currentDay), 0), 6);
+      const dayEnd = setHours(setMinutes(new Date(currentDay), 0), 23); // till 11 PM
+
+      groups.forEach((group_id) => {
+        schedules.push({
+          content_id,
+          content_type: "stream",
+          group_id,
+          start_time: formatISO(dayStart),
+          end_time: formatISO(dayEnd),
+          total_duration: parseInt(total_duration),
+          priority,
+        });
+      });
+
+      currentDay = addDays(currentDay, 1);
+    }
+
+    const created = await Schedule.bulkCreate(schedules);
+
+    await pushToGroupQueue(groups);
+
+    res.json({
+      message: "Live stream schedules added successfully",
+      schedules: created,
+    });
+  } catch (error) {
+    console.error("Error adding live schedule:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// Update live stream schedule
+module.exports.updateLiveSchedule = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = req.body;
+
+    const schedule = await Schedule.findOne({
+      where: { schedule_id: id, content_type: "stream" },
+    });
+
+    if (!schedule) {
+      return res.status(404).json({ error: "Live schedule not found" });
+    }
+
+    await Schedule.update(data, { where: { schedule_id: id } });
+
+    await pushToGroupQueue([schedule.group_id]);
+
+    res.json({ message: "Live schedule updated successfully" });
+  } catch (error) {
+    console.error("Error updating live schedule:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// Delete single live schedule
+module.exports.deleteLiveSchedule = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const schedule = await Schedule.findOne({
+      where: { schedule_id: id, content_type: "stream" },
+    });
+
+    if (!schedule) {
+      return res.status(404).json({ error: "Live schedule not found" });
+    }
+
+    await Schedule.destroy({ where: { schedule_id: id } });
+
+    await pushToGroupQueue([schedule.group_id]);
+
+    res.json({ message: "Live schedule deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting live schedule:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// Delete multiple live schedules
+module.exports.deleteMultipleLiveSchedules = async (req, res) => {
+  try {
+    const { groupId, contentId, startDate, endDate } = req.body;
+
+    if (!groupId || !contentId || !startDate || !endDate) {
+      return res.status(400).json({
+        error:
+          "Missing required parameters: groupId, contentId, startDate, endDate",
+      });
+    }
+
+    const startOfDay = moment(startDate)
+      .startOf("day")
+      .format("YYYY-MM-DD HH:mm:ss");
+    const endOfDay = moment(endDate).endOf("day").format("YYYY-MM-DD HH:mm:ss");
+
+    const schedules = await Schedule.findAll({
+      where: {
+        group_id: groupId,
+        content_id: contentId,
+        content_type: "stream",
+        start_time: { [Op.between]: [startOfDay, endOfDay] },
+      },
+    });
+
+    if (schedules.length === 0) {
+      return res.status(404).json({ error: "No live schedules found" });
+    }
+
+    await Schedule.destroy({
+      where: {
+        group_id: groupId,
+        content_id: contentId,
+        content_type: "stream",
+        start_time: { [Op.between]: [startOfDay, endOfDay] },
+      },
+    });
+
+    await pushToGroupQueue([groupId]);
+
+    res.json({
+      message: "Multiple live schedules deleted successfully",
+      count: schedules.length,
+    });
+  } catch (error) {
+    console.error("Error deleting multiple live schedules:", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };

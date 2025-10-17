@@ -14,6 +14,11 @@ const {
   updateSchedule,
   getPlaceholder,
   deleteMultipleSchedule,
+  addLiveSchedule,
+  deleteLiveSchedule,
+  deleteMultipleLiveSchedules,
+  getLiveSchedules,
+  updateLiveSchedule,
 } = require("../controllers/scheduleController");
 const {
   getFullSchedule,
@@ -93,6 +98,12 @@ const {
   getAllApkVersions,
   checkForUpdates,
 } = require("../controllers/apkVersionController");
+const {
+  getAllLiveContents,
+  addLiveContent,
+  deleteLiveContent,
+  updateLiveContent,
+} = require("../controllers/liveController");
 
 router.post("/device/register", registerDevice); // takes group id and location input
 
@@ -289,7 +300,29 @@ router.get("/device/:id/event-logs", validateToken, getDeviceEventLog);
 router.post("/device/events", addDeviceEvent);
 
 router.get("/device/:id", getDeviceDetails);
+` `;
 
+// stream apis
+
+router.get("/schedule/live/all", getLiveSchedules);
+router.post("/schedule/live/add", validateToken, addLiveSchedule);
+router.post("/schedule/live/update/:id", updateLiveSchedule);
+router.post("/schedule/live/delete/:id", validateToken, deleteLiveSchedule);
+router.post(
+  "/schedule/live/multiple-delete",
+  validateToken,
+  deleteMultipleLiveSchedules
+);
 // router.post('/apk/extract_data',validateToken,validateAdmin, apkUploadMiddleware, uploadTempApk);
+
+// Create Stream Apis
+
+// router.get("/live/clients", validateToken, getAllClients);
+router.get("/live/all", validateToken, getAllLiveContents);
+router.post("/live/add", validateToken, addLiveContent);
+router.post("/live/update", validateToken, updateLiveContent);
+router.post("/live/delete/:ad_id", validateToken, deleteLiveContent);
+
+// router.get("/ads/:id", validateToken, sendAdDetails);
 
 module.exports = router;

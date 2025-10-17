@@ -13,7 +13,6 @@ const defaultTimestamps = {
     defaultValue: DataTypes.NOW,
   },
 };
-
 const Client = sequelize.define(
   "Client",
   {
@@ -70,6 +69,56 @@ const Device = sequelize.define(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
+    device_type: {
+      type: DataTypes.ENUM("mobile", "laptop", "tv", "tablet", "desktop"),
+      allowNull: false,
+      defaultValue: "tv",
+    },
+
+    device_model: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+
+    device_os_version: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+
+    // ENUM for orientation
+    device_orientation: {
+      type: DataTypes.ENUM("portrait", "landscape", "auto"),
+      allowNull: false,
+      defaultValue: "auto",
+    },
+
+    device_resolution: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+
+    // ENUM for OS
+    device_os: {
+      type: DataTypes.ENUM(
+        "tizen",
+        "android",
+        "webos",
+        "ios",
+        "windows",
+        "linux"
+      ),
+      allowNull: true,
+    },
+    device_on_time: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: "06:00:00", // 6:00 AM
+    },
+    device_off_time: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: "23:00:00", // 11:00 PM
+    },
     device_name: {
       type: DataTypes.STRING,
       defaultValue: "Unknown Device",
@@ -106,6 +155,16 @@ const DeviceGroup = sequelize.define(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
+    max_days_schedules: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 1,
+    }, // Max number of days schedules can be created for
+    current_content_type: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: "ad",
+    }, //website, stream, ad
     client_id: { type: DataTypes.UUID, allowNull: false },
     reg_code: { type: DataTypes.STRING, allowNull: false },
     name: { type: DataTypes.STRING, allowNull: false },
@@ -147,12 +206,39 @@ const Schedule = sequelize.define(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-    ad_id: { type: DataTypes.UUID, allowNull: false },
+    content_id: { type: DataTypes.UUID, allowNull: false },
+    content_type: { type: DataTypes.STRING, allowNull: false }, //website, stream, ad
+    // ad_id: { type: DataTypes.UUID, allowNull: false },
     group_id: { type: DataTypes.UUID, allowNull: false },
     start_time: { type: DataTypes.DATE, allowNull: false },
     end_time: { type: DataTypes.DATE, allowNull: false },
     total_duration: DataTypes.INTEGER,
     priority: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
+    ...defaultTimestamps,
+  },
+  {
+    timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
+  }
+);
+
+const LiveContent = sequelize.define(
+  "LiveContent",
+  {
+    live_id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    client_id: { type: DataTypes.UUID, allowNull: false },
+    content_type: { type: DataTypes.STRING, allowNull: false }, // website, live, ppt
+    name: { type: DataTypes.STRING, allowNull: false },
+    url: { type: DataTypes.STRING, allowNull: false },
+    stream_platform: { type: DataTypes.STRING, allowNull: false }, // youtube, ipTV
+    isDeleted: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false,
+    },
     ...defaultTimestamps,
   },
   {
@@ -485,10 +571,11 @@ Campaign.hasMany(Coupon, { foreignKey: "campaign_id", as: "coupons" });
 Coupon.belongsTo(Campaign, { foreignKey: "campaign_id" });
 Client.hasMany(Ad, { foreignKey: "client_id" });
 Ad.belongsTo(Client, { foreignKey: "client_id" });
+LiveContent.belongsTo(Client, { foreignKey: "client_id" });
 Client.hasMany(DeviceGroup, { foreignKey: "client_id" });
 DeviceGroup.belongsTo(Client, { foreignKey: "client_id" });
-Ad.hasMany(Schedule, { foreignKey: "ad_id" });
-Schedule.belongsTo(Ad, { foreignKey: "ad_id" });
+// Ad.hasMany(Schedule, { foreignKey: "ad_id" });
+// Schedule.belongsTo(Ad, { foreignKey: "ad_id" });
 DeviceGroup.hasMany(Schedule, { foreignKey: "group_id" });
 Schedule.belongsTo(DeviceGroup, { foreignKey: "group_id" });
 Device.belongsTo(DeviceGroup, { foreignKey: "group_id" });
@@ -516,6 +603,28 @@ ProofOfPlayLog.belongsTo(Ad, { foreignKey: "ad_id" });
 Schedule.hasMany(ProofOfPlayLog, { foreignKey: "schedule_id" });
 ProofOfPlayLog.belongsTo(Schedule, { foreignKey: "schedule_id" });
 
+// === Associations ===
+Schedule.belongsTo(LiveContent, {
+  foreignKey: "content_id",
+  constraints: false,
+  as: "liveContent",
+});
+Schedule.belongsTo(Ad, {
+  foreignKey: "content_id",
+  constraints: false,
+  as: "adContent",
+});
+
+DeviceGroup.hasMany(Schedule, { foreignKey: "group_id" });
+Schedule.belongsTo(DeviceGroup, { foreignKey: "group_id" });
+
+// Optional helper method
+Schedule.prototype.getContent = async function () {
+  return this.content_type === "stream"
+    ? await this.getLiveContent() // ✅ this exists
+    : await this.getAdContent(); // ✅ this exists
+};
+
 module.exports = {
   sequelize,
   Client,
@@ -536,4 +645,5 @@ module.exports = {
   ProofOfPlayLog,
   DeviceTelemetryLog,
   DeviceEventLog,
+  LiveContent,
 };
