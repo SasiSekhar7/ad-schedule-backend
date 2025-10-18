@@ -34,6 +34,7 @@ const {
   convertToPushReadyJSON,
   exitDeviceAppliation,
   updateDeviceGroup,
+  updateDeviceMataData,
 } = require("./queueController");
 const moment = require("moment");
 
@@ -757,7 +758,74 @@ module.exports.registerDevice = async (req, res) => {
 
 module.exports.registerNewDevice = async (req, res) => {
   try {
-    const { android_id } = req.body;
+    const {
+      android_id,
+      device_type,
+      device_model,
+      device_os_version,
+      device_orientation,
+      device_resolution,
+      device_os,
+      device_on_time,
+      device_off_time,
+    } = req.body;
+
+    // ------------------ VALIDATION ------------------
+    if (!android_id || typeof android_id !== "string") {
+      return res
+        .status(400)
+        .json({ message: "android_id is required and must be a string" });
+    }
+    // ------------------ CONDITIONAL VALIDATION ------------------
+    if (
+      device_type &&
+      !["mobile", "laptop", "tv", "tablet", "desktop"].includes(device_type)
+    ) {
+      return res.status(400).json({
+        message:
+          "device_type must be one of: mobile, laptop, tv, tablet, desktop",
+      });
+    }
+
+    if (
+      device_orientation &&
+      !["portrait", "landscape", "auto"].includes(device_orientation)
+    ) {
+      return res.status(400).json({
+        message: "device_orientation must be one of: portrait, landscape, auto",
+      });
+    }
+
+    if (
+      device_os &&
+      !["tizen", "android", "webos", "ios", "windows", "linux"].includes(
+        device_os
+      )
+    ) {
+      return res.status(400).json({
+        message:
+          "device_os must be one of: tizen, android, webos, ios, windows, linux",
+      });
+    }
+
+    if (device_resolution && !/^\d+x\d+$/.test(device_resolution)) {
+      return res.status(400).json({
+        message:
+          "device_resolution must be in WIDTHxHEIGHT format, e.g., 1920x1080",
+      });
+    }
+
+    if (device_on_time && !/^\d{2}:\d{2}:\d{2}$/.test(device_on_time)) {
+      return res.status(400).json({
+        message: "device_on_time must be in HH:mm:ss format",
+      });
+    }
+
+    if (device_off_time && !/^\d{2}:\d{2}:\d{2}$/.test(device_off_time)) {
+      return res.status(400).json({
+        message: "device_off_time must be in HH:mm:ss format",
+      });
+    }
 
     const deviceExists = await Device.findOne({
       where: {
@@ -783,6 +851,15 @@ module.exports.registerNewDevice = async (req, res) => {
     if (deviceExists) {
       await Device.update(
         {
+          device_type: device_type || existingDevice.device_type,
+          device_model: device_model || existingDevice.device_model,
+          device_os: device_os || existingDevice.device_os,
+          device_os_version:
+            device_os_version || existingDevice.device_os_version,
+          device_orientation:
+            device_orientation || existingDevice.device_orientation,
+          device_resolution:
+            device_resolution || existingDevice.device_resolution,
           pairing_code: pairing_code,
           registration_status: "pending",
           location: deviceExists.location || "Unknown",
@@ -808,6 +885,12 @@ module.exports.registerNewDevice = async (req, res) => {
     const device = await Device.create({
       android_id,
       group_id: group_id, // Initially set to null, can be updated later
+      device_type: device_type || "tv",
+      device_model: device_model || "Unknown Model",
+      device_os: device_os || null,
+      device_os_version: device_os_version || null,
+      device_orientation: device_orientation || "auto",
+      device_resolution: device_resolution || null,
       location: "Unknown", // Default location, can be updated later
       registration_status: "pending", // Default status
       pairing_code: pairing_code, // Initially set to null
@@ -832,24 +915,44 @@ module.exports.registerNewDevice = async (req, res) => {
 module.exports.getDeviceByPairingCode = async (req, res) => {
   try {
     const { pairing_code } = req.params;
+
     if (!pairing_code) {
       return res.status(400).json({ error: "Pairing code is required" });
     }
+
     const device = await Device.findOne({
       where: { pairing_code, registration_status: "pending" },
     });
+
     if (!device) {
-      return res.status(404).json({ error: "Device not found" });
+      return res
+        .status(404)
+        .json({ error: "Device not found or already paired" });
     }
-    const response = {
+
+    // Return full device details
+    return res.status(200).json({
       device_id: device.device_id,
       device_name: device.device_name || "Unknown Device",
       android_id: device.android_id,
+      device_type: device.device_type,
+      device_model: device.device_model || null,
+      device_os_version: device.device_os_version || null,
+      device_orientation: device.device_orientation,
+      device_resolution: device.device_resolution || null,
+      device_os: device.device_os || null,
+      device_on_time: device.device_on_time,
+      device_off_time: device.device_off_time,
+      group_id: device.group_id || null,
+      status: device.status,
+      registration_status: device.registration_status,
       tags: device.tags || [],
       pairing_code: device.pairing_code,
-      group_id: device.group_id || null, // Group ID can be null if not paired
-    };
-    return res.status(200).json(response);
+      location: device.location || "Unknown",
+      last_synced: device.last_synced,
+      created_at: device.created_at,
+      updated_at: device.updated_at,
+    });
   } catch (error) {
     console.error("Error fetching device by pairing code:", error);
     return res.status(500).json({ error: "Internal server error" });
@@ -859,7 +962,8 @@ module.exports.getDeviceByPairingCode = async (req, res) => {
 module.exports.updateDeviceDetails = async (req, res) => {
   try {
     const { device_id } = req.params;
-    const { device_name, tags, group_id } = req.body;
+    const { device_name, tags, group_id, device_on_time, device_off_time } =
+      req.body;
     if (!device_id) {
       return res.status(400).json({ error: "Device ID is required" });
     }
@@ -877,11 +981,15 @@ module.exports.updateDeviceDetails = async (req, res) => {
     if (tags) {
       device.tags = tags; // Assuming tags is a string or array, adjust as needed
     }
+
     if (group_id) {
       device.group_id = group_id;
-      device.last_synced = getCustomUTCDateTime();
-      device.status = "active"; // Set status to active when group_id is updated
+      // device.last_synced = getCustomUTCDateTime();
+      // device.status = "active"; // Set status to active when group_id is updated
     }
+
+    if (device_on_time) device.device_on_time = device_on_time;
+    if (device_off_time) device.device_off_time = device_off_time;
     await device.save();
     return res.status(200).json({
       message: "Device details updated successfully",
@@ -892,56 +1000,268 @@ module.exports.updateDeviceDetails = async (req, res) => {
   }
 };
 
+// module.exports.updateDeviceDetailsAndLaunch = async (req, res) => {
+//   try {
+//     const { device_id } = req.params;
+//     console.log("body", req.body);
+
+//     const {
+//       location,
+//       group_id,
+//       device_orientation,
+//       device_resolution,
+//       device_on_time,
+//       device_off_time,
+//     } = req.body;
+//     const role = req.user?.role;
+//     if (!device_id) {
+//       return res.status(400).json({ error: "Device ID is required" });
+//     }
+//     if (!location) {
+//       return res.status(400).json({ error: "Location is required" });
+//     }
+//     if (
+//       device_orientation &&
+//       !["portrait", "landscape", "auto"].includes(device_orientation)
+//     ) {
+//       return res.status(400).json({
+//         message: "device_orientation must be one of: portrait, landscape, auto",
+//       });
+//     }
+
+//     if (device_resolution && !/^\d+x\d+$/.test(device_resolution)) {
+//       return res.status(400).json({
+//         message:
+//           "device_resolution must be in WIDTHxHEIGHT format, e.g., 1920x1080",
+//       });
+//     }
+
+//     if (device_on_time && !/^\d{2}:\d{2}:\d{2}$/.test(device_on_time)) {
+//       return res.status(400).json({
+//         message: "device_on_time must be in HH:mm:ss format",
+//       });
+//     }
+
+//     if (device_off_time && !/^\d{2}:\d{2}:\d{2}$/.test(device_off_time)) {
+//       return res.status(400).json({
+//         message: "device_off_time must be in HH:mm:ss format",
+//       });
+//     }
+
+//     const finalLocation = location.lat + "," + location.lng;
+//     const device = await Device.findOne({ where: { device_id } });
+//     if (!device) {
+//       return res.status(404).json({ error: "Device not found" });
+//     }
+
+//     console.log("group_id", group_id);
+
+//     if (group_id) {
+//       const groupExists = await DeviceGroup.findOne({
+//         where: { group_id }, // Ensure `group_id` is the actual column name
+//       });
+//       // Update the location field
+//       device.location = finalLocation;
+//       device.registration_status = "pairing"; // Set status to connected when location is updated
+
+//       let fileName = "placeholder.jpg";
+//       let url;
+//       if (role != "Admin") {
+//         fileName = `${groupExists.client_id}/placeholder.jpg`;
+//         url = await getBucketURL(fileName);
+//         if (!url) {
+//           fileName = "placeholder.jpg";
+//         }
+//       }
+
+//       url = await getBucketURL(fileName);
+//       console.log("url", url);
+
+//       await pushNewDeviceToQueue(device, url);
+//     } else {
+
+//       await updateDeviceMataData(device
+//       )
+//     }
+
+//     await device.save();
+//     return res.status(200).json({
+//       message: "Device details updated successfully",
+//     });
+//   } catch (error) {
+//     console.error("Error updating device location:", error);
+//     return res.status(500).json({ error: "Internal server error" });
+//   }
+// };
+
 module.exports.updateDeviceDetailsAndLaunch = async (req, res) => {
   try {
     const { device_id } = req.params;
-    console.log("body", req.body);
-
-    const { location, group_id } = req.body;
+    const {
+      location,
+      group_id,
+      device_orientation,
+      device_resolution,
+      device_on_time,
+      device_off_time,
+    } = req.body;
     const role = req.user?.role;
+
     if (!device_id) {
       return res.status(400).json({ error: "Device ID is required" });
     }
-    if (!location) {
-      return res.status(400).json({ error: "Location is required" });
-    }
 
-    const finalLocation = location.lat + "," + location.lng;
     const device = await Device.findOne({ where: { device_id } });
     if (!device) {
       return res.status(404).json({ error: "Device not found" });
     }
 
-    console.log("group_id", group_id);
-
-    const groupExists = await DeviceGroup.findOne({
-      where: { group_id }, // Ensure `group_id` is the actual column name
-    });
-    // Update the location field
-    device.location = finalLocation;
-    device.registration_status = "pairing"; // Set status to connected when location is updated
-
-    let fileName = "placeholder.jpg";
-    let url;
-    if (role != "Admin") {
-      fileName = `${groupExists.client_id}/placeholder.jpg`;
-      url = await getBucketURL(fileName);
-      if (!url) {
-        fileName = "placeholder.jpg";
-      }
+    // Validate optional fields only if provided
+    if (
+      device_orientation &&
+      !["portrait", "landscape", "auto"].includes(device_orientation)
+    ) {
+      return res.status(400).json({
+        message: "device_orientation must be one of: portrait, landscape, auto",
+      });
     }
 
-    url = await getBucketURL(fileName);
-    console.log("url", url);
+    if (device_resolution && !/^\d+x\d+$/.test(device_resolution)) {
+      return res.status(400).json({
+        message:
+          "device_resolution must be in WIDTHxHEIGHT format, e.g., 1920x1080",
+      });
+    }
 
-    await pushNewDeviceToQueue(device, url);
+    if (device_on_time && !/^\d{2}:\d{2}:\d{2}$/.test(device_on_time)) {
+      return res
+        .status(400)
+        .json({ message: "device_on_time must be in HH:mm:ss format" });
+    }
+
+    if (device_off_time && !/^\d{2}:\d{2}:\d{2}$/.test(device_off_time)) {
+      return res
+        .status(400)
+        .json({ message: "device_off_time must be in HH:mm:ss format" });
+    }
+
+    // Location is required only if group_id is provided
+    if (group_id && !location) {
+      return res
+        .status(400)
+        .json({ error: "Location is required when group_id is provided" });
+    }
+
+    // Only update the fields that are provided
+    let device_orientation_val =
+      device_orientation ?? device.device_orientation;
+    let device_resolution_val = device_resolution ?? device.device_resolution;
+    device.device_on_time = device_on_time ?? device.device_on_time;
+    device.device_off_time = device_off_time ?? device.device_off_time;
+
+    if (group_id) {
+      const groupExists = await DeviceGroup.findOne({ where: { group_id } });
+      if (!groupExists) {
+        return res.status(404).json({ error: "Device group not found" });
+      }
+
+      device.group_id = group_id;
+      device.location = `${location.lat},${location.lng}`;
+      device.registration_status = "pairing"; // Set status to pairing when group_id is updated
+
+      // Placeholder / URL logic
+      let fileName =
+        role !== "Admin"
+          ? `${groupExists.client_id}/placeholder.jpg`
+          : "placeholder.jpg";
+      const url = (await getBucketURL(fileName)) || "placeholder.jpg";
+
+      // Push to device queue
+      await pushNewDeviceToQueue(device, url);
+    } else if (device_orientation || device_resolution) {
+      // Only metadata update, no group changes
+      const metaData = {
+        device_orientation: device_orientation_val,
+        device_resolution: device_resolution_val,
+      };
+
+      await updateDeviceMataData(device_id, metaData);
+    }
 
     await device.save();
+
     return res.status(200).json({
       message: "Device details updated successfully",
+      device_id: device.device_id,
     });
   } catch (error) {
-    console.error("Error updating device location:", error);
+    console.error("Error updating device:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+module.exports.confirmUpdateDeviceMataData = async (req, res) => {
+  try {
+    const { device_id } = req.params;
+    const {
+      device_orientation,
+      device_resolution,
+      device_on_time,
+      device_off_time,
+    } = req.body;
+    const role = req.user?.role;
+
+    if (!device_id) {
+      return res.status(400).json({ error: "Device ID is required" });
+    }
+
+    const device = await Device.findOne({ where: { device_id } });
+    if (!device) {
+      return res.status(404).json({ error: "Device not found" });
+    }
+
+    // Validate optional fields only if provided
+    if (
+      device_orientation &&
+      !["portrait", "landscape", "auto"].includes(device_orientation)
+    ) {
+      return res.status(400).json({
+        message: "device_orientation must be one of: portrait, landscape, auto",
+      });
+    }
+
+    if (device_resolution && !/^\d+x\d+$/.test(device_resolution)) {
+      return res.status(400).json({
+        message:
+          "device_resolution must be in WIDTHxHEIGHT format, e.g., 1920x1080",
+      });
+    }
+
+    if (device_on_time && !/^\d{2}:\d{2}:\d{2}$/.test(device_on_time)) {
+      return res
+        .status(400)
+        .json({ message: "device_on_time must be in HH:mm:ss format" });
+    }
+
+    if (device_off_time && !/^\d{2}:\d{2}:\d{2}$/.test(device_off_time)) {
+      return res
+        .status(400)
+        .json({ message: "device_off_time must be in HH:mm:ss format" });
+    }
+
+    // Only update the fields that are provided
+    device.device_orientation = device_orientation ?? device.device_orientation;
+    device.device_resolution = device_resolution ?? device.device_resolution;
+    device.device_on_time = device_on_time ?? device.device_on_time;
+    device.device_off_time = device_off_time ?? device.device_off_time;
+    device.last_sync = await device.save();
+
+    return res.status(200).json({
+      message: "Device details updated successfully",
+      device_id: device.device_id,
+    });
+  } catch (error) {
+    console.error("Error updating device:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -951,7 +1271,7 @@ module.exports.updateDeviceMetadata = async (req, res) => {
     const { device_id } = req.params;
     console.log("body", req.body);
 
-    const { location, group_id } = req.body;
+    const { location, group_id, device_orientation, devi } = req.body;
     const role = req.user?.role;
     if (!device_id) {
       return res.status(400).json({ error: "Device ID is required" });
@@ -1015,7 +1335,14 @@ module.exports.getGroutpList = async (req, res) => {
 
     const groups = await DeviceGroup.findAll({
       where: whereClause, // <<== Apply filter here
-      attributes: ["group_id", "name", "reg_code", "client_id"],
+      attributes: [
+        "group_id",
+        "name",
+        "reg_code",
+        "client_id",
+        "rcs_enabled",
+        "placeholder_enabled",
+      ],
     });
 
     const formattedGroups = groups.map((group) => ({
@@ -1023,6 +1350,8 @@ module.exports.getGroutpList = async (req, res) => {
       name: group.name,
       reg_code: group.reg_code,
       client_id: group.client_id,
+      rcs_enabled: group.rcs_enabled,
+      placeholder_enabled: group.placeholder_enabled,
     }));
 
     return res.status(200).json({ groups: formattedGroups });
@@ -1096,7 +1425,8 @@ module.exports.exitDevice = async (req, res) => {
 
 module.exports.createGroup = async (req, res) => {
   try {
-    let { name, reg_code, client_id } = req.body;
+    let { name, reg_code, client_id, rcs_enabled, placeholder_enabled } =
+      req.body;
 
     if (req.user.role != "Admin") {
       client_id = req.user.client_id;
@@ -1112,13 +1442,54 @@ module.exports.createGroup = async (req, res) => {
     }
 
     // Create the group
-    const group = await DeviceGroup.create({ name, reg_code, client_id });
+    const group = await DeviceGroup.create({
+      name,
+      rcs_enabled,
+      placeholder_enabled,
+      reg_code,
+      client_id,
+    });
 
     return res
       .status(201)
       .json({ message: "Group created successfully", group });
   } catch (error) {
     console.error("Error creating group:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+module.exports.updateGroup = async (req, res) => {
+  try {
+    const { group_id } = req.params;
+    let { name, rcs_enabled, placeholder_enabled } = req.body;
+
+    if (!group_id) {
+      return res.status(400).json({ message: "group_id is required" });
+    }
+
+    // Find the group
+    const group = await DeviceGroup.findOne({ where: { group_id } });
+    if (!group) {
+      return res.status(404).json({ message: "Device group not found" });
+    }
+
+    // Update only the provided fields
+    if (name !== undefined) group.name = name;
+    if (rcs_enabled !== undefined) group.rcs_enabled = rcs_enabled;
+    if (placeholder_enabled !== undefined)
+      group.placeholder_enabled = placeholder_enabled;
+
+    await group.save();
+
+    await pushToGroupQueue([group_id]);
+
+    return res.status(200).json({
+      message: "Group updated successfully",
+      group,
+    });
+  } catch (error) {
+    console.error("Error updating group:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -1148,6 +1519,8 @@ module.exports.fetchGroups = async (req, res) => {
         "group_id",
         "name",
         "reg_code",
+        "rcs_enabled",
+        "placeholder_enabled",
         "client_id", // Include client_id from DeviceGroup
         [fn("COUNT", col("Devices.device_id")), "device_count"],
       ],
@@ -1181,6 +1554,8 @@ module.exports.fetchGroups = async (req, res) => {
     const formattedGroups = groups.map((group) => ({
       group_id: group.group_id,
       name: group.name,
+      rcs_enabled: group.rcs_enabled,
+      placeholder_enabled: group.placeholder_enabled,
       reg_code: group.reg_code,
       device_count: parseInt(group.device_count, 10),
       message: group.ScrollText ? group.ScrollText.message : null,

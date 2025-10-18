@@ -95,6 +95,10 @@ module.exports.convertToPushReadyJSON = async (
     console.log(`⚠️ No ads found for group ${group_id}, skipping.`);
   }
 
+  const DeviceGroupData = await DeviceGroup.findOne({
+    where: { group_id }, // Ensure `group_id` is the actual column name
+  });
+
   // Process ads asynchronously
   const ads = await Promise.all(
     scheduledAds.map(async (schedule) => {
@@ -151,7 +155,9 @@ module.exports.convertToPushReadyJSON = async (
   const jsonToSend = {
     rcs: scrollingMessage,
     ads: validAds,
-    placeholder,
+    placeholder: placeholder,
+    rcs_enabled: DeviceGroupData.rcs_enabled ?? false,
+    placeholder_enabled: DeviceGroupData.placeholder_enabled ?? false,
   };
   return jsonToSend;
 };
@@ -341,6 +347,60 @@ module.exports.updateDeviceGroup = async (device_id, group_id) => {
       action: "updateGroup",
       group_id: group_id,
       device_id: device_id,
+    };
+
+    mqttClient.publish(
+      topic,
+      JSON.stringify(message),
+      { qos: 2, retain: false },
+      (err) => {
+        if (err) {
+          console.error(`❌ Failed to publish to ${topic}:`, err);
+        } else {
+          console.log(
+            `📡 Successfully published update group to ${topic} with QoS 2 and retain flag`
+          );
+        }
+      }
+    );
+  } catch (error) {
+    console.error("❌ Error in pushToGroupQueue:", error);
+  }
+};
+
+module.exports.updateDeviceMataData = async (device_id, matadata) => {
+  try {
+    const topic = `device/${device_id}`;
+    const message = {
+      action: "updateDeviceMataData",
+      device_orientation: matadata.device_orientation,
+      device_resolution: matadata.device_resolution,
+    };
+
+    mqttClient.publish(
+      topic,
+      JSON.stringify(message),
+      { qos: 2, retain: false },
+      (err) => {
+        if (err) {
+          console.error(`❌ Failed to publish to ${topic}:`, err);
+        } else {
+          console.log(
+            `📡 Successfully published update group to ${topic} with QoS 2 and retain flag`
+          );
+        }
+      }
+    );
+  } catch (error) {
+    console.error("❌ Error in pushToGroupQueue:", error);
+  }
+};
+
+module.exports.DeviceOnOff = async (device_id, action) => {
+  try {
+    const topic = `device/${device_id}`;
+    const message = {
+      action: action,
     };
 
     mqttClient.publish(

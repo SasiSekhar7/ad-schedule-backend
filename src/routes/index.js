@@ -42,6 +42,8 @@ const {
   getDeviceEventLog,
   addDeviceEvent,
   getDeviceDetails,
+  updateGroup,
+  confirmUpdateDeviceMataData,
 } = require("../controllers/deviceController");
 const {
   addUser,
@@ -115,6 +117,11 @@ router.post(
   validateToken,
   updateDeviceMetadata
 );
+
+router.post(
+  "/device/update/matadata-confirm/:device_id",
+  confirmUpdateDeviceMataData
+);
 router.post("/device/complete-registration", completeRegisterNewDevice);
 router.get("/device/group-list", validateToken, getGroutpList);
 
@@ -162,6 +169,7 @@ router.get("/dashboard/groups/table", validateToken, getGroupPerformanceTable);
 
 router.post("/device/create-group", validateToken, createGroup); // only takes name as input
 router.get("/device/fetch-groups", validateToken, fetchGroups); // only takes name as input
+router.put("/device/update-group/:group_id", validateToken, updateGroup);
 
 router.post("/scroll-text", validateToken, addMessage);
 router.post("/scroll-text/delete/:group_id", validateToken, deleteMessage);
