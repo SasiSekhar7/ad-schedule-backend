@@ -70,6 +70,56 @@ const Device = sequelize.define(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
+    device_type: {
+      type: DataTypes.ENUM("mobile", "laptop", "tv", "tablet", "desktop"),
+      allowNull: false,
+      defaultValue: "tv",
+    },
+
+    device_model: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+
+    device_os_version: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+
+    // ENUM for orientation
+    device_orientation: {
+      type: DataTypes.ENUM("portrait", "landscape", "auto"),
+      allowNull: false,
+      defaultValue: "auto",
+    },
+
+    device_resolution: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+
+    // ENUM for OS
+    device_os: {
+      type: DataTypes.ENUM(
+        "tizen",
+        "android",
+        "webos",
+        "ios",
+        "windows",
+        "linux"
+      ),
+      allowNull: true,
+    },
+    device_on_time: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: "06:00:00", // 6:00 AM
+    },
+    device_off_time: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: "23:00:00", // 11:00 PM
+    },
     device_name: {
       type: DataTypes.STRING,
       defaultValue: "Unknown Device",
@@ -105,6 +155,27 @@ const DeviceGroup = sequelize.define(
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
+    },
+    max_days_schedules: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 1,
+    }, // Max number of days schedules can be created for
+    current_content_type: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: "ad",
+    }, //website, stream, ad
+    rcs_enabled: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true, // default ON
+    },
+
+    placeholder_enabled: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true, // default ON
     },
     client_id: { type: DataTypes.UUID, allowNull: false },
     reg_code: { type: DataTypes.STRING, allowNull: false },

@@ -42,6 +42,8 @@ const {
   getDeviceEventLog,
   addDeviceEvent,
   getDeviceDetails,
+  updateGroup,
+  confirmUpdateDeviceMataData,
 } = require("../controllers/deviceController");
 const {
   addUser,
@@ -63,6 +65,9 @@ const {
   addAd,
   deleteAd,
   changePlaceholder,
+  completeMultipartUpload,
+  generateUploadUrls,
+  createMultipartUpload,
 } = require("../controllers/s3Controller");
 const {
   validateToken,
@@ -115,6 +120,11 @@ router.post(
   validateToken,
   updateDeviceMetadata
 );
+
+router.post(
+  "/device/update/matadata-confirm/:device_id",
+  confirmUpdateDeviceMataData
+);
 router.post("/device/complete-registration", completeRegisterNewDevice);
 router.get("/device/group-list", validateToken, getGroutpList);
 
@@ -162,6 +172,7 @@ router.get("/dashboard/groups/table", validateToken, getGroupPerformanceTable);
 
 router.post("/device/create-group", validateToken, createGroup); // only takes name as input
 router.get("/device/fetch-groups", validateToken, fetchGroups); // only takes name as input
+router.put("/device/update-group/:group_id", validateToken, updateGroup);
 
 router.post("/scroll-text", validateToken, addMessage);
 router.post("/scroll-text/delete/:group_id", validateToken, deleteMessage);
@@ -291,5 +302,10 @@ router.post("/device/events", addDeviceEvent);
 router.get("/device/:id", getDeviceDetails);
 
 // router.post('/apk/extract_data',validateToken,validateAdmin, apkUploadMiddleware, uploadTempApk);
+
+// Define routes
+router.post("/s3/create-multipart-upload", createMultipartUpload);
+router.post("/s3/generate-upload-urls", generateUploadUrls);
+router.post("/s3/complete-multipart-upload", completeMultipartUpload);
 
 module.exports = router;
