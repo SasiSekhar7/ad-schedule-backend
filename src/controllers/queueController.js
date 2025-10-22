@@ -11,6 +11,8 @@ const {
 const { default: mqtt } = require("mqtt");
 // const { getBucketURL } = require("./s3Controller");
 
+const ad_Egress_lambda_url = process.env.AD_EGRESS_LAMBDA_URL;
+const use_ad_egress_lambda = process.env.USE_AD_EGRESS_LAMBDA;
 const brokerUrl = process.env.MQTT_URL;
 const options = {
   username: process.env.MQTT_USER,
@@ -104,8 +106,13 @@ module.exports.convertToPushReadyJSON = async (
     scheduledAds.map(async (schedule) => {
       console.log(`📦 Processing ad: ${JSON.stringify(schedule.Ad)}`);
       try {
-        const { getBucketURL } = require("./s3Controller"); // Require inside function
-        const url = await getBucketURL(schedule.Ad.url);
+        let url;
+        if (use_ad_egress_lambda == "true" || use_ad_egress_lambda == true) {
+          url = ad_Egress_lambda_url + "/" + schedule.Ad.ad_id;
+        } else {
+          const { getBucketURL } = require("./s3Controller"); // Require inside function
+          url = await getBucketURL(schedule.Ad.url);
+        }
         console.log(`🔗 Resolved URL for ad ${schedule.Ad.ad_id}: ${url}`);
         return {
           ad_id: schedule.Ad.ad_id,

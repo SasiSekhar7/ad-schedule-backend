@@ -65,6 +65,9 @@ const {
   addAd,
   deleteAd,
   changePlaceholder,
+  completeMultipartUpload,
+  generateUploadUrls,
+  createMultipartUpload,
 } = require("../controllers/s3Controller");
 const {
   validateToken,
@@ -299,5 +302,10 @@ router.post("/device/events", addDeviceEvent);
 router.get("/device/:id", getDeviceDetails);
 
 // router.post('/apk/extract_data',validateToken,validateAdmin, apkUploadMiddleware, uploadTempApk);
+
+// Define routes
+router.post("/s3/create-multipart-upload", createMultipartUpload);
+router.post("/s3/generate-upload-urls", generateUploadUrls);
+router.post("/s3/complete-multipart-upload", completeMultipartUpload);
 
 module.exports = router;
