@@ -29,20 +29,15 @@ const generalMediaStorage = multer.diskStorage({
 
 // Set up Multer for disk storage for general uploads
 const upload = multer({
-  storage: generalMediaStorage, // Use the new diskStorage configuration
-  limits: { fileSize: 250 * 1024 * 1024 }, // Increased limit for general media, e.g., 250MB
-  fileFilter: (req, file, cb) => {
-    // Example: Only allow images and videos for general media upload
-    if (
-      file.mimetype.startsWith("image/") ||
-      file.mimetype.startsWith("video/")
-    ) {
-      cb(null, true);
-    } else {
-      cb(
-        new Error("Only images and videos are allowed for this upload!"),
-        false
-      );
+    storage: generalMediaStorage, // Use the new diskStorage configuration
+    limits: { fileSize: 400 * 1024 * 1024 }, // Increased limit for general media, e.g., 250MB
+    fileFilter: (req, file, cb) => {
+        // Example: Only allow images and videos for general media upload
+        if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only images and videos are allowed for this upload!'), false);
+        }
     }
   },
 });
