@@ -851,15 +851,15 @@ module.exports.registerNewDevice = async (req, res) => {
     if (deviceExists) {
       await Device.update(
         {
-          device_type: device_type || existingDevice.device_type,
-          device_model: device_model || existingDevice.device_model,
-          device_os: device_os || existingDevice.device_os,
+          device_type: device_type || deviceExists.device_type,
+          device_model: device_model || deviceExists.device_model,
+          device_os: device_os || deviceExists.device_os,
           device_os_version:
-            device_os_version || existingDevice.device_os_version,
+            device_os_version || deviceExists.device_os_version,
           device_orientation:
-            device_orientation || existingDevice.device_orientation,
+            device_orientation || deviceExists.device_orientation,
           device_resolution:
-            device_resolution || existingDevice.device_resolution,
+            device_resolution || deviceExists.device_resolution,
           pairing_code: pairing_code,
           registration_status: "pending",
           location: deviceExists.location || "Unknown",
