@@ -107,17 +107,22 @@ module.exports.convertToPushReadyJSON = async (
       console.log(`📦 Processing ad: ${JSON.stringify(schedule.Ad)}`);
       try {
         let url;
+        let file_extension;
         if (use_ad_egress_lambda == "true" || use_ad_egress_lambda == true) {
           url = ad_Egress_lambda_url + "/" + schedule.Ad.ad_id;
+          file_extension = schedule.Ad.url.split(".").pop();
         } else {
           const { getBucketURL } = require("./s3Controller"); // Require inside function
           url = await getBucketURL(schedule.Ad.url);
+          file_extension = schedule.Ad.url.split("?")[0].split(".").pop();
         }
         console.log(`🔗 Resolved URL for ad ${schedule.Ad.ad_id}: ${url}`);
         return {
           ad_id: schedule.Ad.ad_id,
           name: schedule.Ad.name,
           url,
+          file_extension: schedule.Ad.file_extension,
+          file_extension: file_extension,
           duration: schedule.Ad.duration,
           total_plays: schedule.total_duration,
           start_time: schedule.start_time,
