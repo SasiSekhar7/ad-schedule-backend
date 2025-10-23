@@ -129,8 +129,6 @@ module.exports.changeFile = async (req, res) => {
         await deleteFileFromS3Folder(ad_id);
       }
 
-      await Ad.update({ url: file_url }, { where: { ad_id } });
-
       // 2️⃣ Trigger the Lambda after successful upload
       // 2️⃣ Trigger the Lambda after successful upload
       // 2️⃣ Trigger the Lambda after successful upload
@@ -146,6 +144,10 @@ module.exports.changeFile = async (req, res) => {
         Payload: Buffer.from(JSON.stringify(payload)),
       });
 
+      await Ad.update(
+        { url: file_url, status: "processing" },
+        { where: { ad_id } }
+      );
       await lambda.send(invokeCommand);
     } else {
       if (!req.file) {
@@ -182,7 +184,10 @@ module.exports.changeFile = async (req, res) => {
       }
 
       // Update database with the new file URL
-      await Ad.update({ url: newKey }, { where: { ad_id } });
+      await Ad.update(
+        { url: newKey, status: "processing" },
+        { where: { ad_id } }
+      );
 
       // 2️⃣ Trigger the Lambda after successful upload
       // 2️⃣ Trigger the Lambda after successful upload
@@ -325,6 +330,7 @@ module.exports.addAd = async (req, res) => {
         name,
         url: file_url,
         duration,
+        status: "processing",
       });
       // 2️⃣ Trigger the Lambda after successful upload
       const payload = {
@@ -365,6 +371,7 @@ module.exports.addAd = async (req, res) => {
         name,
         url: newKey,
         duration,
+        status: "processing",
       });
 
       // 2️⃣ Trigger the Lambda after successful upload

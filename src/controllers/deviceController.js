@@ -34,7 +34,7 @@ const {
   convertToPushReadyJSON,
   exitDeviceAppliation,
   updateDeviceGroup,
-  updateDeviceMataData,
+  updateDeviceMetaData,
 } = require("./queueController");
 const moment = require("moment");
 
@@ -1080,7 +1080,7 @@ module.exports.updateDeviceDetails = async (req, res) => {
 //       await pushNewDeviceToQueue(device, url);
 //     } else {
 
-//       await updateDeviceMataData(device
+//       await updateDeviceMetaData(device
 //       )
 //     }
 
@@ -1185,7 +1185,7 @@ module.exports.updateDeviceDetailsAndLaunch = async (req, res) => {
         device_resolution: device_resolution_val,
       };
 
-      await updateDeviceMataData(device_id, metaData);
+      await updateDeviceMetaData(device_id, metaData);
     }
 
     await device.save();
@@ -1200,7 +1200,7 @@ module.exports.updateDeviceDetailsAndLaunch = async (req, res) => {
   }
 };
 
-module.exports.confirmUpdateDeviceMataData = async (req, res) => {
+module.exports.confirmUpdateDeviceMetaData = async (req, res) => {
   try {
     const { device_id } = req.params;
     const {

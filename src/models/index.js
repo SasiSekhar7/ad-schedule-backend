@@ -49,6 +49,11 @@ const Ad = sequelize.define(
     client_id: { type: DataTypes.UUID, allowNull: false },
     name: { type: DataTypes.STRING, allowNull: false },
     url: { type: DataTypes.STRING, allowNull: false },
+    status: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: "pending",
+    },
     duration: { type: DataTypes.INTEGER, allowNull: false },
     isDeleted: {
       type: DataTypes.BOOLEAN,

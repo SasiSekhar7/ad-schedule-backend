@@ -43,7 +43,7 @@ const {
   addDeviceEvent,
   getDeviceDetails,
   updateGroup,
-  confirmUpdateDeviceMataData,
+  confirmUpdateDeviceMetaData,
 } = require("../controllers/deviceController");
 const {
   addUser,
@@ -98,6 +98,10 @@ const {
   getAllApkVersions,
   checkForUpdates,
 } = require("../controllers/apkVersionController");
+const { uploadAdsToEgressS3 } = require("../controllers/onTimeApiController");
+const {
+  triggerMediaConvertWebhook,
+} = require("../controllers/mediaConvertController");
 
 router.post("/device/register", registerDevice); // takes group id and location input
 
@@ -116,14 +120,14 @@ router.post(
   updateDeviceDetailsAndLaunch
 );
 router.post(
-  "/device/update/matadata/:device_id",
+  "/device/update/metadata/:device_id",
   validateToken,
   updateDeviceMetadata
 );
 
 router.post(
-  "/device/update/matadata-confirm/:device_id",
-  confirmUpdateDeviceMataData
+  "/device/update/metadata-confirm/:device_id",
+  confirmUpdateDeviceMetaData
 );
 router.post("/device/complete-registration", completeRegisterNewDevice);
 router.get("/device/group-list", validateToken, getGroutpList);
@@ -307,5 +311,12 @@ router.get("/device/:id", getDeviceDetails);
 router.post("/s3/create-multipart-upload", createMultipartUpload);
 router.post("/s3/generate-upload-urls", generateUploadUrls);
 router.post("/s3/complete-multipart-upload", completeMultipartUpload);
+
+// One Time APIs
+router.post("/onetime/upload-ads-to-egress-s3", uploadAdsToEgressS3);
+
+// MediaConvert Webhook - receives job completion notifications
+// No authentication required as it uses API key validation in the controller
+router.post("/webhooks/mediaconvert", triggerMediaConvertWebhook);
 
 module.exports = router;
