@@ -380,13 +380,13 @@ module.exports.updateDeviceGroup = async (device_id, group_id) => {
   }
 };
 
-module.exports.updateDeviceMataData = async (device_id, matadata) => {
+module.exports.updateDeviceMetaData = async (device_id, metadata) => {
   try {
     const topic = `device/${device_id}`;
     const message = {
-      action: "updateDeviceMataData",
-      device_orientation: matadata.device_orientation,
-      device_resolution: matadata.device_resolution,
+      action: "updateDeviceMetaData",
+      device_orientation: metadata.device_orientation,
+      device_resolution: metadata.device_resolution,
     };
 
     mqttClient.publish(

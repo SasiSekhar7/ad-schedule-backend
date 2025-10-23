@@ -43,7 +43,7 @@ const {
   addDeviceEvent,
   getDeviceDetails,
   updateGroup,
-  confirmUpdateDeviceMataData,
+  confirmUpdateDeviceMetaData,
 } = require("../controllers/deviceController");
 const {
   addUser,
@@ -120,14 +120,14 @@ router.post(
   updateDeviceDetailsAndLaunch
 );
 router.post(
-  "/device/update/matadata/:device_id",
+  "/device/update/metadata/:device_id",
   validateToken,
   updateDeviceMetadata
 );
 
 router.post(
-  "/device/update/matadata-confirm/:device_id",
-  confirmUpdateDeviceMataData
+  "/device/update/metadata-confirm/:device_id",
+  confirmUpdateDeviceMetaData
 );
 router.post("/device/complete-registration", completeRegisterNewDevice);
 router.get("/device/group-list", validateToken, getGroutpList);
