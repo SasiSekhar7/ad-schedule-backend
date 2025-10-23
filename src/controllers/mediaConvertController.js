@@ -52,10 +52,10 @@ const extractOutputFilePath = (body) => {
     const { detail } = body;
 
     // Check if job completed successfully
-    if (detail.status !== "COMPLETE") {
-      console.warn(`⚠️ MediaConvert job status: ${detail.status}`);
-      return null;
-    }
+    // if (detail.status !== "COMPLETE") {
+    //   console.warn(`⚠️ MediaConvert job status: ${detail.status}`);
+    //   return null;
+    // }
 
     // Extract output file path from outputGroupDetails
     if (
@@ -69,7 +69,13 @@ const extractOutputFilePath = (body) => {
       const outputPath =
         detail.outputGroupDetails[0].outputDetails[0].outputFilePaths[0];
       console.log(`✅ Output file path extracted: ${outputPath}`);
-      return outputPath;
+
+      if (outputPath) {
+        // ✅ Remove the 's3://<bucket-name>/' prefix
+        const cleanedPath = outputPath.replace(/^s3:\/\/[^/]+\//, "");
+        console.log(`✅ Cleaned output file path: ${cleanedPath}`);
+        return cleanedPath;
+      }
     }
 
     console.error("❌ Could not extract output file path from webhook");
