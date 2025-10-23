@@ -13,6 +13,8 @@ const { default: mqtt } = require("mqtt");
 
 const ad_Egress_lambda_url = process.env.AD_EGRESS_LAMBDA_URL;
 const use_ad_egress_lambda = process.env.USE_AD_EGRESS_LAMBDA;
+const rcs_message_default =
+  process.env.RCS_MESSAGE || "AdUp By demokrito Contact 98987687876";
 const brokerUrl = process.env.MQTT_URL;
 const options = {
   username: process.env.MQTT_USER,
@@ -121,7 +123,7 @@ module.exports.convertToPushReadyJSON = async (
           ad_id: schedule.Ad.ad_id,
           name: schedule.Ad.name,
           url,
-          file_extension: schedule.Ad.file_extension,
+
           file_extension: file_extension,
           duration: schedule.Ad.duration,
           total_plays: schedule.total_duration,
@@ -144,19 +146,17 @@ module.exports.convertToPushReadyJSON = async (
     attributes: ["message"],
   });
 
-  const matchData = await SelectedSeries.findOne({
-    attributes: ["match_list"],
-    where: { series_name: "IPL" },
-  });
-  const matchList = matchData?.match_list;
+  // const matchData = await SelectedSeries.findOne({
+  //   attributes: ["match_list"],
+  //   where: { series_name: "IPL" },
+  // });
+  // const matchList = matchData?.match_list;
 
-  scrollingMessage = message
-    ? message.message
-    : "AdUp By demokrito Contact 98987687876";
+  scrollingMessage = message ? message.message : rcs_message_default;
 
-  if (matchList) {
-    scrollingMessage = `${scrollingMessage} | Upcoming Fixtures: ${matchList}`;
-  }
+  // if (matchList) {
+  //   scrollingMessage = `${scrollingMessage} | Upcoming Fixtures: ${matchList}`;
+  // }
 
   // Remove null ads (failed URL fetch)
   const validAds = ads.filter((ad) => ad !== null);
