@@ -45,6 +45,7 @@ const {
   updateGroup,
   confirmUpdateDeviceMetaData,
   confirmDeviceExit,
+  exportProofOfPlayReport,
 } = require("../controllers/deviceController");
 const {
   addUser,
@@ -327,5 +328,7 @@ router.post("/onetime/upload-ads-to-egress-s3", uploadAdsToEgressS3);
 // MediaConvert Webhook - receives job completion notifications
 // No authentication required as it uses API key validation in the controller
 router.post("/webhooks/mediaconvert", triggerMediaConvertWebhook);
+
+router.get("/device/proof-of-play/export", exportProofOfPlayReport);
 
 module.exports = router;
