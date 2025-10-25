@@ -150,9 +150,6 @@ module.exports.changeFile = async (req, res) => {
       );
       await lambda.send(invokeCommand);
     } else {
-      if (!req.file) {
-        return res.status(400).json({ message: "New file is required." });
-      }
       // If an ad URL exists, delete the previous file from S3
       if (ad.url) {
         const deleteParams = {
@@ -164,28 +161,13 @@ module.exports.changeFile = async (req, res) => {
         await s3.send(deleteCommand);
       }
 
-      // Read the new file from the temporary disk location
-      fileBuffer = await fs.readFile(req.file.path);
-
-      // Upload the new file to S3
-      const newKey = `ad-${Date.now()}${path.extname(req.file.originalname)}`;
-      const uploadParams = {
-        Bucket: bucketName,
-        Key: newKey,
-        Body: fileBuffer, // Use the buffer read from disk
-        ContentType: req.file.mimetype,
-      };
-
-      const uploadCommand = new PutObjectCommand(uploadParams);
-      await s3.send(uploadCommand); // Assuming s3Client is your configured S3 client
-
       if (ad_id) {
         await deleteFileFromS3Folder(ad_id);
       }
 
       // Update database with the new file URL
       await Ad.update(
-        { url: newKey, status: "processing" },
+        { url: file_url, status: "processing" },
         { where: { ad_id } }
       );
 
@@ -193,7 +175,7 @@ module.exports.changeFile = async (req, res) => {
       // 2️⃣ Trigger the Lambda after successful upload
       // 2️⃣ Trigger the Lambda after successful upload
       const payload = {
-        s3Key: newKey,
+        s3Key: file_url,
         ad_id: ad_id,
         timestamp: new Date().toISOString(),
       };
@@ -347,29 +329,13 @@ module.exports.addAd = async (req, res) => {
 
       await lambda.send(invokeCommand);
     } else {
-      console.log("req.file", req.file);
-      if (!req.file) {
+      if (file_url == "") {
         return res.status(400).json({ message: "File is required." });
       }
-
-      // Read the file from the temporary disk location
-      fileBuffer = await fs.readFile(req.file.path);
-
-      const newKey = `ad-${Date.now()}${path.extname(req.file.originalname)}`;
-      const uploadParams = {
-        Bucket: bucketName,
-        Key: newKey,
-        Body: fileBuffer, // Use the buffer read from disk
-        ContentType: req.file.mimetype,
-      };
-
-      const uploadCommand = new PutObjectCommand(uploadParams);
-      await s3.send(uploadCommand); // Assuming s3Client is your configured S3 client
-
       ad = await Ad.create({
         client_id,
         name,
-        url: newKey,
+        url: file_url,
         duration,
         status: "processing",
       });
@@ -377,7 +343,7 @@ module.exports.addAd = async (req, res) => {
       // 2️⃣ Trigger the Lambda after successful upload
       // 2️⃣ Trigger the Lambda after successful upload
       const payload = {
-        s3Key: newKey,
+        s3Key: file_url,
         ad_id: ad.ad_id,
         timestamp: new Date().toISOString(),
       };
@@ -505,7 +471,7 @@ module.exports.getSignedS3Url = async (fileName, expiresInSeconds) => {
     // Check if object exists (optional, but good for specific error handling)
     await s3.send(new HeadObjectCommand(headParams));
 
-    const getCommand = new GetObjectCommand(headParams);
+    const getCommand = new GetObjectCommand();
     const url = await getSignedUrl(s3, getCommand, {
       expiresIn: expiresInSeconds,
     });
@@ -586,6 +552,26 @@ module.exports.completeMultipartUpload = async (req, res) => {
     res.json({ location: response.Location });
   } catch (error) {
     console.error("Error completing multipart upload:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+module.exports.getSinglePartUpload = async (req, res) => {
+  try {
+    const { fileName, fileType } = req.body;
+
+    const command = new PutObjectCommand({
+      Bucket: bucketName,
+      Key: fileName,
+      ContentType: fileType,
+    });
+
+    // Generate signed URL valid for 1 hour
+    const signedUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
+
+    res.json({ uploadUrl: signedUrl, key: fileName });
+  } catch (error) {
+    console.error("Error generating upload URL:", error);
     res.status(500).json({ error: error.message });
   }
 };

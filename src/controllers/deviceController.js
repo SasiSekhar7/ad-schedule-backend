@@ -1100,6 +1100,7 @@ module.exports.updateDeviceDetailsAndLaunch = async (req, res) => {
     const {
       location,
       group_id,
+      device_type,
       device_orientation,
       device_resolution,
       device_on_time,
@@ -1158,6 +1159,29 @@ module.exports.updateDeviceDetailsAndLaunch = async (req, res) => {
     let device_resolution_val = device_resolution ?? device.device_resolution;
     device.device_on_time = device_on_time ?? device.device_on_time;
     device.device_off_time = device_off_time ?? device.device_off_time;
+    device.device_type = device_type ?? device.device_type;
+
+    // 🔹 Resolution validation according to orientation
+    if (device_resolution_val && device_orientation_val) {
+      const [width, height] = device_resolution_val
+        .split("x")
+        .map((v) => parseInt(v, 10));
+
+      // Only auto-swap for standard resolutions like 1920x1080 or 1080x1920
+      const isStandardResolution =
+        (width === 1920 && height === 1080) ||
+        (width === 1080 && height === 1920);
+
+      if (isStandardResolution) {
+        if (device_orientation_val === "portrait" && width > height) {
+          // Swap to portrait
+          device_resolution_val = `${height}x${width}`;
+        } else if (device_orientation_val === "landscape" && height > width) {
+          // Swap to landscape
+          device_resolution_val = `${height}x${width}`;
+        }
+      }
+    }
 
     if (group_id) {
       const groupExists = await DeviceGroup.findOne({ where: { group_id } });
@@ -1180,6 +1204,7 @@ module.exports.updateDeviceDetailsAndLaunch = async (req, res) => {
       await pushNewDeviceToQueue(device, url);
     } else if (device_orientation || device_resolution) {
       // Only metadata update, no group changes
+
       const metaData = {
         device_orientation: device_orientation_val,
         device_resolution: device_resolution_val,
@@ -1254,7 +1279,8 @@ module.exports.confirmUpdateDeviceMetaData = async (req, res) => {
     device.device_resolution = device_resolution ?? device.device_resolution;
     device.device_on_time = device_on_time ?? device.device_on_time;
     device.device_off_time = device_off_time ?? device.device_off_time;
-    device.last_sync = await device.save();
+
+    await device.save();
 
     return res.status(200).json({
       message: "Device details updated successfully",
@@ -1414,6 +1440,27 @@ module.exports.exitDevice = async (req, res) => {
 
     await Device.destroy({ where: { device_id: id } });
 
+    return res.json({
+      message: "Device exit request sent successfully",
+    });
+  } catch (error) {
+    console.error("Sync error:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+module.exports.confirmDeviceExit = async (req, res) => {
+  try {
+    const { device_id } = req.params;
+    if (!device_id) {
+      return res.status(400).json({ error: "Device ID is required" });
+    }
+    await Device.update(
+      { group_id: process.env.DUMMY_GROUP_ID },
+      {
+        where: { device_id },
+      }
+    );
     return res.json({
       message: "Successfully Deleted record",
     });
