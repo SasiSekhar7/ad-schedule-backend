@@ -44,6 +44,7 @@ const {
   getDeviceDetails,
   updateGroup,
   confirmUpdateDeviceMetaData,
+  confirmDeviceExit,
 } = require("../controllers/deviceController");
 const {
   addUser,
@@ -68,6 +69,7 @@ const {
   completeMultipartUpload,
   generateUploadUrls,
   createMultipartUpload,
+  getSinglePartUpload,
 } = require("../controllers/s3Controller");
 const {
   validateToken,
@@ -144,6 +146,7 @@ router.get("/download-wgt", getWgtUrl);
 
 // router.post('/device/update/:id', validateToken, registerDevice)
 router.post("/device/delete/:id", validateToken, exitDevice);
+router.post("/device/confirm-delete/:id", confirmDeviceExit);
 
 router.get("/device/all", validateToken, getDeviceList);
 
@@ -205,7 +208,12 @@ router.post("/ads/create-client", validateToken, createClient);
 router.post("/ads/update-client/:id", validateToken, updateClient);
 router.post("/ads/delete-client:/id", validateToken, deleteClient);
 
-router.post("/ads/add", validateToken, uploadMiddleware, addAd);
+router.post(
+  "/ads/add",
+  validateToken,
+  // uploadMiddleware,
+  addAd
+);
 router.post("/ads/update", validateToken, addAd);
 router.post("/ads/delete/:ad_id", validateToken, deleteAd);
 
@@ -215,7 +223,7 @@ router.get("/ads/file/get/:path", validateToken, sendAdFile);
 router.post(
   "/ads/file/edit/:ad_id",
   validateToken,
-  uploadMiddleware,
+  // uploadMiddleware,
   changeFile
 );
 
@@ -311,6 +319,7 @@ router.get("/device/:id", getDeviceDetails);
 router.post("/s3/create-multipart-upload", createMultipartUpload);
 router.post("/s3/generate-upload-urls", generateUploadUrls);
 router.post("/s3/complete-multipart-upload", completeMultipartUpload);
+router.post("/s3/single-part-upload", getSinglePartUpload);
 
 // One Time APIs
 router.post("/onetime/upload-ads-to-egress-s3", uploadAdsToEgressS3);

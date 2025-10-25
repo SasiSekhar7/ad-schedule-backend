@@ -111,7 +111,12 @@ module.exports.convertToPushReadyJSON = async (
         let url;
         let file_extension;
         if (use_ad_egress_lambda == "true" || use_ad_egress_lambda == true) {
-          url = ad_Egress_lambda_url + "/" + schedule.Ad.ad_id;
+          url =
+            ad_Egress_lambda_url +
+            "/" +
+            schedule.Ad.ad_id +
+            "." +
+            schedule.Ad.url.split(".").pop();
           file_extension = schedule.Ad.url.split(".").pop();
         } else {
           const { getBucketURL } = require("./s3Controller"); // Require inside function
