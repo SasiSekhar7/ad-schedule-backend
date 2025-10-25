@@ -779,11 +779,13 @@ module.exports.registerNewDevice = async (req, res) => {
     // ------------------ CONDITIONAL VALIDATION ------------------
     if (
       device_type &&
-      !["mobile", "laptop", "tv", "tablet", "desktop"].includes(device_type)
+      !["mobile", "laptop", "tv", "tablet", "desktop", "display"].includes(
+        device_type
+      )
     ) {
       return res.status(400).json({
         message:
-          "device_type must be one of: mobile, laptop, tv, tablet, desktop",
+          "device_type must be one of: mobile, laptop, tv, tablet, desktop, display",
       });
     }
 

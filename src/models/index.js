@@ -76,7 +76,14 @@ const Device = sequelize.define(
       primaryKey: true,
     },
     device_type: {
-      type: DataTypes.ENUM("mobile", "laptop", "tv", "tablet", "desktop"),
+      type: DataTypes.ENUM(
+        "mobile",
+        "laptop",
+        "tv",
+        "display",
+        "tablet",
+        "desktop"
+      ),
       allowNull: false,
       defaultValue: "tv",
     },
