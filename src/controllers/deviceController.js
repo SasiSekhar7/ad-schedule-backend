@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const { v4: uuidv4 } = require("uuid");
+const ExcelJS = require("exceljs");
 const {
   getCustomUTCDateTime,
   getUTCDate,
@@ -2084,6 +2085,145 @@ module.exports.getDeviceDetails = async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching device details:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+module.exports.exportProofOfPlayReport = async (req, res) => {
+  try {
+    const { filter, device_id, start_date, end_date } = req.query;
+
+    let whereCondition = {};
+
+    // --- Date filter ---
+    if (start_date && end_date) {
+      const start = new Date(start_date);
+      const end = new Date(end_date);
+      end.setHours(23, 59, 59, 999);
+      whereCondition.start_time = { [Op.between]: [start, end] };
+    } else if (filter === "today") {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const end = new Date();
+      end.setHours(23, 59, 59, 999);
+      whereCondition.start_time = { [Op.between]: [start, end] };
+    } else if (filter === "yesterday") {
+      const start = new Date();
+      start.setDate(start.getDate() - 1);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date();
+      end.setDate(end.getDate() - 1);
+      end.setHours(23, 59, 59, 999);
+      whereCondition.start_time = { [Op.between]: [start, end] };
+    }
+    // if filter = full → no date condition
+
+    // --- Device filter ---
+    if (device_id) {
+      whereCondition.device_id = device_id;
+    }
+
+    // --- Fetch logs with Ad + Device joins ---
+    const logs = await ProofOfPlayLog.findAll({
+      where: whereCondition,
+      attributes: ["ad_id", "device_id", "start_time"],
+      include: [
+        {
+          model: Ad,
+          attributes: ["name", "duration"],
+          required: false,
+        },
+        {
+          model: Device,
+          attributes: ["device_name"],
+          required: false,
+        },
+      ],
+      raw: true,
+      nest: true,
+    });
+
+    if (!logs.length) {
+      return res.status(404).json({ message: "No proof of play logs found" });
+    }
+
+    // --- Group and aggregate ---
+    const reportData = logs.reduce((acc, log) => {
+      const key = `${log.device_id}_${log.ad_id}`;
+      const adDuration = log.Ad?.duration || 0;
+
+      if (!acc[key]) {
+        acc[key] = {
+          device_id: log.device_id,
+          device_name: log.Device?.device_name || "Unknown Device",
+          ad_id: log.ad_id,
+          ad_name: log.Ad?.name || "Unknown Ad",
+          ad_duration: adDuration,
+          total_plays: 0,
+        };
+      }
+
+      acc[key].total_plays += 1;
+      return acc;
+    }, {});
+
+    // --- Add total play time ---
+    const reportArray = Object.values(reportData).map((item) => ({
+      ...item,
+      total_play_time: item.total_plays * item.ad_duration,
+    }));
+
+    // --- Create Excel workbook ---
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("ProofOfPlayReport");
+
+    // Header columns
+    worksheet.columns = [
+      { header: "Device ID", key: "device_id", width: 25 },
+      { header: "Device Name", key: "device_name", width: 30 },
+      { header: "Ad ID", key: "ad_id", width: 25 },
+      { header: "Ad Name", key: "ad_name", width: 35 },
+      { header: "Ad Duration (sec)", key: "ad_duration", width: 20 },
+      { header: "Total Plays", key: "total_plays", width: 15 },
+      { header: "Total Play Time (sec)", key: "total_play_time", width: 20 },
+    ];
+
+    // Add data rows
+    reportArray.forEach((row) => worksheet.addRow(row));
+
+    // --- Style header ---
+    worksheet.getRow(1).eachCell((cell) => {
+      cell.font = { bold: true };
+      cell.alignment = { horizontal: "center" };
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFCCE5FF" },
+      };
+      cell.border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" },
+      };
+    });
+
+    // --- Generate Excel file ---
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    const filename = `proof_of_play_report_${device_id || "all"}_${
+      filter || `${start_date || "from"}-${end_date || "to"}`
+    }.xlsx`;
+
+    res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+
+    return res.send(buffer);
+  } catch (error) {
+    console.error("Error exporting ProofOfPlay report:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 };
