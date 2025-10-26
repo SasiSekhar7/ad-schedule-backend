@@ -438,3 +438,38 @@ module.exports.DeviceOnOff = async (device_id, action) => {
     console.error("❌ Error in pushToGroupQueue:", error);
   }
 };
+
+module.exports.sendCustomMQTTMessage = async (req, res) => {
+  try {
+    const { device_id } = req.params;
+    const { message } = req.body;
+
+    if (!device_id || !message) {
+      return res
+        .status(400)
+        .json({ error: "Device ID and message are required" });
+    }
+    const topic = `device/${device_id}`;
+    mqttClient.publish(
+      topic,
+      JSON.stringify(message),
+      { qos: 2, retain: false },
+      (err) => {
+        if (err) {
+          console.error(`❌ Failed to publish to ${topic}:`, err);
+        } else {
+          console.log(
+            `📡 Successfully published custom message to ${topic} with QoS 2 and retain flag`
+          );
+        }
+      }
+    );
+
+    return res
+      .status(200)
+      .json({ message: "Custom message sent successfully" });
+  } catch (error) {
+    console.error("Error sending custom MQTT message:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
