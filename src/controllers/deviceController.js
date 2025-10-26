@@ -2227,3 +2227,458 @@ module.exports.exportProofOfPlayReport = async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 };
+
+module.exports.exportDeviceEventLogs = async (req, res) => {
+  try {
+    const { device_id, start_date, end_date, filter } = req.query;
+    let whereCondition = {};
+
+    // --- Date Filter ---
+    if (start_date && end_date) {
+      const start = new Date(start_date);
+      const end = new Date(end_date);
+      end.setHours(23, 59, 59, 999);
+      whereCondition.timestamp = { [Op.between]: [start, end] };
+    } else if (filter === "today") {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const end = new Date();
+      end.setHours(23, 59, 59, 999);
+      whereCondition.timestamp = { [Op.between]: [start, end] };
+    } else if (filter === "yesterday") {
+      const start = new Date();
+      start.setDate(start.getDate() - 1);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date();
+      end.setDate(end.getDate() - 1);
+      end.setHours(23, 59, 59, 999);
+      whereCondition.timestamp = { [Op.between]: [start, end] };
+    }
+
+    if (device_id) {
+      whereCondition.device_id = device_id;
+    }
+
+    // --- Fetch logs ---
+    const logs = await DeviceEventLog.findAll({
+      where: whereCondition,
+      attributes: [
+        "event_id",
+        "device_id",
+        "timestamp",
+        "event_type",
+        "payload",
+      ],
+      raw: true,
+      nest: true,
+    });
+
+    if (!logs.length) {
+      return res.status(404).json({ message: "No device event logs found" });
+    }
+
+    // --- Format timestamps with time (e.g. 2025-10-26 14:35:22) ---
+    const formattedLogs = logs.map((log) => ({
+      ...log,
+      timestamp: new Date(log.timestamp).toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata",
+        hour12: true,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      }),
+    }));
+
+    // --- Create Excel ---
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("DeviceEventLogs");
+
+    worksheet.columns = [
+      { header: "Event ID", key: "event_id", width: 25 },
+      { header: "Device ID", key: "device_id", width: 25 },
+      { header: "Timestamp", key: "timestamp", width: 30 },
+      { header: "Event Type", key: "event_type", width: 20 },
+      { header: "Payload", key: "payload", width: 50 },
+    ];
+
+    formattedLogs.forEach((row) => worksheet.addRow(row));
+
+    // --- Header Style ---
+    worksheet.getRow(1).eachCell((cell) => {
+      cell.font = { bold: true };
+      cell.alignment = { horizontal: "center" };
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFCCE5FF" },
+      };
+      cell.border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" },
+      };
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    const filename = `device_event_logs_${device_id || "all"}_${
+      filter || `${start_date || "from"}-${end_date || "to"}`
+    }.xlsx`;
+
+    res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+
+    return res.send(buffer);
+  } catch (error) {
+    console.error("Error exporting DeviceEvent logs:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+/**
+ * Export full device details with all related data to Excel
+ * Includes: Device Info, Schedules, Proof of Play, Telemetry, Event Logs
+ * Multiple sheets for different data types
+ */
+module.exports.exportDeviceDetailsToExcel = async (req, res) => {
+  try {
+    const { device_id } = req.params;
+    const { start_date, end_date, filter } = req.query;
+
+    if (!device_id) {
+      return res.status(400).json({ error: "Device ID is required" });
+    }
+
+    // Fetch device with all related data
+    const device = await Device.findOne({
+      where: { device_id },
+      include: [
+        {
+          model: DeviceGroup,
+          attributes: ["group_id", "name", "client_id", "reg_code"],
+        },
+      ],
+    });
+
+    if (!device) {
+      return res.status(404).json({ error: "Device not found" });
+    }
+
+    // Authorization check for non-admin users
+    if (req.user && req.user.role === "Client" && req.user.client_id) {
+      if (device.DeviceGroup.client_id !== req.user.client_id) {
+        return res.status(403).json({ error: "Unauthorized access" });
+      }
+    }
+
+    // Build date filter based on filter parameter or start_date/end_date
+    const dateFilter = {};
+    let filterLabel = "All Time";
+
+    if (start_date && end_date) {
+      // Custom date range
+      const start = new Date(start_date);
+      const end = new Date(end_date);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.timestamp = { [Op.between]: [start, end] };
+      filterLabel = `${start_date} to ${end_date}`;
+    } else if (filter === "today") {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const end = new Date();
+      end.setHours(23, 59, 59, 999);
+      dateFilter.timestamp = { [Op.between]: [start, end] };
+      filterLabel = "Today";
+    } else if (filter === "yesterday") {
+      const start = new Date();
+      start.setDate(start.getDate() - 1);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date();
+      end.setDate(end.getDate() - 1);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.timestamp = { [Op.between]: [start, end] };
+      filterLabel = "Yesterday";
+    } else if (filter === "week") {
+      const start = new Date();
+      start.setDate(start.getDate() - start.getDay());
+      start.setHours(0, 0, 0, 0);
+      const end = new Date();
+      end.setDate(end.getDate() - end.getDay() + 6);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.timestamp = { [Op.between]: [start, end] };
+      filterLabel = "This Week";
+    } else if (filter === "month") {
+      const start = new Date();
+      start.setDate(1);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date();
+      end.setDate(0);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.timestamp = { [Op.between]: [start, end] };
+      filterLabel = "This Month";
+    } else if (filter === "year") {
+      const start = new Date();
+      start.setMonth(0, 1);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date();
+      end.setMonth(11, 31);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.timestamp = { [Op.between]: [start, end] };
+      filterLabel = "This Year";
+    } else if (filter === "all") {
+      // No filter, get all data
+      filterLabel = "All Time";
+    } else if (filter) {
+      return res.status(400).json({
+        error:
+          "Invalid filter. Use: today, yesterday, week, month, year, or all",
+      });
+    }
+
+    // Fetch all related data
+    const [schedules, proofOfPlayLogs, telemetryLogs, eventLogs] =
+      await Promise.all([
+        Schedule.findAll({
+          where: { group_id: device.group_id },
+          include: [
+            {
+              model: Ad,
+              attributes: ["name", "duration"],
+            },
+          ],
+          order: [["start_time", "DESC"]],
+        }),
+        ProofOfPlayLog.findAll({
+          where: {
+            device_id,
+            ...(Object.keys(dateFilter).length > 0 && {
+              start_time: dateFilter.timestamp,
+            }),
+          },
+          include: [
+            {
+              model: Ad,
+              attributes: ["name"],
+            },
+          ],
+          order: [["start_time", "DESC"]],
+        }),
+        DeviceTelemetryLog.findAll({
+          where: { device_id, ...dateFilter },
+          order: [["timestamp", "DESC"]],
+        }),
+        DeviceEventLog.findAll({
+          where: { device_id, ...dateFilter },
+          order: [["timestamp", "DESC"]],
+        }),
+      ]);
+
+    // Create workbook
+    const workbook = new ExcelJS.Workbook();
+
+    // Sheet 1: Device Information
+    const deviceSheet = workbook.addWorksheet("Device Info");
+    deviceSheet.columns = [
+      { header: "Field", key: "field", width: 25 },
+      { header: "Value", key: "value", width: 40 },
+    ];
+
+    // Helper function to format date and time
+    const formatDateTime = (dateValue) => {
+      if (!dateValue) return "N/A";
+      const date = new Date(dateValue);
+      if (isNaN(date.getTime())) return "N/A";
+
+      const day = String(date.getDate()).padStart(2, "0");
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const year = date.getFullYear();
+
+      let hours = date.getHours();
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+      const seconds = String(date.getSeconds()).padStart(2, "0");
+      const ampm = hours >= 12 ? "pm" : "am";
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      const hoursStr = String(hours).padStart(2, "0");
+
+      return `${day}/${month}/${year}, ${hoursStr}:${minutes}:${seconds} ${ampm}`;
+    };
+
+    const deviceData = [
+      { field: "Report Generated", value: formatDateTime(new Date()) },
+      { field: "Data Range", value: filterLabel },
+      { field: "Device ID", value: device.device_id },
+      { field: "Device Name", value: device.device_name || "N/A" },
+      { field: "Android ID", value: device.android_id },
+      { field: "Device Type", value: device.device_type },
+      { field: "Device Model", value: device.device_model || "N/A" },
+      { field: "Device OS", value: device.device_os || "N/A" },
+      { field: "OS Version", value: device.device_os_version || "N/A" },
+      { field: "Resolution", value: device.device_resolution || "N/A" },
+      { field: "Orientation", value: device.device_orientation },
+      { field: "Location", value: device.location },
+      { field: "Status", value: device.status },
+      { field: "Registration Status", value: device.registration_status },
+      { field: "Device On Time", value: device.device_on_time },
+      { field: "Device Off Time", value: device.device_off_time },
+      { field: "Group Name", value: device.DeviceGroup?.name || "N/A" },
+      { field: "Group ID", value: device.DeviceGroup?.group_id || "N/A" },
+      { field: "License Key", value: device.DeviceGroup?.reg_code || "N/A" },
+      { field: "Last Synced", value: formatDateTime(device.last_synced) },
+      { field: "Tags", value: device.tags?.join(", ") || "N/A" },
+    ];
+
+    deviceSheet.addRows(deviceData);
+
+    // Style header row
+    deviceSheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+    deviceSheet.getRow(1).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF4472C4" },
+    };
+
+    // Sheet 2: Schedules
+    const scheduleSheet = workbook.addWorksheet("Schedules");
+    scheduleSheet.columns = [
+      { header: "Schedule ID", key: "schedule_id", width: 20 },
+      { header: "Ad Name", key: "ad_name", width: 25 },
+      { header: "Ad Duration (sec)", key: "duration", width: 15 },
+      { header: "Schedule Start Time", key: "start_time", width: 20 },
+      { header: "Schedule End Time", key: "end_time", width: 20 },
+      { header: "Priority", key: "priority", width: 10 },
+    ];
+
+    const scheduleData = schedules.map((s) => ({
+      schedule_id: s.schedule_id,
+      ad_name: s.Ad?.name || "N/A",
+      duration: s.Ad?.duration || "N/A",
+      start_time: formatDateTime(s.start_time),
+      end_time: formatDateTime(s.end_time),
+      priority: s.priority,
+    }));
+
+    scheduleSheet.addRows(scheduleData);
+
+    // Style header row
+    scheduleSheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+    scheduleSheet.getRow(1).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF70AD47" },
+    };
+
+    // Sheet 3: Proof of Play Logs
+    const proofOfPlaySheet = workbook.addWorksheet("Proof of Play");
+    proofOfPlaySheet.columns = [
+      { header: "Event ID", key: "event_id", width: 20 },
+      { header: "Ad Name", key: "ad_name", width: 25 },
+      { header: "Play Start Time", key: "start_time", width: 20 },
+      { header: "Play End Time", key: "end_time", width: 20 },
+      { header: "Duration Played (ms)", key: "duration_played_ms", width: 18 },
+    ];
+
+    const proofOfPlayData = proofOfPlayLogs.map((p) => ({
+      event_id: p.event_id,
+      ad_name: p.Ad?.name || "N/A",
+      start_time: formatDateTime(p.start_time),
+      end_time: formatDateTime(p.end_time),
+      duration_played_ms: p.duration_played_ms,
+    }));
+
+    proofOfPlaySheet.addRows(proofOfPlayData);
+
+    // Style header row
+    proofOfPlaySheet.getRow(1).font = {
+      bold: true,
+      color: { argb: "FFFFFFFF" },
+    };
+    proofOfPlaySheet.getRow(1).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFC55A11" },
+    };
+
+    // Sheet 4: Telemetry Logs
+    const telemetrySheet = workbook.addWorksheet("Telemetry");
+    telemetrySheet.columns = [
+      { header: "Timestamp", key: "timestamp", width: 20 },
+      { header: "CPU Usage (%)", key: "cpu_usage", width: 15 },
+      { header: "RAM Free (MB)", key: "ram_free_mb", width: 15 },
+      { header: "Storage Free (MB)", key: "storage_free_mb", width: 18 },
+      { header: "Network Type", key: "network_type", width: 15 },
+      { header: "App Version Code", key: "app_version_code", width: 15 },
+    ];
+
+    const telemetryData = telemetryLogs.map((t) => ({
+      timestamp: formatDateTime(t.timestamp),
+      cpu_usage: t.cpu_usage || "N/A",
+      ram_free_mb: t.ram_free_mb || "N/A",
+      storage_free_mb: t.storage_free_mb || "N/A",
+      network_type: t.network_type || "N/A",
+      app_version_code: t.app_version_code || "N/A",
+    }));
+
+    telemetrySheet.addRows(telemetryData);
+
+    // Style header row
+    telemetrySheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+    telemetrySheet.getRow(1).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF5B9BD5" },
+    };
+
+    // Sheet 5: Event Logs
+    const eventSheet = workbook.addWorksheet("Event Logs");
+    eventSheet.columns = [
+      { header: "Event ID", key: "event_id", width: 20 },
+      { header: "Event Type", key: "event_type", width: 20 },
+      { header: "Timestamp", key: "timestamp", width: 20 },
+      { header: "Payload", key: "payload", width: 50 },
+    ];
+
+    const eventData = eventLogs.map((e) => ({
+      event_id: e.event_id,
+      event_type: e.event_type,
+      timestamp: formatDateTime(e.timestamp),
+      payload: JSON.stringify(e.payload),
+    }));
+
+    eventSheet.addRows(eventData);
+
+    // Style header row
+    eventSheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+    eventSheet.getRow(1).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF9E480E" },
+    };
+
+    // Generate filename
+    const timestamp = new Date().toISOString().split("T")[0];
+    const filename = `Device_Report_${
+      device.device_name || device.device_id
+    }_${timestamp}.xlsx`;
+
+    // Send file
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    console.error("Error exporting device details:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};

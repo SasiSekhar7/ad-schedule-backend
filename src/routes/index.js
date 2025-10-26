@@ -46,6 +46,8 @@ const {
   confirmUpdateDeviceMetaData,
   confirmDeviceExit,
   exportProofOfPlayReport,
+  exportDeviceEventLogs,
+  exportDeviceDetailsToExcel,
 } = require("../controllers/deviceController");
 const {
   addUser,
@@ -105,6 +107,7 @@ const { uploadAdsToEgressS3 } = require("../controllers/onTimeApiController");
 const {
   triggerMediaConvertWebhook,
 } = require("../controllers/mediaConvertController");
+const { sendCustomMQTTMessage } = require("../controllers/queueController");
 
 router.post("/device/register", registerDevice); // takes group id and location input
 
@@ -330,5 +333,14 @@ router.post("/onetime/upload-ads-to-egress-s3", uploadAdsToEgressS3);
 router.post("/webhooks/mediaconvert", triggerMediaConvertWebhook);
 
 router.get("/device/proof-of-play/export", exportProofOfPlayReport);
+router.get("/device/event-logs/export", exportDeviceEventLogs);
 
+// Export full device details to Excel with multiple sheets
+router.get(
+  "/device/:device_id/export-full-details",
+  validateToken,
+  exportDeviceDetailsToExcel
+);
+
+router.post("/device/mqtt-custom-message/:device_id", sendCustomMQTTMessage);
 module.exports = router;
