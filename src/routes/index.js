@@ -46,6 +46,7 @@ const {
   confirmUpdateDeviceMetaData,
   confirmDeviceExit,
   exportProofOfPlayReport,
+  exportAdsProofOfPlayReport,
   exportDeviceEventLogs,
   exportDeviceDetailsToExcel,
 } = require("../controllers/deviceController");
@@ -333,6 +334,7 @@ router.post("/onetime/upload-ads-to-egress-s3", uploadAdsToEgressS3);
 router.post("/webhooks/mediaconvert", triggerMediaConvertWebhook);
 
 router.get("/device/proof-of-play/export", exportProofOfPlayReport);
+router.get("/ads/proof-of-play/export", exportAdsProofOfPlayReport);
 router.get("/device/event-logs/export", exportDeviceEventLogs);
 
 // Export full device details to Excel with multiple sheets

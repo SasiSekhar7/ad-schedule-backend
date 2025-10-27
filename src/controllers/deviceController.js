@@ -2228,6 +2228,281 @@ module.exports.exportProofOfPlayReport = async (req, res) => {
   }
 };
 
+// Helper function to format date and time
+const formatDateTime = (dateValue) => {
+  if (!dateValue) return "N/A";
+  const date = new Date(dateValue);
+  if (isNaN(date.getTime())) return "N/A";
+
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+
+  let hours = date.getHours();
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  const ampm = hours >= 12 ? "pm" : "am";
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const hoursStr = String(hours).padStart(2, "0");
+
+  return `${day}/${month}/${year}, ${hoursStr}:${minutes}:${seconds} ${ampm}`;
+};
+
+module.exports.exportAdsProofOfPlayReport = async (req, res) => {
+  try {
+    const { ad_id, filter, start_date, end_date } = req.query;
+
+    // Validate ad_id parameter
+    if (!ad_id) {
+      return res.status(400).json({
+        error:
+          "ad_id parameter is required (single ID, comma-separated IDs, or 'all')",
+      });
+    }
+
+    // Build ad filter
+    let adFilter = {};
+    let adIds = [];
+
+    if (ad_id.toLowerCase() === "all") {
+      // No filter - get all ads
+      adFilter = {};
+    } else if (ad_id.includes(",")) {
+      // Multiple ad IDs
+      adIds = ad_id.split(",").map((id) => id.trim());
+      adFilter = { ad_id: { [Op.in]: adIds } };
+    } else {
+      // Single ad ID
+      adIds = [ad_id];
+      adFilter = { ad_id };
+    }
+
+    // Build date filter
+    let dateFilter = {};
+    let filterLabel = "All Time";
+
+    if (start_date && end_date) {
+      const start = new Date(start_date);
+      const end = new Date(end_date);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.start_time = { [Op.between]: [start, end] };
+      filterLabel = `${start_date} to ${end_date}`;
+    } else if (filter === "today") {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const end = new Date();
+      end.setHours(23, 59, 59, 999);
+      dateFilter.start_time = { [Op.between]: [start, end] };
+      filterLabel = "Today";
+    } else if (filter === "yesterday") {
+      const start = new Date();
+      start.setDate(start.getDate() - 1);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date();
+      end.setDate(end.getDate() - 1);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.start_time = { [Op.between]: [start, end] };
+      filterLabel = "Yesterday";
+    } else if (filter === "week") {
+      const start = new Date();
+      start.setDate(start.getDate() - start.getDay());
+      start.setHours(0, 0, 0, 0);
+      const end = new Date();
+      end.setDate(end.getDate() - end.getDay() + 6);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.start_time = { [Op.between]: [start, end] };
+      filterLabel = "This Week";
+    } else if (filter === "month") {
+      const start = new Date();
+      start.setDate(1);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date();
+      end.setDate(0);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.start_time = { [Op.between]: [start, end] };
+      filterLabel = "This Month";
+    } else if (filter === "year") {
+      const start = new Date();
+      start.setMonth(0, 1);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date();
+      end.setMonth(11, 31);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.start_time = { [Op.between]: [start, end] };
+      filterLabel = "This Year";
+    } else if (filter === "all") {
+      // No filter
+      filterLabel = "All Time";
+    } else if (filter) {
+      return res.status(400).json({
+        error:
+          "Invalid filter. Use: today, yesterday, week, month, year, or all",
+      });
+    }
+
+    // Fetch proof of play logs for the specified ads
+    const logs = await ProofOfPlayLog.findAll({
+      where: { ...adFilter, ...dateFilter },
+      attributes: [
+        "id",
+        "event_id",
+        "ad_id",
+        "device_id",
+        "start_time",
+        "end_time",
+        "duration_played_ms",
+      ],
+      include: [
+        {
+          model: Ad,
+          attributes: ["name", "duration"],
+          required: true,
+        },
+        {
+          model: Device,
+          attributes: ["device_id", "device_name"],
+          required: true,
+        },
+      ],
+      order: [
+        ["device_id", "ASC"],
+        ["start_time", "DESC"],
+      ],
+    });
+
+    if (!logs.length) {
+      return res.status(404).json({
+        message: "No proof of play logs found for the specified ads",
+      });
+    }
+
+    // Group logs by device (keep all individual entries)
+    const logsByDevice = {};
+    logs.forEach((log) => {
+      const deviceId = log.Device.device_id;
+      if (!logsByDevice[deviceId]) {
+        logsByDevice[deviceId] = {
+          device_id: deviceId,
+          device_name: log.Device.device_name,
+          logs: [],
+        };
+      }
+      logsByDevice[deviceId].logs.push(log);
+    });
+
+    // Create workbook with multiple sheets (one per device)
+    const workbook = new ExcelJS.Workbook();
+
+    // Add summary sheet
+    const summarySheet = workbook.addWorksheet("Summary");
+    summarySheet.columns = [
+      { header: "Report Generated", key: "generated", width: 25 },
+      { header: "Date Range", key: "dateRange", width: 25 },
+      { header: "Ad IDs", key: "adIds", width: 30 },
+      { header: "Total Devices", key: "totalDevices", width: 15 },
+      { header: "Total Logs", key: "totalLogs", width: 15 },
+    ];
+
+    summarySheet.addRow({
+      generated: formatDateTime(new Date()),
+      dateRange: filterLabel,
+      adIds: ad_id.toLowerCase() === "all" ? "All Ads" : ad_id,
+      totalDevices: Object.keys(logsByDevice).length,
+      totalLogs: logs.length,
+    });
+
+    // Style summary header
+    summarySheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+    summarySheet.getRow(1).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF4472C4" },
+    };
+
+    // Add a sheet for each device
+    let sheetCounter = 0;
+    Object.values(logsByDevice).forEach((deviceData) => {
+      sheetCounter++;
+      // Create unique sheet name: device_name (device_id) - max 31 chars
+      let sheetName =
+        `${deviceData.device_name} (${deviceData.device_id})`.substring(0, 31);
+
+      // If still duplicate, add counter
+      let finalSheetName = sheetName;
+      let counter = 1;
+      const existingSheets = workbook.worksheets.map((ws) => ws.name);
+      while (existingSheets.includes(finalSheetName)) {
+        finalSheetName = `${sheetName.substring(0, 25)}_${counter}`.substring(
+          0,
+          31
+        );
+        counter++;
+      }
+
+      const sheet = workbook.addWorksheet(finalSheetName);
+
+      sheet.columns = [
+        { header: "Event ID", key: "event_id", width: 20 },
+        { header: "Ad ID", key: "ad_id", width: 20 },
+        { header: "Ad Name", key: "ad_name", width: 30 },
+        { header: "Play Start Time", key: "start_time", width: 25 },
+        { header: "Play End Time", key: "end_time", width: 25 },
+        {
+          header: "Duration Played (ms)",
+          key: "duration_played_ms",
+          width: 20,
+        },
+        { header: "Ad Duration (sec)", key: "ad_duration", width: 18 },
+      ];
+
+      // Add individual entry rows
+      deviceData.logs.forEach((log) => {
+        sheet.addRow({
+          event_id: log.event_id || "N/A",
+          ad_id: log.ad_id,
+          ad_name: log.Ad?.name || "Unknown Ad",
+          start_time: formatDateTime(log.start_time),
+          end_time: formatDateTime(log.end_time),
+          duration_played_ms: log.duration_played_ms || "N/A",
+          ad_duration: log.Ad?.duration || "N/A",
+        });
+      });
+
+      // Style header
+      sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+      sheet.getRow(1).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF70AD47" },
+      };
+    });
+
+    // Generate Excel file
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    const adLabel =
+      ad_id.toLowerCase() === "all"
+        ? "all_ads"
+        : ad_id.replace(/,/g, "_").substring(0, 20);
+    const filename = `ads_proof_of_play_${adLabel}_${filterLabel.replace(
+      / /g,
+      "_"
+    )}.xlsx`;
+
+    res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+
+    return res.send(buffer);
+  } catch (error) {
+    console.error("Error exporting Ads ProofOfPlay report:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 module.exports.exportDeviceEventLogs = async (req, res) => {
   try {
     const { device_id, start_date, end_date, filter } = req.query;
