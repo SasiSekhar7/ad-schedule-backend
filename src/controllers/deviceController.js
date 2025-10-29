@@ -1530,9 +1530,14 @@ module.exports.updateGroup = async (req, res) => {
     if (placeholder_enabled !== undefined)
       group.placeholder_enabled = placeholder_enabled;
 
+    let fileName = group.client_id
+      ? `${group.client_id}/placeholder.jpg`
+      : "placeholder.jpg";
+    const url = (await getBucketURL(fileName)) || "placeholder.jpg";
+
     await group.save();
 
-    await pushToGroupQueue([group_id]);
+    await pushToGroupQueue([group_id], url);
 
     return res.status(200).json({
       message: "Group updated successfully",
@@ -2394,22 +2399,57 @@ module.exports.exportAdsProofOfPlayReport = async (req, res) => {
     // Create workbook with multiple sheets (one per device)
     const workbook = new ExcelJS.Workbook();
 
-    // Add summary sheet
+    // Add summary sheet with aggregated data by device and ad
     const summarySheet = workbook.addWorksheet("Summary");
     summarySheet.columns = [
-      { header: "Report Generated", key: "generated", width: 25 },
-      { header: "Date Range", key: "dateRange", width: 25 },
-      { header: "Ad IDs", key: "adIds", width: 30 },
-      { header: "Total Devices", key: "totalDevices", width: 15 },
-      { header: "Total Logs", key: "totalLogs", width: 15 },
+      { header: "Device ID", key: "device_id", width: 40 },
+      { header: "Device Name", key: "device_name", width: 30 },
+      { header: "Ad ID", key: "ad_id", width: 40 },
+      { header: "Ad Name", key: "ad_name", width: 30 },
+      { header: "Ad Duration (sec)", key: "ad_duration", width: 18 },
+      { header: "Total Plays", key: "total_plays", width: 15 },
+      {
+        header: "Total Play Time (sec)",
+        key: "total_play_time_sec",
+        width: 20,
+      },
     ];
 
-    summarySheet.addRow({
-      generated: formatDateTime(new Date()),
-      dateRange: filterLabel,
-      adIds: ad_id.toLowerCase() === "all" ? "All Ads" : ad_id,
-      totalDevices: Object.keys(logsByDevice).length,
-      totalLogs: logs.length,
+    // Aggregate data by device and ad
+    const summaryData = [];
+    logs.forEach((log) => {
+      const existing = summaryData.find(
+        (item) =>
+          item.device_id === log.Device.device_id && item.ad_id === log.ad_id
+      );
+
+      if (existing) {
+        existing.total_plays += 1;
+        existing.total_play_time_ms += log.duration_played_ms || 0;
+      } else {
+        summaryData.push({
+          device_id: log.Device.device_id,
+          device_name: log.Device.device_name,
+          ad_id: log.ad_id,
+          ad_name: log.Ad?.name || "Unknown Ad",
+          ad_duration: log.Ad?.duration || 0,
+          total_plays: 1,
+          total_play_time_ms: log.duration_played_ms || 0,
+        });
+      }
+    });
+
+    // Add aggregated rows to summary sheet
+    summaryData.forEach((item) => {
+      summarySheet.addRow({
+        device_id: item.device_id,
+        device_name: item.device_name,
+        ad_id: item.ad_id,
+        ad_name: item.ad_name,
+        ad_duration: item.ad_duration,
+        total_plays: item.total_plays,
+        total_play_time_sec: (item.total_play_time_ms / 1000).toFixed(2),
+      });
     });
 
     // Style summary header
