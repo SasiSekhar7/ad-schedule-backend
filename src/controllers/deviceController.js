@@ -2488,11 +2488,11 @@ module.exports.exportAdsProofOfPlayReport = async (req, res) => {
         { header: "Ad Name", key: "ad_name", width: 30 },
         { header: "Play Start Time", key: "start_time", width: 25 },
         { header: "Play End Time", key: "end_time", width: 25 },
-        {
-          header: "Duration Played (ms)",
-          key: "duration_played_ms",
-          width: 20,
-        },
+        // {
+        //   header: "Duration Played (ms)",
+        //   key: "duration_played_ms",
+        //   width: 20,
+        // },
         { header: "Ad Duration (sec)", key: "ad_duration", width: 18 },
       ];
 
@@ -2504,7 +2504,7 @@ module.exports.exportAdsProofOfPlayReport = async (req, res) => {
           ad_name: log.Ad?.name || "Unknown Ad",
           start_time: formatDateTime(log.start_time),
           end_time: formatDateTime(log.end_time),
-          duration_played_ms: log.duration_played_ms || "N/A",
+          // duration_played_ms: log.duration_played_ms || "N/A",
           ad_duration: log.Ad?.duration || "N/A",
         });
       });
