@@ -2236,22 +2236,11 @@ module.exports.exportProofOfPlayReport = async (req, res) => {
 // Helper function to format date and time
 const formatDateTime = (dateValue) => {
   if (!dateValue) return "N/A";
-  const date = new Date(dateValue);
-  if (isNaN(date.getTime())) return "N/A";
 
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const year = date.getFullYear();
+  const m = moment(dateValue).tz("Asia/Kolkata");
+  if (!m.isValid()) return "N/A";
 
-  let hours = date.getHours();
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  const seconds = String(date.getSeconds()).padStart(2, "0");
-  const ampm = hours >= 12 ? "pm" : "am";
-  hours = hours % 12;
-  hours = hours ? hours : 12;
-  const hoursStr = String(hours).padStart(2, "0");
-
-  return `${day}/${month}/${year}, ${hoursStr}:${minutes}:${seconds} ${ampm}`;
+  return m.format("DD/MM/YYYY, hh:mm:ss A");
 };
 
 module.exports.exportAdsProofOfPlayReport = async (req, res) => {
@@ -2487,7 +2476,12 @@ module.exports.exportAdsProofOfPlayReport = async (req, res) => {
         { header: "Ad ID", key: "ad_id", width: 20 },
         { header: "Ad Name", key: "ad_name", width: 30 },
         { header: "Play Start Time", key: "start_time", width: 25 },
-        { header: "Play End Time", key: "end_time", width: 25 },
+        {
+          header: "Play End Time",
+          key: "end_time",
+          width: 25,
+          // style: { numFmt: "dd/mm/yyyy hh:mm:ss" },
+        },
         // {
         //   header: "Duration Played (ms)",
         //   key: "duration_played_ms",
@@ -2504,6 +2498,7 @@ module.exports.exportAdsProofOfPlayReport = async (req, res) => {
           ad_name: log.Ad?.name || "Unknown Ad",
           start_time: formatDateTime(log.start_time),
           end_time: formatDateTime(log.end_time),
+          // end_time: log.end_time,
           // duration_played_ms: log.duration_played_ms || "N/A",
           ad_duration: log.Ad?.duration || "N/A",
         });
