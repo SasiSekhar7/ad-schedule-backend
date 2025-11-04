@@ -82,7 +82,8 @@ const Device = sequelize.define(
         "tv",
         "display",
         "tablet",
-        "desktop"
+        "desktop",
+        "signage"
       ),
       allowNull: false,
       defaultValue: "tv",
