@@ -790,9 +790,15 @@ module.exports.registerNewDevice = async (req, res) => {
     // ------------------ CONDITIONAL VALIDATION ------------------
     if (
       device_type &&
-      !["mobile", "laptop", "tv", "tablet", "desktop", "display"].includes(
-        device_type
-      )
+      ![
+        "mobile",
+        "laptop",
+        "tv",
+        "tablet",
+        "desktop",
+        "display",
+        "signage",
+      ].includes(device_type)
     ) {
       return res.status(400).json({
         message:
