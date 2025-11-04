@@ -248,8 +248,10 @@ module.exports.exitDeviceAppliation = async (device_id) => {
         }
       }
     );
+    return true;
   } catch (error) {
     console.error("❌ Error in pushToGroupQueue:", error);
+    return false;
   }
 };
 module.exports.pushToCricketQueue = async (matchData) => {
@@ -330,6 +332,9 @@ module.exports.pushNewDeviceToQueue = async (device, placeholder = null) => {
       device_id: device.device_id,
       device_name: device.device_name,
       group_id: device.group_id,
+      device_orientation: device.device_orientation,
+      device_resolution: device.device_resolution,
+      device_type: device.device_type,
       ...jsonToSend,
     };
     console.log(
