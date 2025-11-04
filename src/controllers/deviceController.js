@@ -385,7 +385,17 @@ module.exports.getFullSchedule_v2 = async (req, res) => {
   try {
     const { from, to } = req.query;
     const whereClause = {};
-    const todayStart = moment().startOf("day").format("YYYY-MM-DD HH:mm:ss");
+
+    const fromStart = moment(`${from} 00:00:00`, "YYYY-MM-DD HH:mm:ss");
+    const toEnd = moment(`${to} 23:59:59`, "YYYY-MM-DD HH:mm:ss");
+    let todayStart = moment().startOf("day");
+
+    if (fromStart.isBefore(todayStart)) {
+      console.log("Adjusted from date to today's start:", todayStart.format());
+      console.log("fromStart:", fromStart.format());
+      // Adjust today's start to fromStart
+      todayStart = fromStart;
+    }
 
     if (from && to) {
       const fromStart = `${from} 00:00:00`;
@@ -1187,6 +1197,9 @@ module.exports.updateDeviceDetailsAndLaunch = async (req, res) => {
     }
 
     if (group_id) {
+      device.device_orientation = device_orientation_val;
+      device.device_resolution = device_resolution_val;
+
       const groupExists = await DeviceGroup.findOne({ where: { group_id } });
       if (!groupExists) {
         return res.status(404).json({ error: "Device group not found" });
