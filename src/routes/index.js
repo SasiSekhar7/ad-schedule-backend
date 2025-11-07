@@ -104,7 +104,10 @@ const {
   getAllApkVersions,
   checkForUpdates,
 } = require("../controllers/apkVersionController");
-const { uploadAdsToEgressS3 } = require("../controllers/onTimeApiController");
+const {
+  uploadAdsToEgressS3,
+  dailySchedulePushManual,
+} = require("../controllers/onTimeApiController");
 const {
   triggerMediaConvertWebhook,
 } = require("../controllers/mediaConvertController");
@@ -345,4 +348,6 @@ router.get(
 );
 
 router.post("/device/mqtt-custom-message/:device_id", sendCustomMQTTMessage);
+
+router.post("/cron/daily-schedule-push", dailySchedulePushManual);
 module.exports = router;

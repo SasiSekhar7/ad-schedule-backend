@@ -74,3 +74,18 @@ module.exports.uploadAdsToEgressS3 = async (req, res) => {
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+module.exports.dailySchedulePushManual = async (req, res) => {
+  try {
+    const groups = await DeviceGroup.findAll({ attributes: ["group_id"] });
+
+    const groupIds = groups.map((grp) => grp.group_id);
+
+    await pushToGroupQueue(groupIds);
+
+    res.json({ message: "Daily schedule push initiated" });
+  } catch (error) {
+    console.error("Error in daily schedule push:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
