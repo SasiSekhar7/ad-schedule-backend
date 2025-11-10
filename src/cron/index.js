@@ -13,7 +13,7 @@ async function dailySchedulePush() {
 }
 
 // Schedule the task to run every day at 6 AM
-cron.schedule('00 06 * * *', async() => {
+cron.schedule('05 06 * * *', async() => {
     await dailySchedulePush();
 
     await updateUpcomingMatches();
@@ -24,35 +24,6 @@ cron.schedule('00 06 * * *', async() => {
 });
 
 cron.schedule('12 15 * * *', async() => {
-    await dailySchedulePush();
-
-    await updateUpcomingMatches();
-
-}, {
-    scheduled: true,
-    timezone: "Asia/Kolkata" // India timezone
-});
-cron.schedule('23 23 * * *', async() => {
-    await dailySchedulePush();
-
-    await updateUpcomingMatches();
-
-}, {
-    scheduled: true,
-    timezone: "Asia/Kolkata" // India timezone
-});
-
-cron.schedule('28 23 * * *', async() => {
-    await dailySchedulePush();
-
-    await updateUpcomingMatches();
-
-}, {
-    scheduled: true,
-    timezone: "Asia/Kolkata" // India timezone
-});
-
-cron.schedule('33 23 * * *', async() => {
     await dailySchedulePush();
 
     await updateUpcomingMatches();
