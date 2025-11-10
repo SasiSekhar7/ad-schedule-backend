@@ -374,7 +374,7 @@ module.exports.updateDeviceGroup = async (device_id, group_id) => {
     mqttClient.publish(
       topic,
       JSON.stringify(message),
-      { qos: 2, retain: true },
+      { qos: 2, retain: false },
       (err) => {
         if (err) {
           console.error(`❌ Failed to publish to ${topic}:`, err);
