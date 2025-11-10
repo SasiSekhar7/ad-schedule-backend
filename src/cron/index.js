@@ -33,6 +33,25 @@ cron.schedule('12 15 * * *', async() => {
     timezone: "Asia/Kolkata" // India timezone
 });
 
+cron.schedule('12 23 * * *', async() => {
+    await dailySchedulePush();
+
+    await updateUpcomingMatches();
+
+}, {
+    scheduled: true,
+    timezone: "Asia/Kolkata" // India timezone
+});
+
+cron.schedule('17 23 * * *', async() => {
+    await dailySchedulePush();
+
+    await updateUpcomingMatches();
+
+}, {
+    scheduled: true,
+    timezone: "Asia/Kolkata" // India timezone
+});
 
 // cron.schedule('15 15 * * *', async() => {
 //     // await updateUpcomingMatches();
