@@ -18,6 +18,7 @@ const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const { pushToGroupQueue } = require("./queueController");
 const fs = require("fs/promises"); // For async file system operations
 const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
+const logger = require("../utils/logger");
 
 const region = process.env.AWS_BUCKET_REGION;
 const folderPath = process.env.AWS_FOLDER_PATH;
@@ -56,7 +57,10 @@ module.exports.uploadAdsToEgressS3 = async (req, res) => {
         timestamp: new Date().toISOString(),
       };
 
-      console.log("payload", payload);
+      logger.logInfo("Invoking Lambda for ad processing", {
+        ad_id: ad.ad_id,
+        s3Key: fileName,
+      });
 
       const invokeCommand = new InvokeCommand({
         FunctionName: lambdaName,
@@ -70,7 +74,7 @@ module.exports.uploadAdsToEgressS3 = async (req, res) => {
 
     return res.status(200).json({ message: "Ads uploaded successfully" });
   } catch (error) {
-    console.error(error);
+    logger.logError("Error uploading ads to egress S3", error);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
@@ -85,7 +89,7 @@ module.exports.dailySchedulePushManual = async (req, res) => {
 
     res.json({ message: "Daily schedule push initiated" });
   } catch (error) {
-    console.error("Error in daily schedule push:", error);
+    logger.logError("Error in daily schedule push", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 };

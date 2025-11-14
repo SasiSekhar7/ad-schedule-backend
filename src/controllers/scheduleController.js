@@ -13,6 +13,7 @@ const { pushToGroupQueue } = require("./queueController");
 const { getBucketURL } = require("./s3Controller");
 const { updateImpressionsTable } = require("../services/impressionCalculator"); // Adjust path
 const moment = require("moment");
+const logger = require("../utils/logger");
 
 module.exports.scheduleAd2 = async (req, res) => {
   try {
@@ -35,15 +36,12 @@ module.exports.scheduleAd2 = async (req, res) => {
     const start_time = new Date(now.setMinutes(0, 0, 0)); // Start at current hour
     const end_time = new Date(start_time.getTime() + hours * 60 * 60000); // End after X hours
 
-    console.log(
-      "Scheduling from:",
+    logger.logDebug("Scheduling ad", {
       start_time,
-      "to",
       end_time,
-      "for ad duration:",
       adDuration,
-      "seconds"
-    );
+      ad_id,
+    });
 
     // Fetch devices in the specified locations
     let devices = await Device.findAll({
@@ -58,7 +56,9 @@ module.exports.scheduleAd2 = async (req, res) => {
         .json({ error: "No devices available for the given locations" });
     }
 
-    console.log("Devices found:", devices.length);
+    logger.logDebug("Devices found for scheduling", {
+      deviceCount: devices.length,
+    });
 
     const totalMinutes = (end_time - start_time) / 60000;
     const totalSlots = devices.length * (totalMinutes / 60);
@@ -96,7 +96,7 @@ module.exports.scheduleAd2 = async (req, res) => {
 
     return res.json({ message: "Ad scheduled successfully", schedules });
   } catch (error) {
-    console.error("Scheduling error:", error);
+    logger.logError("Scheduling error", error, { ad_id: req.body.ad_id });
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -150,7 +150,7 @@ module.exports.scheduleAd_alt = async (req, res) => {
       schedules: createdSchedules,
     });
   } catch (error) {
-    console.error(error);
+    logger.logError("Error in scheduleAd_alt", error);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
@@ -210,35 +210,37 @@ module.exports.scheduleAd = async (req, res) => {
 
     // ---> Perform the bulkCreate within a transaction if possible, although not strictly necessary here
     const createdSchedules = await Schedule.bulkCreate(schedules);
-    console.log(
-      `Successfully created ${createdSchedules.length} schedule entries.`
-    );
+    logger.logInfo("Schedule entries created", {
+      count: createdSchedules.length,
+    });
 
     // ---> Update the DailyImpressionSummary table
-    console.log(
-      `Triggering impression summary update for ${affectedDates.size} dates and ${affectedGroupIds.size} groups...`
-    );
+    logger.logDebug("Triggering impression summary update", {
+      affectedDates: affectedDates.size,
+      affectedGroups: affectedGroupIds.size,
+    });
     // Iterate through each affected group
     for (const groupId of affectedGroupIds) {
       // Iterate through each affected date
       for (const dateString of affectedDates) {
-        console.log(
-          `Updating summary for group ${groupId} on date ${dateString}...`
-        );
+        logger.logDebug("Updating summary for group and date", {
+          groupId,
+          dateString,
+        });
         try {
           // Call the update function for each specific group and date combination
           await updateImpressionsTable(dateString, { groupId: groupId });
         } catch (summaryError) {
           // Log error but don't fail the entire request
-          console.error(
-            `Error updating summary table for group ${groupId} on ${dateString}:`,
-            summaryError
-          );
+          logger.logError("Error updating summary table", summaryError, {
+            groupId,
+            dateString,
+          });
           // Optional: Add more robust error tracking/alerting here
         }
       }
     }
-    console.log("Finished triggering impression summary updates.");
+    logger.logDebug("Finished triggering impression summary updates");
     // --- [End of summary update section] ---
 
     // ---> Push to device queue (if needed)
@@ -250,7 +252,7 @@ module.exports.scheduleAd = async (req, res) => {
       schedules: createdSchedules,
     });
   } catch (error) {
-    console.error("Error in scheduleAd endpoint:", error);
+    logger.logError("Error in scheduleAd endpoint", error);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
@@ -265,7 +267,9 @@ module.exports.updateSchedule = async (req, res) => {
 
     res.json({ message: "Schedule Updated." });
   } catch (error) {
-    console.error(error);
+    logger.logError("Error updating schedule", error, {
+      schedule_id: req.params.id,
+    });
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
@@ -294,7 +298,9 @@ module.exports.deleteSchedule_alt = async (req, res) => {
 
     res.json({ message: "Schedule deleted successfully", group_id });
   } catch (error) {
-    console.error("Error deleting schedule:", error);
+    logger.logError("Error deleting schedule", error, {
+      schedule_id: req.params.id,
+    });
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
@@ -327,22 +333,27 @@ module.exports.deleteSchedule = async (req, res) => {
 
     // ---> Now delete the schedule entry
     await Schedule.destroy({ where: { schedule_id: id } });
-    console.log(`Successfully deleted schedule entry ${id}.`);
+    logger.logInfo("Schedule entry deleted", { schedule_id: id });
 
     // ---> Update the DailyImpressionSummary table for the affected date and group
-    console.log(
-      `Triggering impression summary update for group ${affectedGroupId} on date ${affectedDateString} due to deletion...`
-    );
+    logger.logDebug("Triggering impression summary update due to deletion", {
+      affectedGroupId,
+      affectedDateString,
+    });
     try {
       await updateImpressionsTable(affectedDateString, {
         groupId: affectedGroupId,
       });
-      console.log(`Summary update for ${affectedDateString} triggered.`);
+      logger.logDebug("Summary update triggered", { affectedDateString });
     } catch (summaryError) {
       // Log error but don't necessarily fail the request
-      console.error(
-        `Error updating summary table for group ${affectedGroupId} on ${affectedDateString} after deletion:`,
-        summaryError
+      logger.logError(
+        "Error updating summary table after deletion",
+        summaryError,
+        {
+          affectedGroupId,
+          affectedDateString,
+        }
       );
       // Optional: Add more robust error tracking/alerting here
     }
@@ -357,7 +368,9 @@ module.exports.deleteSchedule = async (req, res) => {
       affected_group_id: affectedGroupId,
     });
   } catch (error) {
-    console.error("Error deleting schedule:", error);
+    logger.logError("Error deleting schedule", error, {
+      schedule_id: req.params.id,
+    });
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
@@ -411,23 +424,31 @@ module.exports.deleteMultipleSchedule = async (req, res) => {
       },
     });
 
-    console.log(
-      `Successfully deleted ${schedulesToDelete.length} schedule entries for group ${groupId}, ad ${adId}, between ${startDate} and ${endDate}.`
-    );
+    logger.logInfo("Multiple schedule entries deleted", {
+      count: schedulesToDelete.length,
+      groupId,
+      adId,
+      startDate,
+      endDate,
+    });
 
     // Update DailyImpressionSummary for each affected date
     for (const dateStr of [...new Set(affectedDates)]) {
       try {
-        console.log(
-          `Triggering impression summary update for group ${groupId} on date ${dateStr} due to deletion...`
+        logger.logDebug(
+          "Triggering impression summary update due to deletion",
+          {
+            groupId,
+            dateStr,
+          }
         );
         await updateImpressionsTable(dateStr, { groupId });
-        console.log(`Summary update for ${dateStr} triggered.`);
+        logger.logDebug("Summary update triggered", { dateStr });
       } catch (summaryError) {
-        console.error(
-          `Error updating summary table for group ${groupId} on ${dateStr}:`,
-          summaryError
-        );
+        logger.logError("Error updating summary table", summaryError, {
+          groupId,
+          dateStr,
+        });
       }
     }
 
@@ -442,7 +463,10 @@ module.exports.deleteMultipleSchedule = async (req, res) => {
       affected_dates: [...new Set(affectedDates)],
     });
   } catch (error) {
-    console.error("Error deleting schedules:", error);
+    logger.logError("Error deleting schedules", error, {
+      groupId: req.body.groupId,
+      adId: req.body.adId,
+    });
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
@@ -468,7 +492,10 @@ module.exports.getPlaceholder = async (req, res) => {
     }
     res.json({ url });
   } catch (error) {
-    console.error("Error fetching placeholder:", error.message, error.stack);
+    logger.logError("Error fetching placeholder", error, {
+      clientId: req.user?.client_id,
+      role: req.user?.role,
+    });
     res.status(500).json({ message: "Internal Server Error" });
   }
 };

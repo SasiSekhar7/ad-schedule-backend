@@ -1,6 +1,7 @@
 const { Op, fn, col } = require("sequelize");
 const { Client, Ad, Schedule, Device, DeviceGroup } = require("../models");
 const { getBucketURL } = require("./s3Controller");
+const logger = require("../utils/logger");
 
 module.exports.createClient = async (req, res) => {
   try {
@@ -11,14 +12,12 @@ module.exports.createClient = async (req, res) => {
       phone_number: phoneNumber,
     });
 
-    return res
-      .status(200)
-      .json({
-        message: "Client Created Successfully ",
-        client_id: client.client_id,
-      });
+    return res.status(200).json({
+      message: "Client Created Successfully ",
+      client_id: client.client_id,
+    });
   } catch (error) {
-    console.log(error);
+    logger.logError("Error creating client", error, { name, email });
     return res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
@@ -51,7 +50,9 @@ module.exports.getAllAds = async (req, res) => {
 
     return res.status(200).json({ ads: flattenedAds });
   } catch (error) {
-    console.error("Error fetching ads:", error);
+    logger.logError("Error fetching ads", error, {
+      client_id: req.user?.client_id,
+    });
     return res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
@@ -74,7 +75,7 @@ module.exports.getAllClients = async (req, res) => {
 
     return res.status(200).json({ clients });
   } catch (error) {
-    console.log(error);
+    logger.logError("Error fetching all clients", error);
     return res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
@@ -91,14 +92,14 @@ module.exports.updateClient = async (req, res) => {
       where: { client_id: req.params.id },
     });
 
-    return res
-      .status(200)
-      .json({
-        message: "Client Updated Successfully ",
-        client_id: client.client_id,
-      });
+    return res.status(200).json({
+      message: "Client Updated Successfully ",
+      client_id: client.client_id,
+    });
   } catch (error) {
-    console.log(error);
+    logger.logError("Error updating client", error, {
+      client_id: req.params.id,
+    });
     return res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
@@ -116,14 +117,14 @@ module.exports.deleteClient = async (req, res) => {
       },
     });
 
-    return res
-      .status(200)
-      .json({
-        message: "Client Deleted Successfully ",
-        client_id: client.client_id,
-      });
+    return res.status(200).json({
+      message: "Client Deleted Successfully ",
+      client_id: client.client_id,
+    });
   } catch (error) {
-    console.log(error);
+    logger.logError("Error deleting client", error, {
+      client_id: req.params.id,
+    });
     return res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
@@ -173,14 +174,14 @@ module.exports.getAllDetails = async (req, res) => {
       schedules: schedulesCount,
     };
 
-    console.log(response);
-
     return res.status(200).json({
       message: "Dashboard data fetched successfully",
       data: response,
     });
   } catch (error) {
-    console.error(error);
+    logger.logError("Error fetching dashboard data", error, {
+      client_id: req.user?.client_id,
+    });
     return res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
