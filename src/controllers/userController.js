@@ -1,6 +1,7 @@
 const { User, Client } = require("../models");
 const bcrypt = require("bcrypt");
 const { Op } = require("sequelize");
+const logger = require("../utils/logger");
 
 const saltRounds = 10;
 module.exports.addUser = async (req, res) => {
@@ -21,9 +22,17 @@ module.exports.addUser = async (req, res) => {
       password: hash,
     });
 
+    logger.logInfo("User created successfully", {
+      userId: req.user?.id,
+      newUserEmail: email,
+      role,
+    });
     res.json({ message: "User created successfully." });
   } catch (error) {
-    console.error(error);
+    logger.logError("Error creating user", error, {
+      email: req.body.email,
+      role: req.body.role,
+    });
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
@@ -46,7 +55,7 @@ module.exports.getAllusers = async (req, res) => {
 
     res.json({ users: formattedUsers });
   } catch (error) {
-    console.error(error);
+    logger.logError("Error fetching all users", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
@@ -63,9 +72,15 @@ module.exports.deleteUser = async (req, res) => {
 
     await User.destroy({ where: { user_id: userId } });
 
+    logger.logInfo("User deleted successfully", {
+      deletedUserId: userId,
+      deletedBy: req.user?.id,
+    });
     return res.json({ message: "User deleted successfully." });
   } catch (error) {
-    console.error("Error deleting user:", error);
+    logger.logError("Error deleting user", error, {
+      userId: req.params.user_id,
+    });
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
@@ -86,8 +101,13 @@ module.exports.resetPass = async (req, res) => {
     user.password = hashed;
     await user.save();
 
+    logger.logInfo("Password reset successfully", {
+      userId,
+      resetBy: req.user?.id,
+    });
     res.json({ message: "Password reset successfully" });
   } catch (err) {
+    logger.logError("Error resetting password", err, { userId });
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -207,7 +227,9 @@ module.exports.getUserData = async (req, res) => {
 
     res.json(userData);
   } catch (error) {
-    console.error(error);
+    logger.logError("Error fetching user data", error, {
+      userId: req.user?.user_id,
+    });
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
@@ -244,7 +266,9 @@ module.exports.getAccountInfo = async (req, res) => {
 
     res.json({ account: accountInfo });
   } catch (error) {
-    console.error("Error fetching account info:", error);
+    logger.logError("Error fetching account info", error, {
+      userId: req.user?.user_id,
+    });
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
@@ -310,6 +334,16 @@ module.exports.updateAccountInfo = async (req, res) => {
 
     await user.save();
 
+    logger.logInfo("Account information updated successfully", {
+      userId: user.user_id,
+      updatedFields: {
+        name: !!name,
+        email: !!email,
+        phone_number: !!phone_number,
+        password: !!newPassword,
+      },
+    });
+
     res.json({
       message: "Account information updated successfully",
       updatedAccount: {
@@ -322,7 +356,9 @@ module.exports.updateAccountInfo = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error updating account info:", error);
+    logger.logError("Error updating account info", error, {
+      userId: req.user?.user_id,
+    });
     res.status(500).json({ message: "Internal Server Error" });
   }
 };

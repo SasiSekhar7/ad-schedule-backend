@@ -3,14 +3,19 @@
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs/promises"); // For async file system operations
+const logger = require("../utils/logger");
 
 // --- Directories for temporary storage ---
 const generalUploadDir = path.join(__dirname, "../uploads/temp_general_media");
 const apkUploadDir = path.join(__dirname, "../uploads/temp_apks");
 
 // Ensure directories exist when the application starts
-fs.mkdir(generalUploadDir, { recursive: true }).catch(console.error);
-fs.mkdir(apkUploadDir, { recursive: true }).catch(console.error);
+fs.mkdir(generalUploadDir, { recursive: true }).catch((err) => {
+  logger.logError("Failed to create general upload directory", err);
+});
+fs.mkdir(apkUploadDir, { recursive: true }).catch((err) => {
+  logger.logError("Failed to create APK upload directory", err);
+});
 
 // --- Existing Middleware for general images/media (MODIFIED to use disk storage) ---
 
@@ -56,7 +61,10 @@ const uploadMiddleware = (req, res, next) => {
     upload.single("file")(req, res, (err) => {
       // Assumes the field name is 'file'
       if (err instanceof multer.MulterError) {
-        console.error("Multer Error (General):", err);
+        logger.logWarn("Multer Error (General)", {
+          error: err.message,
+          code: err.code,
+        });
         // Customize error message for file size limit specific to general media
         if (err.code === "LIMIT_FILE_SIZE") {
           return res.status(413).json({
@@ -67,7 +75,7 @@ const uploadMiddleware = (req, res, next) => {
         }
         return res.status(400).json({ error: `Multer error: ${err.message}` });
       } else if (err) {
-        console.error("Upload Error (General):", err);
+        logger.logError("Upload Error (General)", err);
         return res.status(400).json({ error: `Upload error: ${err.message}` });
       }
 
@@ -116,7 +124,10 @@ const uploadApk = multer({
 const apkUploadMiddleware = (req, res, next) => {
   uploadApk.single("apk_file")(req, res, (err) => {
     if (err instanceof multer.MulterError) {
-      console.error("Multer Error (APK):", err);
+      logger.logWarn("Multer Error (APK)", {
+        error: err.message,
+        code: err.code,
+      });
       if (err.code === "LIMIT_FILE_SIZE") {
         return res.status(413).json({
           error: `APK file is too large. Max allowed size is ${
@@ -126,7 +137,7 @@ const apkUploadMiddleware = (req, res, next) => {
       }
       return res.status(400).json({ error: `Multer error: ${err.message}` });
     } else if (err) {
-      console.error("Upload Error (APK):", err);
+      logger.logError("Upload Error (APK)", err);
       return res.status(400).json({ error: `Upload error: ${err.message}` });
     }
 

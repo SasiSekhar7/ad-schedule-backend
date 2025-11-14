@@ -9,7 +9,7 @@ const {
   SelectedSeries,
 } = require("../models");
 const { default: mqtt } = require("mqtt");
-// const { getBucketURL } = require("./s3Controller");
+const logger = require("../utils/logger");
 
 const ad_Egress_lambda_url = process.env.AD_EGRESS_LAMBDA_URL;
 const use_ad_egress_lambda = process.env.USE_AD_EGRESS_LAMBDA;
@@ -21,31 +21,25 @@ const options = {
   password: process.env.MQTT_PASSWORD,
 };
 
-// Debug MQTT connection
-console.log(`📡 Connecting to MQTT broker at ${brokerUrl}...`);
-console.log(`🔑 Using username: ${JSON.stringify(options)}`);
+// MQTT connection
+logger.logInfo(`Connecting to MQTT broker`, { brokerUrl });
 const mqttClient = mqtt.connect(brokerUrl, options);
 
 mqttClient.on("connect", () => {
-  console.log("✅ MQTT Connected!");
-  // const topics = ["device/sync", "device/register/#"];
-  // const topics = ["device/#"]; // matches device/sync, device/register/123, etc.
+  logger.logInfo("MQTT Connected successfully");
 
   // Subscribe to the "device/sync" topic upon connection
   mqttClient.subscribe("device/sync", { qos: 2 }, (err, granted) => {
     if (err) {
-      console.error("❌ Error subscribing to topics:", err);
+      logger.logError("Error subscribing to MQTT topics", err);
     } else {
-      console.log(
-        "📡 Subscribed to topics:",
-        granted.map((g) => g.topic).join(", ")
-      );
+      logger.logInfo("Subscribed to MQTT topics", {
+        topics: granted.map((g) => g.topic).join(", "),
+      });
     }
   });
 });
-mqttClient.on("error", (err) =>
-  console.error("❌ MQTT Connection Error:", err)
-);
+mqttClient.on("error", (err) => logger.logError("MQTT Connection Error", err));
 
 module.exports.convertToPushReadyJSON = async (
   group_id,
@@ -77,9 +71,11 @@ module.exports.convertToPushReadyJSON = async (
     )
   ).toISOString(); // 10 PM UTC
 
-  console.log(
-    `📅 Filtering ads between ${startOfDay} and ${endOfDay} for group ${group_id}`
-  );
+  logger.logDebug(`Filtering ads for group`, {
+    group_id,
+    startOfDay,
+    endOfDay,
+  });
 
   const scheduledAds = await Schedule.findAll({
     where: {
@@ -91,12 +87,13 @@ module.exports.convertToPushReadyJSON = async (
     include: [{ model: Ad }],
   });
 
-  console.log(
-    `📊 Found ${scheduledAds.length} scheduled ads for group ${group_id}`
-  );
+  logger.logDebug(`Found scheduled ads for group`, {
+    group_id,
+    count: scheduledAds.length,
+  });
 
   if (scheduledAds.length === 0) {
-    console.log(`⚠️ No ads found for group ${group_id}, skipping.`);
+    logger.logDebug(`No ads found for group, skipping`, { group_id });
   }
 
   const DeviceGroupData = await DeviceGroup.findOne({
@@ -106,7 +103,6 @@ module.exports.convertToPushReadyJSON = async (
   // Process ads asynchronously
   const ads = await Promise.all(
     scheduledAds.map(async (schedule) => {
-      console.log(`📦 Processing ad: ${JSON.stringify(schedule.Ad)}`);
       try {
         let url;
         let file_extension;
@@ -123,7 +119,6 @@ module.exports.convertToPushReadyJSON = async (
           url = await getBucketURL(schedule.Ad.url);
           file_extension = schedule.Ad.url.split("?")[0].split(".").pop();
         }
-        console.log(`🔗 Resolved URL for ad ${schedule.Ad.ad_id}: ${url}`);
         return {
           ad_id: schedule.Ad.ad_id,
           name: schedule.Ad.name,
@@ -135,10 +130,9 @@ module.exports.convertToPushReadyJSON = async (
           start_time: schedule.start_time,
         };
       } catch (urlError) {
-        console.error(
-          `❌ Error fetching URL for ad ${schedule.Ad.ad_id}:`,
-          urlError
-        );
+        logger.logError(`Error fetching URL for ad`, urlError, {
+          ad_id: schedule.Ad.ad_id,
+        });
         return null; // Skip this ad
       }
     })
@@ -165,9 +159,10 @@ module.exports.convertToPushReadyJSON = async (
 
   // Remove null ads (failed URL fetch)
   const validAds = ads.filter((ad) => ad !== null);
-  console.log(
-    `✅ Ready to publish ${validAds.length} ads for group ${group_id}`
-  );
+  logger.logDebug(`Ready to publish ads for group`, {
+    group_id,
+    validAdsCount: validAds.length,
+  });
 
   const jsonToSend = {
     rcs: scrollingMessage,
@@ -181,10 +176,12 @@ module.exports.convertToPushReadyJSON = async (
 
 module.exports.pushToGroupQueue = async (groups, placeholder = null) => {
   try {
-    console.log(`🔄 Processing groups: ${JSON.stringify(groups)}`);
+    logger.logInfo(`Processing groups for MQTT publish`, {
+      groupCount: groups.length,
+    });
 
     for (const group_id of groups) {
-      console.log(`📌 Processing group: ${group_id}`);
+      logger.logDebug(`Processing group`, { group_id });
 
       const topic = `ads/${group_id}`;
 
@@ -192,18 +189,20 @@ module.exports.pushToGroupQueue = async (groups, placeholder = null) => {
         group_id,
         placeholder
       );
-      // if (validAds.length > 0) {
+
       mqttClient.publish(
         topic,
         JSON.stringify(jsonToSend),
         { qos: 2, retain: true },
         (err) => {
           if (err) {
-            console.error(`❌ Failed to publish to ${topic}:`, err);
+            logger.logError(`Failed to publish to MQTT topic`, err, { topic });
           } else {
-            console.log(
-              `📡 Successfully published ads to ${topic} with QoS 2 and retain flag`
-            );
+            logger.logInfo(`Successfully published ads to MQTT topic`, {
+              topic,
+              qos: 2,
+              retain: true,
+            });
           }
         }
       );
@@ -218,12 +217,9 @@ module.exports.pushToGroupQueue = async (groups, placeholder = null) => {
           },
         }
       );
-      // } else {
-      //   console.log(`⚠️ No valid ads to publish for group ${group_id}`);
-      // }
     }
   } catch (error) {
-    console.error("❌ Error in pushToGroupQueue:", error);
+    logger.logError("Error in pushToGroupQueue", error);
   }
 };
 
@@ -240,17 +236,21 @@ module.exports.exitDeviceAppliation = async (device_id) => {
       { qos: 2, retain: false },
       (err) => {
         if (err) {
-          console.error(`❌ Failed to publish to ${topic}:`, err);
+          logger.logError(`Failed to publish exit command to device`, err, {
+            topic,
+            device_id,
+          });
         } else {
-          console.log(
-            `📡 Successfully published ads to ${topic} with QoS 2 and retain flag`
-          );
+          logger.logInfo(`Successfully published exit command to device`, {
+            topic,
+            device_id,
+          });
         }
       }
     );
     return true;
   } catch (error) {
-    console.error("❌ Error in pushToGroupQueue:", error);
+    logger.logError("Error in exitDeviceApplication", error, { device_id });
     return false;
   }
 };
@@ -260,19 +260,17 @@ module.exports.pushToCricketQueue = async (matchData) => {
 
     mqttClient.publish(topic, matchData, { qos: 2, retain: true }, (err) => {
       if (err) {
-        console.error(`❌ Failed to publish to ${topic}:`, err);
+        logger.logError(`Failed to publish cricket data to MQTT`, err, {
+          topic,
+        });
       } else {
-        console.log(
-          `📡 Successfully published ads to ${topic} with QoS 2 and retain flag`
-        );
+        logger.logInfo(`Successfully published cricket data to MQTT`, {
+          topic,
+        });
       }
     });
-
-    // } else {
-    //   console.log(`⚠️ No valid ads to publish for group ${group_id}`);
-    //
   } catch (error) {
-    console.error("❌ Error in pushToGroupQueue:", error);
+    logger.logError("Error in pushToCricketQueue", error);
   }
 };
 const deviceUpdateQueue = new Map(); // android_id => timestamp
@@ -290,13 +288,18 @@ setInterval(async () => {
   const promises = updates.map(([android_id]) =>
     Device.update({ last_synced: now }, { where: { android_id } }).catch(
       (err) => {
-        console.error(`Failed to update ${android_id}:`, err);
+        logger.logError(`Failed to update device last_synced`, err, {
+          android_id,
+        });
       }
     )
   );
 
   await Promise.allSettled(promises);
-  console.log(`Batch update: ${updates.length} devices at ${now}`);
+  logger.logDebug(`Batch update completed`, {
+    deviceCount: updates.length,
+    timestamp: now,
+  });
 }, BATCH_INTERVAL_MS);
 
 // On MQTT message
@@ -310,7 +313,10 @@ mqttClient.on("message", (topic, message) => {
         deviceUpdateQueue.set(android_id, Date.now()); // deduplicated
       }
     } catch (err) {
-      console.error("Invalid JSON or malformed payload:", err);
+      logger.logError(
+        "Invalid JSON or malformed payload from device sync",
+        err
+      );
     }
   }
 });
@@ -337,11 +343,10 @@ module.exports.pushNewDeviceToQueue = async (device, placeholder = null) => {
       device_type: device.device_type,
       ...jsonToSend,
     };
-    console.log(
-      `📲 Pushing new device registration to ${topic}: ${JSON.stringify(
-        payload
-      )}`
-    );
+    logger.logInfo(`Pushing new device registration to MQTT`, {
+      topic,
+      device_id: device.device_id,
+    });
 
     mqttClient.publish(
       topic,
@@ -349,16 +354,22 @@ module.exports.pushNewDeviceToQueue = async (device, placeholder = null) => {
       { qos: 2, retain: false },
       (err) => {
         if (err) {
-          console.error(`❌ Failed to publish to ${topic}:`, err);
+          logger.logError(`Failed to publish device registration`, err, {
+            topic,
+            device_id: device.device_id,
+          });
         } else {
-          console.log(
-            `📡 Successfully published new device registration to ${topic} with QoS 2 and retain flag`
-          );
+          logger.logInfo(`Successfully published device registration`, {
+            topic,
+            device_id: device.device_id,
+          });
         }
       }
     );
   } catch (error) {
-    console.error("❌ Error in pushNewDeviceToQueue:", error);
+    logger.logError("Error in pushNewDeviceToQueue", error, {
+      device_id: device?.device_id,
+    });
   }
 };
 
@@ -377,16 +388,25 @@ module.exports.updateDeviceGroup = async (device_id, group_id) => {
       { qos: 2, retain: false },
       (err) => {
         if (err) {
-          console.error(`❌ Failed to publish to ${topic}:`, err);
+          logger.logError(`Failed to publish group update to device`, err, {
+            topic,
+            device_id,
+            group_id,
+          });
         } else {
-          console.log(
-            `📡 Successfully published update group to ${topic} with QoS 2 and retain flag`
-          );
+          logger.logInfo(`Successfully published group update to device`, {
+            topic,
+            device_id,
+            group_id,
+          });
         }
       }
     );
   } catch (error) {
-    console.error("❌ Error in pushToGroupQueue:", error);
+    logger.logError("Error in updateDeviceGroup", error, {
+      device_id,
+      group_id,
+    });
   }
 };
 
@@ -405,16 +425,20 @@ module.exports.updateDeviceMetaData = async (device_id, metadata) => {
       { qos: 2, retain: false },
       (err) => {
         if (err) {
-          console.error(`❌ Failed to publish to ${topic}:`, err);
+          logger.logError(`Failed to publish metadata update to device`, err, {
+            topic,
+            device_id,
+          });
         } else {
-          console.log(
-            `📡 Successfully published update group to ${topic} with QoS 2 and retain flag`
-          );
+          logger.logInfo(`Successfully published metadata update to device`, {
+            topic,
+            device_id,
+          });
         }
       }
     );
   } catch (error) {
-    console.error("❌ Error in pushToGroupQueue:", error);
+    logger.logError("Error in updateDeviceMetaData", error, { device_id });
   }
 };
 
@@ -431,16 +455,22 @@ module.exports.DeviceOnOff = async (device_id, action) => {
       { qos: 2, retain: false },
       (err) => {
         if (err) {
-          console.error(`❌ Failed to publish to ${topic}:`, err);
+          logger.logError(`Failed to publish device on/off command`, err, {
+            topic,
+            device_id,
+            action,
+          });
         } else {
-          console.log(
-            `📡 Successfully published update group to ${topic} with QoS 2 and retain flag`
-          );
+          logger.logInfo(`Successfully published device on/off command`, {
+            topic,
+            device_id,
+            action,
+          });
         }
       }
     );
   } catch (error) {
-    console.error("❌ Error in pushToGroupQueue:", error);
+    logger.logError("Error in DeviceOnOff", error, { device_id, action });
   }
 };
 
@@ -461,11 +491,15 @@ module.exports.sendCustomMQTTMessage = async (req, res) => {
       { qos: 2, retain: false },
       (err) => {
         if (err) {
-          console.error(`❌ Failed to publish to ${topic}:`, err);
+          logger.logError(`Failed to publish custom MQTT message`, err, {
+            topic,
+            device_id,
+          });
         } else {
-          console.log(
-            `📡 Successfully published custom message to ${topic} with QoS 2 and retain flag`
-          );
+          logger.logInfo(`Successfully published custom MQTT message`, {
+            topic,
+            device_id,
+          });
         }
       }
     );
@@ -474,7 +508,9 @@ module.exports.sendCustomMQTTMessage = async (req, res) => {
       .status(200)
       .json({ message: "Custom message sent successfully" });
   } catch (error) {
-    console.error("Error sending custom MQTT message:", error);
+    logger.logError("Error sending custom MQTT message", error, {
+      device_id: req.params?.device_id,
+    });
     return res.status(500).json({ error: "Internal server error" });
   }
 };

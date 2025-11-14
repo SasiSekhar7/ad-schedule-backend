@@ -1,25 +1,25 @@
 const api = require("../api");
 const { getCustomUTCDateTime } = require("../helpers");
 const { SiteUser, CampaignInteraction } = require("../models");
+const logger = require("../utils/logger");
 const customerId = process.env.CUST_ID;
 
 module.exports.sendOtp = async (req, res) => {
   try {
     const { phoneNumber, ipAddress, userAgent, campaign_id } = req.body;
-    console.log(req.body);
 
     //api
     const response = await api.post(
       `/send?countryCode=91&customerId=${customerId}&flowType=SMS&mobileNumber=${phoneNumber}`
     );
-    // const response = await api.get(`/`);
-    // console.log(response);
 
     if (response.responseCode === 200) {
       const { verificationId } = response.data;
 
       // Find or create the user record based on the phone number.
-      let user = await SiteUser.findOne({ where: { phone_number: phoneNumber } });
+      let user = await SiteUser.findOne({
+        where: { phone_number: phoneNumber },
+      });
       if (user) {
         await SiteUser.update(
           {
@@ -45,14 +45,26 @@ module.exports.sendOtp = async (req, res) => {
       // Await the helper function to ensure errors are caught.
       await addOrUpdateInteraction(user.id, campaign_id);
 
+      logger.logInfo("OTP sent successfully", {
+        phoneNumber,
+        campaign_id,
+        verificationId,
+      });
+
       return res
         .status(200)
         .json({ message: "OTP sent successfully", verId: verificationId });
     } else {
+      logger.logWarn("Failed to send OTP", {
+        phoneNumber,
+        responseCode: response.responseCode,
+      });
       return res.status(400).json({ message: "Error Sending OTP" });
     }
   } catch (error) {
-    console.error(error);
+    logger.logError("Error sending OTP", error, {
+      phoneNumber: req.body.phoneNumber,
+    });
     return res.status(500).json({ message: "Internal server error!", error });
   }
 };
@@ -63,7 +75,10 @@ module.exports.sendOtp = async (req, res) => {
  */
 async function addOrUpdateInteraction(user_id, campaign_id) {
   try {
-    console.log(user_id, campaign_id)
+    logger.logDebug("Adding or updating campaign interaction", {
+      user_id,
+      campaign_id,
+    });
     const campaignInteraction = await CampaignInteraction.findOne({
       where: { user_id, campaign_id },
     });
@@ -80,7 +95,10 @@ async function addOrUpdateInteraction(user_id, campaign_id) {
       });
     }
   } catch (err) {
-    console.error("Error in addOrUpdateInteraction:", err);
+    logger.logError("Error in addOrUpdateInteraction", err, {
+      user_id,
+      campaign_id,
+    });
     throw err; // Rethrow so that the parent try/catch can handle it.
   }
 }
@@ -92,8 +110,7 @@ module.exports.verifyOtp = async (req, res) => {
     const response = await api.get(
       `/validateOtp?countryCode=91&mobileNumber=${phoneNumber}&verificationId=${verificationId}&customerId=${customerId}&code=${otp}`
     );
-    // const response = await api.get('/')
-    // console.log(response)
+
     if (response.responseCode === 200) {
       await SiteUser.update(
         {
@@ -107,6 +124,10 @@ module.exports.verifyOtp = async (req, res) => {
           },
         }
       );
+      logger.logInfo("OTP verified successfully", {
+        phoneNumber,
+        verificationId,
+      });
       return res.status(200).json({ message: "OTP Verified succesfully" });
     } else {
       await SiteUser.update(
@@ -120,10 +141,17 @@ module.exports.verifyOtp = async (req, res) => {
           },
         }
       );
+      logger.logWarn("OTP verification failed", {
+        phoneNumber,
+        verificationId,
+      });
       return res.status(400).json({ message: "OTP Verification failed" });
     }
   } catch (error) {
-    console.log(error);
+    logger.logError("Error verifying OTP", error, {
+      phoneNumber: req.body.phoneNumber,
+      verificationId: req.body.verificationId,
+    });
     return res.status(500).json({ message: "Internal server error!", error });
   }
 };

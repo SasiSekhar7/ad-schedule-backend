@@ -1,4 +1,11 @@
-const { Client, Coupon, Campaign, SiteUser, CampaignInteraction } = require("../models");
+const {
+  Client,
+  Coupon,
+  Campaign,
+  SiteUser,
+  CampaignInteraction,
+} = require("../models");
+const logger = require("../utils/logger");
 
 module.exports.createClient = async (req, res) => {
   try {
@@ -9,14 +16,15 @@ module.exports.createClient = async (req, res) => {
       phone_number: phoneNumber,
     });
 
-    return res
-      .status(200)
-      .json({
-        message: "Client Created Successfully ",
-        client_id: client.client_id,
-      });
+    return res.status(200).json({
+      message: "Client Created Successfully ",
+      client_id: client.client_id,
+    });
   } catch (error) {
-    console.log(error);
+    logger.logError("Error creating client", error, {
+      name: req.body.name,
+      email: req.body.email,
+    });
     return res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
@@ -36,9 +44,9 @@ module.exports.createCampaign = async (req, res) => {
       requires_questions: false,
     });
 
-    if (Array.isArray(coupons) && coupons.length> 0) {
+    if (Array.isArray(coupons) && coupons.length > 0) {
       await Promise.all(
-        coupons.map(async (coupon) => 
+        coupons.map(async (coupon) =>
           module.exports.addCoupon(coupon, campaign.campaign_id)
         )
       );
@@ -49,7 +57,10 @@ module.exports.createCampaign = async (req, res) => {
       campaign_id: campaign.campaign_id,
     });
   } catch (error) {
-    console.error(error);
+    logger.logError("Error creating campaign", error, {
+      client_id: req.params.client_id,
+      campaignName: req.body.name,
+    });
     return res.status(500).json({
       message: "Internal Server Error",
       error: error.message,
@@ -71,14 +82,21 @@ module.exports.addCoupon = async (coupon, campaign_id) => {
 
     return true;
   } catch (error) {
-    console.error(error);
+    logger.logError("Error creating coupons", error, { campaign_id });
     return false;
   }
 };
 
 module.exports.updateCampaignWithCoupons = async (req, res) => {
   try {
-    const { campaign_id, name, description, requires_phone, requires_questions, coupons } = req.body;
+    const {
+      campaign_id,
+      name,
+      description,
+      requires_phone,
+      requires_questions,
+      coupons,
+    } = req.body;
 
     // Find the existing campaign
     const campaign = await Campaign.findByPk(campaign_id);
@@ -87,28 +105,45 @@ module.exports.updateCampaignWithCoupons = async (req, res) => {
     }
 
     // Update campaign attributes
-    await campaign.update({ name, description, requires_phone, requires_questions });
+    await campaign.update({
+      name,
+      description,
+      requires_phone,
+      requires_questions,
+    });
 
     // Delete all existing coupons for this campaign
     await Coupon.destroy({ where: { campaign_id } });
 
     // Insert new coupons if provided
     if (Array.isArray(coupons) && coupons.length > 0) {
-      const newCoupons = coupons.map(({ coupon_code, coupon_description, expiry_date, is_active }) => ({
-        campaign_id,
-        coupon_code,
-        description: coupon_description,
-        expiry_date,
-        is_active,
-      }));
+      const newCoupons = coupons.map(
+        ({ coupon_code, coupon_description, expiry_date, is_active }) => ({
+          campaign_id,
+          coupon_code,
+          description: coupon_description,
+          expiry_date,
+          is_active,
+        })
+      );
 
       await Coupon.bulkCreate(newCoupons);
     }
 
-    return res.status(200).json({ message: "Campaign and coupons updated successfully", campaign_id });
+    logger.logInfo("Campaign and coupons updated successfully", {
+      campaign_id,
+    });
+    return res.status(200).json({
+      message: "Campaign and coupons updated successfully",
+      campaign_id,
+    });
   } catch (error) {
-    console.error("Error updating campaign:", error);
-    return res.status(500).json({ message: "Internal Server Error", error: error.message });
+    logger.logError("Error updating campaign", error, {
+      campaign_id: req.params.campaign_id,
+    });
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
   }
 };
 module.exports.deleteCampaign = async (req, res) => {
@@ -117,7 +152,6 @@ module.exports.deleteCampaign = async (req, res) => {
 
     // Find the campaign
     const campaign = await Campaign.findByPk(campaign_id);
-    console.log(campaign, campaign_id)
     if (!campaign) {
       return res.status(404).json({ message: "Campaign not found" });
     }
@@ -128,15 +162,23 @@ module.exports.deleteCampaign = async (req, res) => {
     // Delete the campaign
     await campaign.destroy();
 
-    return res.status(200).json({ message: "Campaign and associated coupons deleted successfully" });
+    logger.logInfo("Campaign and associated coupons deleted successfully", {
+      campaign_id,
+    });
+    return res.status(200).json({
+      message: "Campaign and associated coupons deleted successfully",
+    });
   } catch (error) {
-    console.error("Error deleting campaign:", error);
-    return res.status(500).json({ message: "Internal Server Error", error: error.message });
+    logger.logError("Error deleting campaign", error, {
+      campaign_id: req.params.campaign_id,
+    });
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
   }
 };
 
-
-module.exports.allCampaigns = async (req,res) => {
+module.exports.allCampaigns = async (req, res) => {
   try {
     const campaigns = await Campaign.findAll({
       include: [
@@ -161,22 +203,19 @@ module.exports.allCampaigns = async (req,res) => {
         "requires_questions",
       ],
     });
-    return res
-    .status(200)
-    .json({
+    return res.status(200).json({
       message: "coupon added Successfully ",
-      campaigns
+      campaigns,
     });
-} catch (error) {
-  console.log(error);
-  return res
-    .status(500)
-    .json({ message: "Internal Server Error", error: error.message });
-}
+  } catch (error) {
+    logger.logError("Error adding coupon", error);
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
 };
 
 // Call the function (Example Usage)
-
 
 module.exports.fetchCampaignInteractions = async (req, res) => {
   try {
@@ -210,16 +249,16 @@ module.exports.fetchCampaignInteractions = async (req, res) => {
 
     return res.status(200).json({ interactions: formattedInteractions });
   } catch (error) {
-    console.error("Fetch Campaign Interactions Error:", error);
+    logger.logError("Fetch Campaign Interactions Error", error, {
+      campaign_id: req.params.campaign_id,
+    });
     return res.status(500).json({ error: "Internal server error" });
   }
 };
 
-
 module.exports.getCampaign = async (req, res) => {
   try {
     const { campaign_id } = req.params;
-    console.log(campaign_id)
     const campaign = await Campaign.findOne({
       include: [
         {
@@ -242,20 +281,19 @@ module.exports.getCampaign = async (req, res) => {
         "requires_phone",
         "requires_questions",
       ],
-      where:{
-        campaign_id
-      }
+      where: {
+        campaign_id,
+      },
     });
 
-    
-    return res
-      .status(200)
-      .json({
-        message: "coupon added Successfully ",
-        campaign,
-      });
+    return res.status(200).json({
+      message: "coupon added Successfully ",
+      campaign,
+    });
   } catch (error) {
-    console.log(error);
+    logger.logError("Error fetching campaign", error, {
+      campaign_id: req.params.campaign_id,
+    });
     return res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
@@ -284,9 +322,9 @@ module.exports.getCampaignCode = async (req, res) => {
       return res.status(404).json({ message: "Campaign not found" });
     }
 
-
     // Ensure coupons exist before accessing properties
-    const firstCoupon = campaignData.coupons?.length > 0 ? campaignData.coupons[0] : null;
+    const firstCoupon =
+      campaignData.coupons?.length > 0 ? campaignData.coupons[0] : null;
 
     const campaign = {
       coupon_code: firstCoupon ? firstCoupon.coupon_code : null,
@@ -300,7 +338,11 @@ module.exports.getCampaignCode = async (req, res) => {
       campaign,
     });
   } catch (error) {
-    console.error("Error fetching campaign:", error);
-    return res.status(500).json({ message: "Internal Server Error", error: error.message });
+    logger.logError("Error fetching campaign with coupons", error, {
+      campaign_id: req.params.campaign_id,
+    });
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
   }
 };
