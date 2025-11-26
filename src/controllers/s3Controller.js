@@ -18,6 +18,7 @@ const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const { pushToGroupQueue } = require("./queueController");
 const fs = require("fs/promises"); // For async file system operations
 const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
+const logger = require("../utils/logger");
 
 const region = process.env.AWS_BUCKET_REGION;
 const folderPath = process.env.AWS_FOLDER_PATH;
@@ -53,7 +54,7 @@ async function deleteFileFromS3Folder(ad_id) {
     const listedObjects = await s3.send(new ListObjectsV2Command(listParams));
 
     if (!listedObjects.Contents || listedObjects.Contents.length === 0) {
-      console.log(`No files found for ad_id: ${ad_id}`);
+      logger.logInfo(`No files found for ad_id: ${ad_id}`, { ad_id });
       return;
     }
 
@@ -64,17 +65,23 @@ async function deleteFileFromS3Folder(ad_id) {
       },
     };
 
-    console.log("Listed Objects:", listedObjects);
+    logger.logDebug("Listed Objects for deletion", {
+      ad_id,
+      count: listedObjects.Contents.length,
+    });
 
     const result = await s3.send(new DeleteObjectsCommand(deleteParams));
-    console.log(`Deleted ${result.Deleted.length} files for ad_id: ${ad_id}`);
+    logger.logInfo(`Deleted files from S3`, {
+      ad_id,
+      deletedCount: result.Deleted.length,
+    });
 
     // Handle pagination if more than 1000 objects
     if (listedObjects.IsTruncated) {
       await deleteFileFromS3Folder(ad_id);
     }
   } catch (error) {
-    console.error("Error deleting files from S3:", error);
+    logger.logError("Error deleting files from S3", error, { ad_id });
   }
 }
 
@@ -91,9 +98,9 @@ module.exports.getBucketURL = async (fileName) => {
     return url;
   } catch (error) {
     if (error.name === "NotFound" || error.$metadata?.httpStatusCode === 404) {
-      console.warn(`S3 file not found: ${fileName}`);
+      logger.logWarn(`S3 file not found`, { fileName });
     } else {
-      console.error("S3 getBucketURL error:", error.message);
+      logger.logError("S3 getBucketURL error", error, { fileName });
     }
     return null;
   }
@@ -110,7 +117,11 @@ module.exports.changeFile = async (req, res) => {
     }
     const { file_url, isMultipartUpload } = req.body;
 
-    console.log("isMultipartUpload", isMultipartUpload);
+    logger.logDebug("Change file request", {
+      ad_id,
+      isMultipartUpload,
+      userId: req.user?.user_id,
+    });
     if (isMultipartUpload == true || isMultipartUpload == "true") {
       if (!file_url) {
         return res.status(400).json({ message: "New file is required." });
@@ -191,19 +202,23 @@ module.exports.changeFile = async (req, res) => {
 
     return res.json({ message: "File uploaded and ad updated successfully." });
   } catch (error) {
-    console.error(error);
+    logger.logError("Error changing ad file", error, {
+      ad_id: req.params.ad_id,
+      userId: req.user?.user_id,
+    });
     return res.status(500).json({ message: "Internal Server Error!" });
   } finally {
     // IMPORTANT: Delete the temporary file from disk
     if (req.file && req.file.path) {
       try {
         await fs.unlink(req.file.path);
-        console.log(`Successfully deleted temporary file: ${req.file.path}`);
+        logger.logDebug(`Successfully deleted temporary file`, {
+          filePath: req.file.path,
+        });
       } catch (unlinkError) {
-        console.error(
-          `Error deleting temporary file ${req.file.path}:`,
-          unlinkError
-        );
+        logger.logError("Error deleting temporary file", unlinkError, {
+          filePath: req.file.path,
+        });
       }
     }
   }
@@ -258,19 +273,22 @@ module.exports.changePlaceholder = async (req, res) => {
 
     res.json({ message: "Placeholder changed successfully" });
   } catch (error) {
-    console.error("Error changing placeholder:", error.message, error.stack);
+    logger.logError("Error changing placeholder", error, {
+      userId: req.user?.user_id,
+    });
     res.status(500).json({ message: "Internal Server Error" });
   } finally {
     // IMPORTANT: Delete the temporary file from disk
     if (req.file && req.file.path) {
       try {
         await fs.unlink(req.file.path);
-        console.log(`Successfully deleted temporary file: ${req.file.path}`);
+        logger.logDebug(`Successfully deleted temporary file`, {
+          filePath: req.file.path,
+        });
       } catch (unlinkError) {
-        console.error(
-          `Error deleting temporary file ${req.file.path}:`,
-          unlinkError
-        );
+        logger.logError("Error deleting temporary file", unlinkError, {
+          filePath: req.file.path,
+        });
       }
     }
   }
@@ -281,7 +299,13 @@ module.exports.addAd = async (req, res) => {
   try {
     let { client_id, name, duration, file_url, isMultipartUpload } = req.body;
 
-    console.log("req.body", req.body);
+    logger.logDebug("Add ad request", {
+      client_id,
+      name,
+      duration,
+      isMultipartUpload,
+      userId: req.user?.user_id,
+    });
 
     // If client_id is missing and user is a Client, use their client_id
     if (!client_id && req.user.role === "Client") {
@@ -304,9 +328,9 @@ module.exports.addAd = async (req, res) => {
     }
 
     let ad;
-    console.log("isMultipartUpload", isMultipartUpload);
+    logger.logDebug("Processing ad upload", { isMultipartUpload });
     if (isMultipartUpload == "true" || isMultipartUpload == true) {
-      console.log("multipart upload");
+      logger.logDebug("Using multipart upload");
       ad = await Ad.create({
         client_id,
         name,
@@ -357,9 +381,19 @@ module.exports.addAd = async (req, res) => {
       await lambda.send(invokeCommand);
     }
 
+    logger.logInfo("Ad created successfully", {
+      ad_id: ad.ad_id,
+      client_id,
+      name,
+      userId: req.user?.user_id,
+    });
     return res.status(200).json({ message: "Ad Created Successfully", ad });
   } catch (error) {
-    console.error(error);
+    logger.logError("Error creating ad", error, {
+      client_id: req.body.client_id,
+      name: req.body.name,
+      userId: req.user?.user_id,
+    });
     return res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
@@ -368,12 +402,13 @@ module.exports.addAd = async (req, res) => {
     if (req.file && req.file.path) {
       try {
         await fs.unlink(req.file.path);
-        console.log(`Successfully deleted temporary file: ${req.file.path}`);
+        logger.logDebug(`Successfully deleted temporary file`, {
+          filePath: req.file.path,
+        });
       } catch (unlinkError) {
-        console.error(
-          `Error deleting temporary file ${req.file.path}:`,
-          unlinkError
-        );
+        logger.logError("Error deleting temporary file", unlinkError, {
+          filePath: req.file.path,
+        });
       }
     }
   }
@@ -382,7 +417,8 @@ module.exports.addAd = async (req, res) => {
 module.exports.deleteAd = async (req, res) => {
   try {
     const { ad_id } = req.params;
-    console.log("delete command hit ");
+    logger.logInfo("Delete ad request", { ad_id, userId: req.user?.user_id });
+
     const ad = await Ad.findOne({ where: { ad_id } });
     if (ad.url) {
       const deleteParams = {
@@ -400,14 +436,21 @@ module.exports.deleteAd = async (req, res) => {
       { where: { ad_id } }
     );
 
+    logger.logInfo("Ad deleted successfully", {
+      ad_id,
+      userId: req.user?.user_id,
+    });
     return res
       .status(200)
       .json({ message: `AdID: ${ad_id} Deleted Successfully ` });
   } catch (error) {
-    console.log(error);
+    logger.logError("Error deleting ad", error, {
+      ad_id: req.params.ad_id,
+      userId: req.user?.user_id,
+    });
     return res
       .status(500)
-      .json({ message: "Internal Server Error dsdsd", error: error.message });
+      .json({ message: "Internal Server Error", error: error.message });
   }
 };
 
@@ -429,9 +472,10 @@ module.exports.uploadFileToS3 = async (fileData) => {
   try {
     const command = new PutObjectCommand(uploadParams);
     await s3.send(command);
+    logger.logDebug("File uploaded to S3", { key: fileData.Key });
     return fileData.Key; // Return the key on success
   } catch (error) {
-    console.error("S3 uploadFileToS3 error:", error);
+    logger.logError("S3 uploadFileToS3 error", error, { key: fileData.Key });
     throw new Error(`Failed to upload file to S3: ${error.message}`);
   }
 };
@@ -450,8 +494,9 @@ module.exports.deleteFileFromS3 = async (key) => {
   try {
     const command = new DeleteObjectCommand(deleteParams);
     await s3.send(command);
+    logger.logDebug("File deleted from S3", { key });
   } catch (error) {
-    console.error("S3 deleteFileFromS3 error:", error);
+    logger.logError("S3 deleteFileFromS3 error", error, { key });
     throw new Error(`Failed to delete file from S3: ${error.message}`);
   }
 };
@@ -478,9 +523,9 @@ module.exports.getSignedS3Url = async (fileName, expiresInSeconds) => {
     return url;
   } catch (error) {
     if (error.name === "NotFound" || error.$metadata?.httpStatusCode === 404) {
-      console.warn(`S3 file not found for signed URL: ${fileName}`);
+      logger.logWarn(`S3 file not found for signed URL`, { fileName });
     } else {
-      console.error("S3 getSignedS3Url error:", error);
+      logger.logError("S3 getSignedS3Url error", error, { fileName });
     }
     return null;
   }
@@ -492,15 +537,28 @@ module.exports.getSignedS3Url = async (fileName, expiresInSeconds) => {
 module.exports.createMultipartUpload = async (req, res) => {
   try {
     const { fileName, fileType, ad_id, isUpdate } = req.body;
+    logger.logDebug("Creating multipart upload", {
+      fileName,
+      fileType,
+      ad_id,
+      isUpdate,
+    });
+
     const command = new CreateMultipartUploadCommand({
       Bucket: bucketName,
       Key: fileName,
       ContentType: fileType,
     });
     const response = await s3.send(command);
+    logger.logInfo("Multipart upload created", {
+      fileName,
+      uploadId: response.UploadId,
+    });
     res.json({ uploadId: response.UploadId });
   } catch (error) {
-    console.error("Error creating multipart upload:", error);
+    logger.logError("Error creating multipart upload", error, {
+      fileName: req.body.fileName,
+    });
     res.status(500).json({ error: error.message });
   }
 };
@@ -511,6 +569,11 @@ module.exports.createMultipartUpload = async (req, res) => {
 module.exports.generateUploadUrls = async (req, res) => {
   try {
     const { fileName, uploadId, partsCount } = req.body;
+    logger.logDebug("Generating upload URLs", {
+      fileName,
+      uploadId,
+      partsCount,
+    });
 
     const urls = await Promise.all(
       Array.from({ length: partsCount }, async (_, i) => {
@@ -527,7 +590,10 @@ module.exports.generateUploadUrls = async (req, res) => {
 
     res.json({ urls });
   } catch (error) {
-    console.error("Error generating upload URLs:", error);
+    logger.logError("Error generating upload URLs", error, {
+      fileName: req.body.fileName,
+      uploadId: req.body.uploadId,
+    });
     res.status(500).json({ error: error.message });
   }
 };
@@ -538,6 +604,11 @@ module.exports.generateUploadUrls = async (req, res) => {
 module.exports.completeMultipartUpload = async (req, res) => {
   try {
     const { fileName, uploadId, parts } = req.body;
+    logger.logDebug("Completing multipart upload", {
+      fileName,
+      uploadId,
+      partsCount: parts?.length,
+    });
 
     const command = new CompleteMultipartUploadCommand({
       Bucket: bucketName,
@@ -549,9 +620,16 @@ module.exports.completeMultipartUpload = async (req, res) => {
     });
 
     const response = await s3.send(command);
+    logger.logInfo("Multipart upload completed", {
+      fileName,
+      location: response.Location,
+    });
     res.json({ location: response.Location });
   } catch (error) {
-    console.error("Error completing multipart upload:", error);
+    logger.logError("Error completing multipart upload", error, {
+      fileName: req.body.fileName,
+      uploadId: req.body.uploadId,
+    });
     res.status(500).json({ error: error.message });
   }
 };
@@ -559,6 +637,10 @@ module.exports.completeMultipartUpload = async (req, res) => {
 module.exports.getSinglePartUpload = async (req, res) => {
   try {
     const { fileName, fileType } = req.body;
+    logger.logDebug("Generating single part upload URL", {
+      fileName,
+      fileType,
+    });
 
     const command = new PutObjectCommand({
       Bucket: bucketName,
@@ -571,7 +653,9 @@ module.exports.getSinglePartUpload = async (req, res) => {
 
     res.json({ uploadUrl: signedUrl, key: fileName });
   } catch (error) {
-    console.error("Error generating upload URL:", error);
+    logger.logError("Error generating upload URL", error, {
+      fileName: req.body.fileName,
+    });
     res.status(500).json({ error: error.message });
   }
 };

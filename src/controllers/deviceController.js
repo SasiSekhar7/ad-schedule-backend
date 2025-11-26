@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
 const { v4: uuidv4 } = require("uuid");
 const ExcelJS = require("exceljs");
+const logger = require("../utils/logger");
 const {
   getCustomUTCDateTime,
   getUTCDate,
@@ -79,7 +80,9 @@ module.exports.getFullScheduleCalendar = async (req, res) => {
 
     res.json(formattedSchedules[0]); // Send the transformed data
   } catch (error) {
-    console.error(error);
+    logger.logError("Error in getSchedule", error, {
+      device_id: req.params.device_id,
+    });
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
@@ -121,7 +124,10 @@ module.exports.getFullSchedule = async (req, res) => {
 
     res.json({ schedules: result, total: result.length });
   } catch (error) {
-    console.error(error);
+    logger.logError("Error in getFullSchedule", error, {
+      from: req.query.from,
+      to: req.query.to,
+    });
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
@@ -391,8 +397,10 @@ module.exports.getFullSchedule_v2 = async (req, res) => {
     let todayStart = moment().startOf("day");
 
     if (fromStart.isBefore(todayStart)) {
-      console.log("Adjusted from date to today's start:", todayStart.format());
-      console.log("fromStart:", fromStart.format());
+      logger.logDebug("Adjusted from date to today's start", {
+        todayStart: todayStart.format(),
+        fromStart: fromStart.format(),
+      });
       // Adjust today's start to fromStart
       todayStart = fromStart;
     }
@@ -520,7 +528,10 @@ module.exports.getFullSchedule_v2 = async (req, res) => {
 
     res.json({ ads: adsWithGroups, total: adsWithGroups.length });
   } catch (error) {
-    console.error("Error in getFullSchedule_v2:", error);
+    logger.logError("Error in getFullSchedule_v2", error, {
+      from: req.query.from,
+      to: req.query.to,
+    });
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
@@ -532,7 +543,7 @@ async function getAddressFromCoordinates(lat, lon) {
     const data = await response.json();
     return data.display_name || "Unknown Location";
   } catch (error) {
-    console.error("Error fetching location:", error);
+    logger.logError("Error fetching location", error, { lat, lon });
     return "Unknown Location";
   }
 }
@@ -570,7 +581,7 @@ module.exports.getDeviceList = async (req, res) => {
 
     res.json({ devices: deviceList });
   } catch (error) {
-    console.error(error);
+    logger.logError("Error in getAllDevices", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
@@ -592,7 +603,7 @@ module.exports.getApkUrl = async (req, res) => {
     }
     res.json({ message: `Download URL`, url });
   } catch (error) {
-    console.error(error);
+    logger.logError("Error in getApkUrl", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
@@ -602,7 +613,7 @@ module.exports.getWgtUrl = async (req, res) => {
     const url = await getBucketURL("adupPlayer.wgt");
     res.json({ message: `Download URL`, url });
   } catch (error) {
-    console.error(error);
+    logger.logError("Error in getWgtUrl", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
@@ -629,7 +640,7 @@ module.exports.getWgt = async (req, res) => {
     // Or if you prefer streaming it without download prompt:
     // res.sendFile(filePath);
   } catch (error) {
-    console.error("Error serving .wgt file:", error);
+    logger.logError("Error serving .wgt file", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
@@ -642,7 +653,9 @@ module.exports.updateGroupSchedule = async (req, res) => {
 
     res.json({ message: `Successfully updated group schedule` });
   } catch (error) {
-    console.error(error);
+    logger.logError("Error in updateGroupSchedule", error, {
+      group_id: req.params.group_id,
+    });
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
@@ -655,7 +668,6 @@ module.exports.registerDevice = async (req, res) => {
       attributes: ["group_id", "client_id"],
       where: { reg_code }, // Ensure `reg_code` is the actual column name
     });
-    console.log("groupExists", groupExists);
 
     if (!groupExists) {
       return res.status(400).json({ message: "Invalid License Key" });
@@ -671,7 +683,7 @@ module.exports.registerDevice = async (req, res) => {
         group_id,
       },
     });
-    console.log("device Exists", deviceExists);
+
     if (deviceExists) {
       await Device.update(
         {
@@ -692,7 +704,6 @@ module.exports.registerDevice = async (req, res) => {
         group_id: deviceExists.group_id,
         last_synced: deviceExists.last_synced,
       };
-      console.log("payload -------->", payload);
       const token = jwt.sign(payload, process.env.JWT_DEVICE_SECRET, {
         expiresIn: "30d",
       });
@@ -760,7 +771,10 @@ module.exports.registerDevice = async (req, res) => {
     //     });
     //   });
   } catch (error) {
-    console.error(error);
+    logger.logError("Error in registerDevice", error, {
+      android_id: req.body.android_id,
+      reg_code: req.body.reg_code,
+    });
     res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
@@ -924,7 +938,9 @@ module.exports.registerNewDevice = async (req, res) => {
       android_id: device.android_id,
     });
   } catch (error) {
-    console.error("Error registering new device:", error);
+    logger.logError("Error registering new device", error, {
+      android_id: req.body.android_id,
+    });
     return res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
@@ -973,7 +989,9 @@ module.exports.getDeviceByPairingCode = async (req, res) => {
       updated_at: device.updated_at,
     });
   } catch (error) {
-    console.error("Error fetching device by pairing code:", error);
+    logger.logError("Error fetching device by pairing code", error, {
+      pairing_code: req.params.pairing_code,
+    });
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -1014,7 +1032,9 @@ module.exports.updateDeviceDetails = async (req, res) => {
       message: "Device details updated successfully",
     });
   } catch (error) {
-    console.error("Error updating device details:", error);
+    logger.logError("Error updating device details", error, {
+      device_id: req.params.device_id,
+    });
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -1242,7 +1262,9 @@ module.exports.updateDeviceDetailsAndLaunch = async (req, res) => {
       device_id: device.device_id,
     });
   } catch (error) {
-    console.error("Error updating device:", error);
+    logger.logError("Error updating device", error, {
+      device_id: req.params.device_id,
+    });
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -1309,7 +1331,9 @@ module.exports.confirmUpdateDeviceMetaData = async (req, res) => {
       device_id: device.device_id,
     });
   } catch (error) {
-    console.error("Error updating device:", error);
+    logger.logError("Error updating device", error, {
+      device_id: req.params.device_id,
+    });
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -1317,7 +1341,6 @@ module.exports.confirmUpdateDeviceMetaData = async (req, res) => {
 module.exports.updateDeviceMetadata = async (req, res) => {
   try {
     const { device_id } = req.params;
-    console.log("body", req.body);
 
     const { location, group_id, device_orientation, devi } = req.body;
     const role = req.user?.role;
@@ -1344,7 +1367,9 @@ module.exports.updateDeviceMetadata = async (req, res) => {
       message: "Device metadata updated successfully",
     });
   } catch (error) {
-    console.error("Error updating device location:", error);
+    logger.logError("Error updating device location", error, {
+      device_id: req.params.device_id,
+    });
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -1369,7 +1394,9 @@ module.exports.completeRegisterNewDevice = async (req, res) => {
       message: "Device registered successfully",
     });
   } catch (error) {
-    console.error("Error completing device registration:", error);
+    logger.logError("Error completing device registration", error, {
+      device_id: req.body.device_id,
+    });
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -1404,7 +1431,7 @@ module.exports.getGroutpList = async (req, res) => {
 
     return res.status(200).json({ groups: formattedGroups });
   } catch (error) {
-    console.error("Error fetching groups:", error);
+    logger.logError("Error fetching groups", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -1418,7 +1445,7 @@ module.exports.syncDevice = async (req, res) => {
     if (!group_id) {
       return res.status(400).json({ error: "Group ID is required" });
     }
-    console.log(`📌 Processing group: ${group_id}`);
+    logger.logDebug("Processing group for sync", { group_id });
     const jsonToSend = await convertToPushReadyJSON(group_id);
 
     return res.json({
@@ -1427,7 +1454,10 @@ module.exports.syncDevice = async (req, res) => {
       ...jsonToSend,
     });
   } catch (error) {
-    console.error("Sync error:", error);
+    logger.logError("Sync error", error, {
+      device_id: req.device?.device_id,
+      group_id: req.device?.group_id,
+    });
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -1466,7 +1496,9 @@ module.exports.exitDevice = async (req, res) => {
       message: "Device exit request sent successfully",
     });
   } catch (error) {
-    console.error("Sync error:", error);
+    logger.logError("Error in exitDevice", error, {
+      device_id: req.params.id,
+    });
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -1487,7 +1519,9 @@ module.exports.confirmDeviceExit = async (req, res) => {
       message: "Successfully Deleted record",
     });
   } catch (error) {
-    console.error("Sync error:", error);
+    logger.logError("Error in confirmDeviceExit", error, {
+      device_id: req.params.device_id,
+    });
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -1523,7 +1557,10 @@ module.exports.createGroup = async (req, res) => {
       .status(201)
       .json({ message: "Group created successfully", group });
   } catch (error) {
-    console.error("Error creating group:", error);
+    logger.logError("Error creating group", error, {
+      reg_code: req.body.reg_code,
+      client_id: req.body.client_id,
+    });
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -1531,7 +1568,7 @@ module.exports.createGroup = async (req, res) => {
 module.exports.updateGroup = async (req, res) => {
   try {
     const { group_id } = req.params;
-    let { name, rcs_enabled, placeholder_enabled } = req.body;
+    let { name, rcs_enabled, placeholder_enabled, logo_enabled } = req.body;
 
     if (!group_id) {
       return res.status(400).json({ message: "group_id is required" });
@@ -1548,6 +1585,7 @@ module.exports.updateGroup = async (req, res) => {
     if (rcs_enabled !== undefined) group.rcs_enabled = rcs_enabled;
     if (placeholder_enabled !== undefined)
       group.placeholder_enabled = placeholder_enabled;
+    if (logo_enabled !== undefined) group.logo_enabled = logo_enabled;
 
     let fileName = group.client_id
       ? `${group.client_id}/placeholder.jpg`
@@ -1563,7 +1601,9 @@ module.exports.updateGroup = async (req, res) => {
       group,
     });
   } catch (error) {
-    console.error("Error updating group:", error);
+    logger.logError("Error updating group", error, {
+      group_id: req.params.group_id,
+    });
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -1644,7 +1684,7 @@ module.exports.fetchGroups = async (req, res) => {
 
     return res.status(200).json({ groups: formattedGroups });
   } catch (error) {
-    console.error("Error fetching groups:", error);
+    logger.logError("Error fetching groups", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -1736,7 +1776,7 @@ module.exports.fetchGroupsOld = async (req, res) => {
 
     return res.status(200).json({ groups: formattedGroups });
   } catch (error) {
-    console.error("Sync error:", error);
+    logger.logError("Error in fetchGroupsOld", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -1774,7 +1814,9 @@ module.exports.addMessage = async (req, res) => {
         .json({ message: "Message added successfully", scrollText });
     }
   } catch (error) {
-    console.error("Error in addMessage:", error);
+    logger.logError("Error in addMessage", error, {
+      group_id: req.body.group_id,
+    });
     return res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
@@ -1805,7 +1847,9 @@ module.exports.deleteMessage = async (req, res) => {
 
     return res.status(200).json({ message: "Message deleted successfully" });
   } catch (error) {
-    console.error("Error in deleteMessage:", error);
+    logger.logError("Error in deleteMessage", error, {
+      group_id: req.params.group_id,
+    });
     return res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
@@ -1844,7 +1888,9 @@ module.exports.getProofOfPlayLog = async (req, res) => {
       data: logs,
     });
   } catch (error) {
-    console.error("Error fetching ProofOfPlay logs:", error);
+    logger.logError("Error fetching ProofOfPlay logs", error, {
+      device_id: req.params.id,
+    });
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -1873,7 +1919,9 @@ module.exports.getDeviceTelemetryLog = async (req, res) => {
       data: logs,
     });
   } catch (error) {
-    console.error("Error fetching DeviceTelemetry logs:", error);
+    logger.logError("Error fetching DeviceTelemetry logs", error, {
+      device_id: req.params.id,
+    });
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -1902,7 +1950,9 @@ module.exports.getDeviceEventLog = async (req, res) => {
       data: logs,
     });
   } catch (error) {
-    console.error("Error fetching DeviceEvent logs:", error);
+    logger.logError("Error fetching DeviceEvent logs", error, {
+      device_id: req.params.id,
+    });
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -1946,7 +1996,7 @@ module.exports.addDeviceEvent = async (req, res) => {
         );
         result.proofOfPlay = "success";
       } catch (err) {
-        console.error("Error inserting ProofOfPlay logs:", err);
+        logger.logError("Error inserting ProofOfPlay logs", err, { deviceId });
         result.proofOfPlay = "failed";
       }
     }
@@ -1965,7 +2015,7 @@ module.exports.addDeviceEvent = async (req, res) => {
         );
         result.telemetry = "success";
       } catch (err) {
-        console.error("Error inserting Telemetry logs:", err);
+        logger.logError("Error inserting Telemetry logs", err, { deviceId });
         result.telemetry = "failed";
       }
     }
@@ -1986,7 +2036,7 @@ module.exports.addDeviceEvent = async (req, res) => {
         );
         result.events = "success";
       } catch (err) {
-        console.error("Error inserting Device Events:", err);
+        logger.logError("Error inserting Device Events", err, { deviceId });
         result.events = "failed";
       }
     }
@@ -1996,7 +2046,9 @@ module.exports.addDeviceEvent = async (req, res) => {
       status: result,
     });
   } catch (error) {
-    console.error("Unexpected error in addDeviceEvent:", error);
+    logger.logError("Unexpected error in addDeviceEvent", error, {
+      deviceId: req.body.deviceId,
+    });
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -2108,7 +2160,9 @@ module.exports.getDeviceDetails = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error fetching device details:", error);
+    logger.logError("Error fetching device details", error, {
+      device_id: req.params.id,
+    });
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -2247,7 +2301,10 @@ module.exports.exportProofOfPlayReport = async (req, res) => {
 
     return res.send(buffer);
   } catch (error) {
-    console.error("Error exporting ProofOfPlay report:", error);
+    logger.logError("Error exporting ProofOfPlay report", error, {
+      device_id: req.query.device_id,
+      filter: req.query.filter,
+    });
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -2552,7 +2609,10 @@ module.exports.exportAdsProofOfPlayReport = async (req, res) => {
 
     return res.send(buffer);
   } catch (error) {
-    console.error("Error exporting Ads ProofOfPlay report:", error);
+    logger.logError("Error exporting Ads ProofOfPlay report", error, {
+      ad_id: req.query.ad_id,
+      filter: req.query.filter,
+    });
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -2666,7 +2726,10 @@ module.exports.exportDeviceEventLogs = async (req, res) => {
 
     return res.send(buffer);
   } catch (error) {
-    console.error("Error exporting DeviceEvent logs:", error);
+    logger.logError("Error exporting DeviceEvent logs", error, {
+      device_id: req.query.device_id,
+      filter: req.query.filter,
+    });
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -3007,7 +3070,9 @@ module.exports.exportDeviceDetailsToExcel = async (req, res) => {
     await workbook.xlsx.write(res);
     res.end();
   } catch (error) {
-    console.error("Error exporting device details:", error);
+    logger.logError("Error exporting device details", error, {
+      device_id: req.params.id,
+    });
     return res.status(500).json({ error: "Internal server error" });
   }
 };
