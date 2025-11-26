@@ -170,6 +170,7 @@ module.exports.convertToPushReadyJSON = async (
     placeholder: placeholder,
     rcs_enabled: DeviceGroupData.rcs_enabled ?? false,
     placeholder_enabled: DeviceGroupData.placeholder_enabled ?? false,
+    logo_enabled: DeviceGroupData.logo_enabled ?? false,
   };
   return jsonToSend;
 };

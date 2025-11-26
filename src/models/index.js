@@ -190,6 +190,11 @@ const DeviceGroup = sequelize.define(
       allowNull: false,
       defaultValue: true, // default ON
     },
+    logo_enabled: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true, // default ON
+    },
     client_id: { type: DataTypes.UUID, allowNull: false },
     reg_code: { type: DataTypes.STRING, allowNull: false },
     name: { type: DataTypes.STRING, allowNull: false },

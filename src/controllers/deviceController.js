@@ -1568,7 +1568,7 @@ module.exports.createGroup = async (req, res) => {
 module.exports.updateGroup = async (req, res) => {
   try {
     const { group_id } = req.params;
-    let { name, rcs_enabled, placeholder_enabled } = req.body;
+    let { name, rcs_enabled, placeholder_enabled, logo_enabled } = req.body;
 
     if (!group_id) {
       return res.status(400).json({ message: "group_id is required" });
@@ -1585,6 +1585,7 @@ module.exports.updateGroup = async (req, res) => {
     if (rcs_enabled !== undefined) group.rcs_enabled = rcs_enabled;
     if (placeholder_enabled !== undefined)
       group.placeholder_enabled = placeholder_enabled;
+    if (logo_enabled !== undefined) group.logo_enabled = logo_enabled;
 
     let fileName = group.client_id
       ? `${group.client_id}/placeholder.jpg`
