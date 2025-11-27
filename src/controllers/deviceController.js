@@ -1635,6 +1635,7 @@ module.exports.fetchGroups = async (req, res) => {
         "reg_code",
         "rcs_enabled",
         "placeholder_enabled",
+        "logo_enabled",
         "client_id", // Include client_id from DeviceGroup
         [fn("COUNT", col("Devices.device_id")), "device_count"],
       ],
@@ -1670,6 +1671,7 @@ module.exports.fetchGroups = async (req, res) => {
       name: group.name,
       rcs_enabled: group.rcs_enabled,
       placeholder_enabled: group.placeholder_enabled,
+      logo_enabled: group.logo_enabled,
       reg_code: group.reg_code,
       device_count: parseInt(group.device_count, 10),
       message: group.ScrollText ? group.ScrollText.message : null,
