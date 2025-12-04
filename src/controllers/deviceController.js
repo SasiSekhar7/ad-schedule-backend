@@ -2163,12 +2163,12 @@ const formatDateTime = (dateValue) => {
   return m.format("DD/MM/YYYY, hh:mm:ss A");
 };
 
-    const scheduleDataWithStartTime = schedules.map((schedule) => ({
-      ...schedule.dataValues,
-      start_time: formatDateTime(schedule.start_time),
-      end_time: formatDateTime(schedule.end_time),
-      // start_time: schedule.start_time,
-    }));
+    // const scheduleDataWithStartTime = schedules.map((schedule) => ({
+    //   ...schedule.dataValues,
+    //   start_time: formatDateTime(schedule.start_time),
+    //   end_time: formatDateTime(schedule.end_time),
+    //   // start_time: schedule.start_time,
+    // }));
 
     return res.status(200).json({
       device,
@@ -2177,7 +2177,7 @@ const formatDateTime = (dateValue) => {
         limit,
         total: count,
         totalPages: Math.ceil(count / limit),
-        data: scheduleDataWithStartTime,
+        data: schedules,
       },
     });
   } catch (error) {
@@ -2962,8 +2962,10 @@ module.exports.exportDeviceDetailsToExcel = async (req, res) => {
       schedule_id: s.schedule_id,
       ad_name: s.Ad?.name || "N/A",
       duration: s.Ad?.duration || "N/A",
-      start_time: formatDateTime(s.start_time),
-      end_time: formatDateTime(s.end_time),
+        // start_time: formatDateTime(s.start_time),
+        // end_time: formatDateTime(s.end_time),
+        start_time: s.start_time,
+        end_time: s.end_time,
       priority: s.priority,
     }));
 
