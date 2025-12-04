@@ -38,7 +38,9 @@ const {
   updateDeviceGroup,
   updateDeviceMetaData,
 } = require("./queueController");
-const moment = require("moment");
+// const moment = require("moment");
+const moment = require("moment-timezone");
+
 
 const { createGroupWithDummyClient } = require("../db/utils");
 module.exports.getFullScheduleCalendar = async (req, res) => {
