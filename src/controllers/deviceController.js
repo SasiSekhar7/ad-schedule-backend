@@ -2151,6 +2151,23 @@ module.exports.getDeviceDetails = async (req, res) => {
       offset,
     });
 
+    // Helper function to format date and time
+const formatDateTime = (dateValue) => {
+  if (!dateValue) return "N/A";
+
+  const m = moment(dateValue).tz("Asia/Kolkata");
+  if (!m.isValid()) return "N/A";
+
+  return m.format("DD/MM/YYYY, hh:mm:ss A");
+};
+
+    const scheduleDataWithStartTime = schedules.map((schedule) => ({
+      ...schedule.dataValues,
+      start_time: formatDateTime(schedule.start_time),
+      end_time: formatDateTime(schedule.end_time),
+      // start_time: schedule.start_time,
+    }));
+
     return res.status(200).json({
       device,
       schedules: {
@@ -2158,7 +2175,7 @@ module.exports.getDeviceDetails = async (req, res) => {
         limit,
         total: count,
         totalPages: Math.ceil(count / limit),
-        data: schedules,
+        data: scheduleDataWithStartTime,
       },
     });
   } catch (error) {
@@ -2886,23 +2903,12 @@ module.exports.exportDeviceDetailsToExcel = async (req, res) => {
 
     // Helper function to format date and time
     const formatDateTime = (dateValue) => {
-      if (!dateValue) return "N/A";
-      const date = new Date(dateValue);
-      if (isNaN(date.getTime())) return "N/A";
+       if (!dateValue) return "N/A";
 
-      const day = String(date.getDate()).padStart(2, "0");
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const year = date.getFullYear();
+  const m = moment(dateValue).tz("Asia/Kolkata");
+  if (!m.isValid()) return "N/A";
 
-      let hours = date.getHours();
-      const minutes = String(date.getMinutes()).padStart(2, "0");
-      const seconds = String(date.getSeconds()).padStart(2, "0");
-      const ampm = hours >= 12 ? "pm" : "am";
-      hours = hours % 12;
-      hours = hours ? hours : 12;
-      const hoursStr = String(hours).padStart(2, "0");
-
-      return `${day}/${month}/${year}, ${hoursStr}:${minutes}:${seconds} ${ampm}`;
+  return m.format("DD/MM/YYYY, hh:mm:ss A");
     };
 
     const deviceData = [
