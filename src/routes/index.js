@@ -112,6 +112,20 @@ const {
   triggerMediaConvertWebhook,
 } = require("../controllers/mediaConvertController");
 const { sendCustomMQTTMessage } = require("../controllers/queueController");
+const {
+  createLiveContent,
+  getAllLiveContent,
+  getLiveContentById,
+  updateLiveContent,
+  deleteLiveContent,
+} = require("../controllers/liveContentController");
+const {
+  createCarousel,
+  getAllCarousels,
+  getCarouselById,
+  updateCarousel,
+  deleteCarousel,
+} = require("../controllers/carouselController");
 
 router.post("/device/register", registerDevice); // takes group id and location input
 
@@ -234,6 +248,20 @@ router.post(
   // uploadMiddleware,
   changeFile
 );
+
+// LiveContent routes
+router.post("/live-content/create", validateToken, createLiveContent);
+router.get("/live-content/all", validateToken, getAllLiveContent);
+router.get("/live-content/:id", validateToken, getLiveContentById);
+router.put("/live-content/:id", validateToken, updateLiveContent);
+router.delete("/live-content/:id", validateToken, deleteLiveContent);
+
+// Carousel routes
+router.post("/carousel/create", validateToken, createCarousel);
+router.get("/carousel/all", validateToken, getAllCarousels);
+router.get("/carousel/:id", validateToken, getCarouselById);
+router.put("/carousel/:id", validateToken, updateCarousel);
+router.delete("/carousel/:id", validateToken, deleteCarousel);
 
 router.get("/campaign/all", validateToken, validateAdmin, allCampaigns);
 

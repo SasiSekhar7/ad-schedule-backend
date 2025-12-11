@@ -62,14 +62,14 @@ module.exports.uploadAdsToEgressS3 = async (req, res) => {
         s3Key: fileName,
       });
 
-      const invokeCommand = new InvokeCommand({
-        FunctionName: lambdaName,
-        InvocationType: "Event",
-        Payload: Buffer.from(JSON.stringify(payload)),
-      });
+      // const invokeCommand = new InvokeCommand({
+      //   FunctionName: lambdaName,
+      //   InvocationType: "Event",
+      //   Payload: Buffer.from(JSON.stringify(payload)),
+      // });
 
-      await lambda.send(invokeCommand);
-      await Ad.update({ status: "processing" }, { where: { ad_id: ad.ad_id } });
+      // await lambda.send(invokeCommand);
+      await Ad.update({ status: "completed" }, { where: { ad_id: ad.ad_id } });
     }
 
     return res.status(200).json({ message: "Ads uploaded successfully" });

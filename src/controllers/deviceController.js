@@ -19,6 +19,9 @@ const {
   ProofOfPlayLog,
   DeviceTelemetryLog,
   DeviceEventLog,
+  LiveContent,
+  Carousel,
+  CarouselItem,
 } = require("../models");
 const {
   addHours,
@@ -403,7 +406,6 @@ module.exports.getFullSchedule_v2 = async (req, res) => {
         todayStart: todayStart.format(),
         fromStart: fromStart.format(),
       });
-      // Adjust today's start to fromStart
       todayStart = fromStart;
     }
 
@@ -411,106 +413,125 @@ module.exports.getFullSchedule_v2 = async (req, res) => {
       const fromStart = `${from} 00:00:00`;
       const toEnd = `${to} 23:59:59`;
 
-      // Include schedules that overlap the selected range
       whereClause[Op.and] = [
-        { start_time: { [Op.lte]: toEnd } }, // starts before "to"
-        { end_time: { [Op.gte]: fromStart } }, // ends after "from"
+        { start_time: { [Op.lte]: toEnd } },
+        { end_time: { [Op.gte]: fromStart } },
       ];
     } else {
-      // Default: only active and future schedules
       whereClause.end_time = { [Op.gte]: todayStart };
     }
 
-    // Apply client filter
     if (req.user && req.user.role === "Client" && req.user.client_id) {
       whereClause["$DeviceGroup.client_id$"] = req.user.client_id;
     }
 
-    // 1. Get filtered schedules (overlapping the date range)
+    // Get all schedules (no longer joining with Ad directly)
     const schedules = await Schedule.findAll({
       where: whereClause,
       include: [
-        { model: Ad, attributes: ["ad_id", "name", "duration"] },
         { model: DeviceGroup, attributes: ["group_id", "name", "client_id"] },
       ],
       order: [["start_time", "ASC"]],
     });
 
-    // 2. Get full ranges for each Ad+Group (active & future schedules)
+    // Get all schedules for full range calculation
     const allSchedules = await Schedule.findAll({
       where: { end_time: { [Op.gte]: todayStart } },
       include: [
-        { model: Ad, attributes: ["ad_id", "name", "duration"] },
         { model: DeviceGroup, attributes: ["group_id", "name", "client_id"] },
       ],
       order: [["start_time", "ASC"]],
     });
 
-    // 3. Build full ranges for Ad+Group
+    // Collect all content IDs by type
+    const adIds = new Set();
+    const liveContentIds = new Set();
+    const carouselIds = new Set();
+
+    [...schedules, ...allSchedules].forEach((s) => {
+      if (s.content_type === "ad") adIds.add(s.content_id);
+      else if (s.content_type === "live_content") liveContentIds.add(s.content_id);
+      else if (s.content_type === "carousel") carouselIds.add(s.content_id);
+    });
+
+    // Fetch all content in bulk
+    const [ads, liveContents, carousels] = await Promise.all([
+      Ad.findAll({ where: { ad_id: { [Op.in]: [...adIds] } }, attributes: ["ad_id", "name", "duration"] }),
+      LiveContent.findAll({ where: { live_content_id: { [Op.in]: [...liveContentIds] } }, attributes: ["live_content_id", "name", "duration", "content_type", "url"] }),
+      Carousel.findAll({
+        where: { carousel_id: { [Op.in]: [...carouselIds] } },
+        attributes: ["carousel_id", "name", "total_duration"],
+        include: [{ model: CarouselItem, as: "items", include: [{ model: Ad, attributes: ["ad_id", "name", "duration", "url"] }] }]
+      }),
+    ]);
+
+    // Create lookup maps
+    const contentMap = {};
+    ads.forEach((a) => { contentMap[`ad-${a.ad_id}`] = { id: a.ad_id, name: a.name, duration: a.duration, type: "ad" }; });
+    liveContents.forEach((l) => { contentMap[`live_content-${l.live_content_id}`] = { id: l.live_content_id, name: l.name, duration: l.duration, type: "live_content", contentType: l.content_type, url: l.url }; });
+    carousels.forEach((c) => { contentMap[`carousel-${c.carousel_id}`] = { id: c.carousel_id, name: c.name, duration: c.total_duration, type: "carousel", items: c.items }; });
+
+    // Build full ranges
     const fullRanges = {};
     allSchedules.forEach((s) => {
-      const ad = s.Ad;
+      const content = contentMap[`${s.content_type}-${s.content_id}`];
+      if (!content) return;
+
       const group = s.DeviceGroup;
-      const key = `${ad.ad_id}-${group.group_id}`;
+      const key = `${s.content_type}-${s.content_id}-${group.group_id}`;
 
       if (!fullRanges[key]) {
-        fullRanges[key] = {
-          fromDate: moment(s.start_time),
-          toDate: moment(s.end_time),
-        };
+        fullRanges[key] = { fromDate: moment(s.start_time), toDate: moment(s.end_time) };
       } else {
-        fullRanges[key].fromDate = moment.min(
-          fullRanges[key].fromDate,
-          moment(s.start_time)
-        );
-        fullRanges[key].toDate = moment.max(
-          fullRanges[key].toDate,
-          moment(s.end_time)
-        );
+        fullRanges[key].fromDate = moment.min(fullRanges[key].fromDate, moment(s.start_time));
+        fullRanges[key].toDate = moment.max(fullRanges[key].toDate, moment(s.end_time));
       }
     });
 
-    // 4. Group filtered schedules by Ad → Groups
-    const adsMap = {};
+    // Group schedules by content → groups
+    const contentScheduleMap = {};
     schedules.forEach((s) => {
-      const ad = s.Ad;
-      const group = s.DeviceGroup;
-      const key = `${ad.ad_id}-${group.group_id}`;
+      const content = contentMap[`${s.content_type}-${s.content_id}`];
+      if (!content) return;
 
-      if (!adsMap[ad.ad_id]) {
-        adsMap[ad.ad_id] = {
-          adId: ad.ad_id,
-          adName: ad.name,
-          adDuration: ad.duration,
+      const group = s.DeviceGroup;
+      const contentKey = `${s.content_type}-${s.content_id}`;
+      const rangeKey = `${s.content_type}-${s.content_id}-${group.group_id}`;
+
+      if (!contentScheduleMap[contentKey]) {
+        contentScheduleMap[contentKey] = {
+          contentId: content.id,
+          contentName: content.name,
+          contentDuration: content.duration,
+          contentType: s.content_type,
           groups: {},
         };
       }
 
-      if (!adsMap[ad.ad_id].groups[group.group_id]) {
-        const full = fullRanges[key];
-        adsMap[ad.ad_id].groups[group.group_id] = {
+      if (!contentScheduleMap[contentKey].groups[group.group_id]) {
+        const full = fullRanges[rangeKey];
+        contentScheduleMap[contentKey].groups[group.group_id] = {
           groupId: group.group_id,
           groupName: group.name,
           clientId: group.client_id,
-          fromDate: full.fromDate,
-          toDate: full.toDate,
+          fromDate: full?.fromDate || moment(s.start_time),
+          toDate: full?.toDate || moment(s.end_time),
+          // New fields for weekday and time slot scheduling
+          weekdays: s.weekdays || null,
+          time_slots: s.time_slots || null,
         };
       }
     });
 
-    // 5. Transform for response
-    const adsWithGroups = Object.values(adsMap).map((ad) => {
-      const groups = Object.values(ad.groups).map((g) => {
+    // Transform for response
+    const contentWithGroups = Object.values(contentScheduleMap).map((item) => {
+      const groups = Object.values(item.groups).map((g) => {
         const totalDays = g.toDate.diff(g.fromDate, "days") + 1;
-
         const today = moment();
         const completedDays = today.isBefore(g.fromDate)
           ? 0
           : Math.min(today.diff(g.fromDate, "days") + 1, totalDays);
-
-        const completedPercentage = ((completedDays / totalDays) * 100).toFixed(
-          2
-        );
+        const completedPercentage = ((completedDays / totalDays) * 100).toFixed(2);
 
         return {
           groupId: g.groupId,
@@ -522,13 +543,32 @@ module.exports.getFullSchedule_v2 = async (req, res) => {
           completedDays,
           completedPercentage: `${completedPercentage}%`,
           lastDate: g.toDate.format("DD-MM-YYYY"),
+          // New scheduling fields
+          weekdays: g.weekdays,
+          time_slots: g.time_slots,
         };
       });
 
-      return { ...ad, groups };
+      return { ...item, groups };
     });
 
-    res.json({ ads: adsWithGroups, total: adsWithGroups.length });
+    // Separate by content type for backward compatibility
+    const ads_result = contentWithGroups.filter((c) => c.contentType === "ad").map((c) => ({
+      adId: c.contentId,
+      adName: c.contentName,
+      adDuration: c.contentDuration,
+      groups: c.groups,
+    }));
+
+    const live_contents = contentWithGroups.filter((c) => c.contentType === "live_content");
+    const carousels_result = contentWithGroups.filter((c) => c.contentType === "carousel");
+
+    res.json({
+      ads: ads_result,
+      live_contents,
+      carousels: carousels_result,
+      total: contentWithGroups.length
+    });
   } catch (error) {
     logger.logError("Error in getFullSchedule_v2", error, {
       from: req.query.from,

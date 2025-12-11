@@ -7,6 +7,9 @@ const {
   Device,
   DeviceGroup,
   SelectedSeries,
+  LiveContent,
+  Carousel,
+  CarouselItem,
 } = require("../models");
 const { default: mqtt } = require("mqtt");
 const logger = require("../utils/logger");
@@ -41,6 +44,47 @@ mqttClient.on("connect", () => {
 });
 mqttClient.on("error", (err) => logger.logError("MQTT Connection Error", err));
 
+/**
+ * Convert scheduled content to push-ready JSON format for MQTT publish
+ *
+ * TODO: UPDATE THIS FUNCTION TO SUPPORT LIVE CONTENT AND CAROUSEL
+ *
+ * Currently this function only handles 'ad' content type.
+ * After the Schedule model now uses content_id and content_type instead of ad_id,
+ * this function needs to be updated to:
+ *
+ * 1. Query schedules and check the content_type field
+ * 2. Based on content_type, fetch the appropriate content:
+ *    - 'ad': Fetch from Ad table (current behavior)
+ *    - 'live_content': Fetch from LiveContent table
+ *    - 'carousel': Fetch from Carousel table and include CarouselItem with nested Ads
+ *
+ * 3. Format the response JSON to include separate arrays for each content type:
+ *    {
+ *      rcs: scrollingMessage,
+ *      ads: [...],           // Regular ads (content_type = 'ad')
+ *      live_contents: [...], // Live content items (content_type = 'live_content')
+ *      carousels: [...],     // Carousel items with nested ads (content_type = 'carousel')
+ *      placeholder: placeholder,
+ *      rcs_enabled: boolean,
+ *      placeholder_enabled: boolean,
+ *      logo_enabled: boolean,
+ *    }
+ *
+ * 4. For live_content items, include:
+ *    - live_content_id
+ *    - name
+ *    - content_type (streaming, website, etc.)
+ *    - url
+ *    - duration
+ *    - config (JSON configuration)
+ *
+ * 5. For carousel items, include:
+ *    - carousel_id
+ *    - name
+ *    - total_duration
+ *    - items: array of ads with their order
+ */
 module.exports.convertToPushReadyJSON = async (
   group_id,
   placeholder = null
@@ -71,67 +115,168 @@ module.exports.convertToPushReadyJSON = async (
     )
   ).toISOString(); // 10 PM UTC
 
-  logger.logDebug(`Filtering ads for group`, {
+  logger.logDebug(`Filtering content for group`, {
     group_id,
     startOfDay,
     endOfDay,
   });
 
-  const scheduledAds = await Schedule.findAll({
+  // TODO: Update this query to handle all content types
+  // Current query only handles content_type = 'ad'
+  // Need to:
+  // 1. Fetch all schedules for this group
+  // 2. Group them by content_type
+  // 3. For each content_type, fetch the related content from appropriate table
+  const scheduledContent = await Schedule.findAll({
     where: {
       group_id,
       start_time: {
         [Op.between]: [startOfDay, endOfDay],
       },
+      // TODO: Add filter for content_type when processing different types
+      // content_type: 'ad', // For now only processing ads
     },
-    include: [{ model: Ad }],
   });
 
-  logger.logDebug(`Found scheduled ads for group`, {
+  logger.logDebug(`Found scheduled content for group`, {
     group_id,
-    count: scheduledAds.length,
+    count: scheduledContent.length,
   });
 
-  if (scheduledAds.length === 0) {
-    logger.logDebug(`No ads found for group, skipping`, { group_id });
+  if (scheduledContent.length === 0) {
+    logger.logDebug(`No content found for group, skipping`, { group_id });
   }
 
   const DeviceGroupData = await DeviceGroup.findOne({
-    where: { group_id }, // Ensure `group_id` is the actual column name
+    where: { group_id },
   });
 
-  // Process ads asynchronously
+  // TODO: Process each content type separately
+  // For now, only processing 'ad' content type
+  // Filter schedules by content_type = 'ad'
+  const adSchedules = scheduledContent.filter(s => s.content_type === 'ad');
+
+  // Process live_content schedules
+  const liveContentSchedules = scheduledContent.filter(s => s.content_type === 'live_content');
+  const liveContents = await Promise.all(liveContentSchedules.map(async (schedule) => {
+    try {
+      const liveContent = await LiveContent.findOne({ where: { live_content_id: schedule.content_id } });
+      if (!liveContent) {
+        logger.logError(`LiveContent not found for content_id`, null, { content_id: schedule.content_id });
+        return null;
+      }
+      return {
+        live_content_id: liveContent.live_content_id,
+        name: liveContent.name,
+        content_type: liveContent.content_type, // streaming, website, etc.
+        url: liveContent.url,
+        duration: liveContent.duration,
+        config: liveContent.config,
+        total_plays: schedule.total_duration,
+        start_time: schedule.start_time,
+        weekdays: schedule.weekdays || null,
+        time_slots: schedule.time_slots || null,
+      };
+    } catch (err) {
+      logger.logError(`Error processing live content`, err, { content_id: schedule.content_id });
+      return null;
+    }
+  }));
+
+  // Process carousel schedules
+  const carouselSchedules = scheduledContent.filter(s => s.content_type === 'carousel');
+  const carousels = await Promise.all(carouselSchedules.map(async (schedule) => {
+    try {
+      const carousel = await Carousel.findOne({
+        where: { carousel_id: schedule.content_id },
+        include: [{
+          model: CarouselItem,
+          as: 'items',
+          include: [{ model: Ad }],
+          order: [['display_order', 'ASC']]
+        }]
+      });
+      if (!carousel) {
+        logger.logError(`Carousel not found for content_id`, null, { content_id: schedule.content_id });
+        return null;
+      }
+      // Get signed URLs for carousel items
+      const items = await Promise.all(carousel.items.map(async (item) => {
+        let url;
+        let file_extension;
+        if (use_ad_egress_lambda == "true" || use_ad_egress_lambda == true) {
+          url = ad_Egress_lambda_url + "/" + item.Ad.ad_id + "." + item.Ad.url.split(".").pop();
+          file_extension = item.Ad.url.split(".").pop();
+        } else {
+          const { getBucketURL } = require("./s3Controller");
+          url = await getBucketURL(item.Ad.url);
+          file_extension = item.Ad.url.split("?")[0].split(".").pop();
+        }
+        return {
+          ad_id: item.Ad.ad_id,
+          name: item.Ad.name,
+          url,
+          file_extension,
+          duration: item.Ad.duration,
+          display_order: item.display_order,
+        };
+      }));
+      return {
+        carousel_id: carousel.carousel_id,
+        name: carousel.name,
+        total_duration: carousel.total_duration,
+        items,
+        total_plays: schedule.total_duration,
+        start_time: schedule.start_time,
+        weekdays: schedule.weekdays || null,
+        time_slots: schedule.time_slots || null,
+      };
+    } catch (err) {
+      logger.logError(`Error processing carousel`, err, { content_id: schedule.content_id });
+      return null;
+    }
+  }));
+
+  // Fetch Ad details for ad schedules
   const ads = await Promise.all(
-    scheduledAds.map(async (schedule) => {
+    adSchedules.map(async (schedule) => {
       try {
+        // Fetch the Ad using content_id
+        const ad = await Ad.findOne({ where: { ad_id: schedule.content_id } });
+        if (!ad) {
+          logger.logError(`Ad not found for content_id`, null, { content_id: schedule.content_id });
+          return null;
+        }
+
         let url;
         let file_extension;
         if (use_ad_egress_lambda == "true" || use_ad_egress_lambda == true) {
           url =
             ad_Egress_lambda_url +
             "/" +
-            schedule.Ad.ad_id +
+            ad.ad_id +
             "." +
-            schedule.Ad.url.split(".").pop();
-          file_extension = schedule.Ad.url.split(".").pop();
+            ad.url.split(".").pop();
+          file_extension = ad.url.split(".").pop();
         } else {
           const { getBucketURL } = require("./s3Controller"); // Require inside function
-          url = await getBucketURL(schedule.Ad.url);
-          file_extension = schedule.Ad.url.split("?")[0].split(".").pop();
+          url = await getBucketURL(ad.url);
+          file_extension = ad.url.split("?")[0].split(".").pop();
         }
         return {
-          ad_id: schedule.Ad.ad_id,
-          name: schedule.Ad.name,
+          ad_id: ad.ad_id,
+          name: ad.name,
           url,
-
           file_extension: file_extension,
-          duration: schedule.Ad.duration,
+          duration: ad.duration,
           total_plays: schedule.total_duration,
           start_time: schedule.start_time,
+          weekdays: schedule.weekdays || null,
+          time_slots: schedule.time_slots || null,
         };
       } catch (urlError) {
         logger.logError(`Error fetching URL for ad`, urlError, {
-          ad_id: schedule.Ad.ad_id,
+          content_id: schedule.content_id,
         });
         return null; // Skip this ad
       }
@@ -145,28 +290,34 @@ module.exports.convertToPushReadyJSON = async (
     attributes: ["message"],
   });
 
-  // const matchData = await SelectedSeries.findOne({
-  //   attributes: ["match_list"],
-  //   where: { series_name: "IPL" },
-  // });
-  // const matchList = matchData?.match_list;
-
   scrollingMessage = message ? message.message : rcs_message_default;
 
-  // if (matchList) {
-  //   scrollingMessage = `${scrollingMessage} | Upcoming Fixtures: ${matchList}`;
-  // }
-
-  // Remove null ads (failed URL fetch)
+  // Remove null items (failed URL fetch or not found)
   const validAds = ads.filter((ad) => ad !== null);
-  logger.logDebug(`Ready to publish ads for group`, {
+  const validLiveContents = liveContents.filter((lc) => lc !== null);
+  const validCarousels = carousels.filter((c) => c !== null);
+
+  logger.logDebug(`Ready to publish content for group`, {
     group_id,
     validAdsCount: validAds.length,
+    validLiveContentsCount: validLiveContents.length,
+    validCarouselsCount: validCarousels.length,
   });
 
+  // New structure: content object with separate arrays
+  const content = {
+    ads: validAds.map(ad => ({ ...ad, content_type: 'ad' })),
+    live_contents: validLiveContents.map(lc => ({ ...lc, content_type: 'live_content' })),
+    carousels: validCarousels.map(c => ({ ...c, content_type: 'carousel' })),
+  };
+
+  // JSON structure with backward compatibility and new content object
   const jsonToSend = {
     rcs: scrollingMessage,
+    // Backward compatible - only ads in "ads" array (original structure)
     ads: validAds,
+    // New structure - content object with separate arrays
+    content: content,
     placeholder: placeholder,
     rcs_enabled: DeviceGroupData.rcs_enabled ?? false,
     placeholder_enabled: DeviceGroupData.placeholder_enabled ?? false,

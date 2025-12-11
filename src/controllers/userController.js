@@ -152,6 +152,24 @@ module.exports.getUserData = async (req, res) => {
         ],
       },
       {
+        title: "Live Content",
+        url: "/live-content",
+        icon: "Bot",
+        items: [
+          { title: "All", url: "/live-content" },
+          { title: "Add", url: "/live-content/add" },
+        ],
+      },
+      {
+        title: "Carousels",
+        url: "/carousels",
+        icon: "Bot",
+        items: [
+          { title: "All", url: "/carousels" },
+          { title: "Add", url: "/carousels/add" },
+        ],
+      },
+      {
         title: "Schedule",
         url: "/schedule",
         icon: "BookOpen",

@@ -228,6 +228,114 @@ const ScrollText = sequelize.define(
   }
 );
 
+// LiveContent model - for streaming, website, or other live content types
+const LiveContent = sequelize.define(
+  "LiveContent",
+  {
+    live_content_id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    client_id: { type: DataTypes.UUID, allowNull: false },
+    name: { type: DataTypes.STRING, allowNull: false },
+    // Type of live content: 'streaming', 'website', 'iframe', 'youtube', 'custom'
+    content_type: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: "website",
+    },
+    // URL for the content (stream URL, website URL, etc.)
+    url: { type: DataTypes.STRING, allowNull: false },
+    // Optional: duration in seconds (for how long to display, 0 = indefinite)
+    duration: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+    // Start time for when this live content should be active
+    start_time: { type: DataTypes.DATE, allowNull: true },
+    // End time for when this live content should stop being active
+    end_time: { type: DataTypes.DATE, allowNull: true },
+    // Status: 'active', 'inactive', 'pending'
+    status: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: "active",
+    },
+    // Additional configuration as JSON (e.g., autoplay, mute, loop settings)
+    config: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+    },
+    isDeleted: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false,
+    },
+    ...defaultTimestamps,
+  },
+  {
+    timestamps: false,
+  }
+);
+
+// Carousel model - a collection of ads that play in sequence
+const Carousel = sequelize.define(
+  "Carousel",
+  {
+    carousel_id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    client_id: { type: DataTypes.UUID, allowNull: false },
+    name: { type: DataTypes.STRING, allowNull: false },
+    // Status: 'active', 'inactive', 'pending'
+    status: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: "active",
+    },
+    // Total duration of carousel (sum of all items) - calculated field
+    total_duration: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+    isDeleted: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false,
+    },
+    ...defaultTimestamps,
+  },
+  {
+    timestamps: false,
+  }
+);
+
+// CarouselItem model - individual ads within a carousel
+const CarouselItem = sequelize.define(
+  "CarouselItem",
+  {
+    carousel_item_id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    carousel_id: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: { model: "Carousels", key: "carousel_id" },
+      onDelete: "CASCADE",
+    },
+    ad_id: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: { model: "Ads", key: "ad_id" },
+    },
+    // Order of the ad in the carousel (1, 2, 3, etc.)
+    display_order: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
+    ...defaultTimestamps,
+  },
+  {
+    timestamps: false,
+  }
+);
+
 const Schedule = sequelize.define(
   "Schedule",
   {
@@ -236,12 +344,34 @@ const Schedule = sequelize.define(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-    ad_id: { type: DataTypes.UUID, allowNull: false },
+    // Generic content_id that can reference Ad, LiveContent, or Carousel
+    content_id: { type: DataTypes.UUID, allowNull: false },
+    // Type of content: 'ad', 'live_content', 'carousel'
+    content_type: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: "ad",
+    },
     group_id: { type: DataTypes.UUID, allowNull: false },
     start_time: { type: DataTypes.DATE, allowNull: false },
     end_time: { type: DataTypes.DATE, allowNull: false },
     total_duration: DataTypes.INTEGER,
     priority: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
+    // Weekdays: array of day numbers (0=Sunday, 1=Monday, ..., 6=Saturday)
+    // null or empty means all days
+    weekdays: {
+      type: DataTypes.ARRAY(DataTypes.INTEGER),
+      allowNull: true,
+      defaultValue: null,
+    },
+    // Time slots: array of time windows for playback
+    // e.g., [{"start": "06:00", "end": "10:00"}, {"start": "18:00", "end": "22:00"}]
+    // null means all day (00:00 to 23:59)
+    time_slots: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      defaultValue: null,
+    },
     ...defaultTimestamps,
   },
   {
@@ -576,8 +706,21 @@ Client.hasMany(Ad, { foreignKey: "client_id" });
 Ad.belongsTo(Client, { foreignKey: "client_id" });
 Client.hasMany(DeviceGroup, { foreignKey: "client_id" });
 DeviceGroup.belongsTo(Client, { foreignKey: "client_id" });
-Ad.hasMany(Schedule, { foreignKey: "ad_id" });
-Schedule.belongsTo(Ad, { foreignKey: "ad_id" });
+
+// LiveContent associations
+Client.hasMany(LiveContent, { foreignKey: "client_id" });
+LiveContent.belongsTo(Client, { foreignKey: "client_id" });
+
+// Carousel associations
+Client.hasMany(Carousel, { foreignKey: "client_id" });
+Carousel.belongsTo(Client, { foreignKey: "client_id" });
+Carousel.hasMany(CarouselItem, { foreignKey: "carousel_id", as: "items", onDelete: "CASCADE" });
+CarouselItem.belongsTo(Carousel, { foreignKey: "carousel_id" });
+CarouselItem.belongsTo(Ad, { foreignKey: "ad_id" });
+Ad.hasMany(CarouselItem, { foreignKey: "ad_id" });
+
+// Schedule associations - now uses content_id/content_type instead of ad_id
+// Note: Schedule.content_id can reference Ad, LiveContent, or Carousel depending on content_type
 DeviceGroup.hasMany(Schedule, { foreignKey: "group_id" });
 Schedule.belongsTo(DeviceGroup, { foreignKey: "group_id" });
 Device.belongsTo(DeviceGroup, { foreignKey: "group_id" });
@@ -625,4 +768,7 @@ module.exports = {
   ProofOfPlayLog,
   DeviceTelemetryLog,
   DeviceEventLog,
+  LiveContent,
+  Carousel,
+  CarouselItem,
 };
