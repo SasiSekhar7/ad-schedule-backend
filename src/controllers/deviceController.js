@@ -2344,6 +2344,12 @@ module.exports.exportAdsProofOfPlayReport = async (req, res) => {
   try {
     const { ad_id, filter, start_date, end_date } = req.query;
 
+      const whereClause =
+      req.user && req.user.role === "Client" && req.user.client_id
+        ? { client_id: req.user.client_id }
+        : {}; // Empty where clause for Admin to fetch all
+
+
     // Validate ad_id parameter
     if (!ad_id) {
       return res.status(400).json({
@@ -2448,6 +2454,7 @@ module.exports.exportAdsProofOfPlayReport = async (req, res) => {
         {
           model: Ad,
           attributes: ["name", "duration"],
+          where: whereClause,
           required: true,
         },
         {
