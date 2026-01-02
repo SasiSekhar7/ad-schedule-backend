@@ -84,7 +84,15 @@ module.exports.convertToPushReadyJSON = async (
         [Op.between]: [startOfDay, endOfDay],
       },
     },
-    include: [{ model: Ad }],
+    include: [
+      {
+        model: Ad,
+        where: {
+          isDeleted: false, // ✅ only non-deleted ads
+        },
+        required: true, // ✅ ensures Schedule is returned ONLY if Ad exists
+      },
+    ],
   });
 
   logger.logDebug(`Found scheduled ads for group`, {
