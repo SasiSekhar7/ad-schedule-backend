@@ -111,6 +111,11 @@ module.exports.convertToPushReadyJSON = async (
   // Process ads asynchronously
   const ads = await Promise.all(
     scheduledAds.map(async (schedule) => {
+
+      if (schedule.Ad.isDeleted || !schedule.Ad.url) {
+        logger.logError(`Ad url is null`, { ad_id: schedule.Ad.ad_id });
+        return null; // Skip this ad
+      }
       try {
         let url;
         let file_extension;
