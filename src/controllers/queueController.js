@@ -305,11 +305,54 @@ module.exports.convertToPushReadyJSON = async (
   });
 
   // New structure: content object with separate arrays
-  const content = {
-    ads: validAds.map(ad => ({ ...ad, content_type: 'ad' })),
-    live_contents: validLiveContents.map(lc => ({ ...lc, content_type: 'live_content' })),
-    carousels: validCarousels.map(c => ({ ...c, content_type: 'carousel' })),
-  };
+  // const content = {
+  //   ads: validAds.map(ad => ({ ...ad, content_type: 'ad' })),
+  //   live_contents: validLiveContents.map(lc => ({ ...lc, content_type: 'live_content' })),
+  //   carousels: validCarousels.map(c => ({ ...c, content_type: 'carousel' })),
+  // };
+
+
+  const unifiedContent = [
+  ...validAds.map(ad => ({
+    type: 'ad',
+    id: ad.ad_id,
+    name: ad.name,
+    url: ad.url,
+    file_extension: ad.file_extension,
+    duration: ad.duration,
+    total_plays: ad.total_plays,
+    start_time: ad.start_time,
+    weekdays: ad.weekdays,
+    time_slots: ad.time_slots
+  })),
+
+  ...validLiveContents.map(lc => ({
+    type: 'live_content',
+    id: lc.live_content_id,
+    name: lc.name,
+    live_type: lc.content_type, // streaming, website
+    url: lc.url,
+    duration: lc.duration,
+    config: lc.config,
+    total_plays: lc.total_plays,
+    start_time: lc.start_time,
+    weekdays: lc.weekdays,
+    time_slots: lc.time_slots
+  })),
+
+  ...validCarousels.map(c => ({
+    type: 'carousel',
+    id: c.carousel_id,
+    name: c.name,
+    total_duration: c.total_duration,
+    items: c.items,
+    total_plays: c.total_plays,
+    start_time: c.start_time,
+    weekdays: c.weekdays,
+    time_slots: c.time_slots
+  }))
+];
+
 
   // JSON structure with backward compatibility and new content object
   const jsonToSend = {
@@ -317,7 +360,7 @@ module.exports.convertToPushReadyJSON = async (
     // Backward compatible - only ads in "ads" array (original structure)
     ads: validAds,
     // New structure - content object with separate arrays
-    content: content,
+    content: unifiedContent,
     placeholder: placeholder,
     rcs_enabled: DeviceGroupData.rcs_enabled ?? false,
     placeholder_enabled: DeviceGroupData.placeholder_enabled ?? false,
