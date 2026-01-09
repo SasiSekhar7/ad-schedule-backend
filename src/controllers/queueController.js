@@ -136,6 +136,15 @@ module.exports.convertToPushReadyJSON = async (
       // TODO: Add filter for content_type when processing different types
       // content_type: 'ad', // For now only processing ads
     },
+    include: [
+      {
+        model: Ad,
+        where: {
+          isDeleted: false, // ✅ only non-deleted ads
+        },
+        required: true, // ✅ ensures Schedule is returned ONLY if Ad exists
+      },
+    ],
   });
 
   logger.logDebug(`Found scheduled content for group`, {
@@ -239,7 +248,12 @@ module.exports.convertToPushReadyJSON = async (
 
   // Fetch Ad details for ad schedules
   const ads = await Promise.all(
-    adSchedules.map(async (schedule) => {
+    scheduledAds.map(async (schedule) => {
+
+      if (schedule.Ad.isDeleted || !schedule.Ad.url) {
+        logger.logError(`Ad url is null`, { ad_id: schedule.Ad.ad_id });
+        return null; // Skip this ad
+      }
       try {
         // Fetch the Ad using content_id
         const ad = await Ad.findOne({ where: { ad_id: schedule.content_id } });

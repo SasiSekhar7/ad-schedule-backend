@@ -31,7 +31,7 @@ const {
   addMinutes,
 } = require("date-fns");
 const { getBucketURL, getSignedS3Url } = require("./s3Controller");
-const { Op, literal, fn, col } = require("sequelize");
+const { Op, literal, fn, col, where } = require("sequelize");
 const path = require("path");
 const {
   pushToGroupQueue,
@@ -43,7 +43,6 @@ const {
 } = require("./queueController");
 // const moment = require("moment");
 const moment = require("moment-timezone");
-
 
 const { createGroupWithDummyClient } = require("../db/utils");
 module.exports.getFullScheduleCalendar = async (req, res) => {
@@ -429,15 +428,27 @@ module.exports.getFullSchedule_v2 = async (req, res) => {
     const schedules = await Schedule.findAll({
       where: whereClause,
       include: [
-        { model: DeviceGroup, attributes: ["group_id", "name", "client_id"] },
+        {
+          model: Ad,
+          attributes: ["ad_id", "name", "duration"],
+          where: { isDeleted: false }, // ✅ only active ads
+          required: true, // ✅ INNER JOIN
+        },
+        {
+          model: DeviceGroup,
+          attributes: ["group_id", "name", "client_id"],
+        },
       ],
       order: [["start_time", "ASC"]],
     });
 
     // Get all schedules for full range calculation
     const allSchedules = await Schedule.findAll({
-      where: { end_time: { [Op.gte]: todayStart } },
+      where: {
+        end_time: { [Op.gte]: todayStart },
+      },
       include: [
+        { model: Ad, attributes: ["ad_id", "name", "duration"] },
         { model: DeviceGroup, attributes: ["group_id", "name", "client_id"] },
       ],
       order: [["start_time", "ASC"]],
@@ -2194,14 +2205,14 @@ module.exports.getDeviceDetails = async (req, res) => {
     });
 
     // Helper function to format date and time
-const formatDateTime = (dateValue) => {
-  if (!dateValue) return "N/A";
+    const formatDateTime = (dateValue) => {
+      if (!dateValue) return "N/A";
 
-  const m = moment(dateValue).tz("Asia/Kolkata");
-  if (!m.isValid()) return "N/A";
+      const m = moment(dateValue).tz("Asia/Kolkata");
+      if (!m.isValid()) return "N/A";
 
-  return m.format("DD/MM/YYYY, hh:mm:ss A");
-};
+      return m.format("DD/MM/YYYY, hh:mm:ss A");
+    };
 
     // const scheduleDataWithStartTime = schedules.map((schedule) => ({
     //   ...schedule.dataValues,
@@ -2384,6 +2395,11 @@ module.exports.exportAdsProofOfPlayReport = async (req, res) => {
   try {
     const { ad_id, filter, start_date, end_date } = req.query;
 
+    const whereClause =
+      req.user && req.user.role === "Client" && req.user.client_id
+        ? { client_id: req.user.client_id }
+        : {}; // Empty where clause for Admin to fetch all
+
     // Validate ad_id parameter
     if (!ad_id) {
       return res.status(400).json({
@@ -2488,6 +2504,7 @@ module.exports.exportAdsProofOfPlayReport = async (req, res) => {
         {
           model: Ad,
           attributes: ["name", "duration"],
+          where: whereClause,
           required: true,
         },
         {
@@ -2945,12 +2962,12 @@ module.exports.exportDeviceDetailsToExcel = async (req, res) => {
 
     // Helper function to format date and time
     const formatDateTime = (dateValue) => {
-       if (!dateValue) return "N/A";
+      if (!dateValue) return "N/A";
 
-  const m = moment(dateValue).tz("Asia/Kolkata");
-  if (!m.isValid()) return "N/A";
+      const m = moment(dateValue).tz("Asia/Kolkata");
+      if (!m.isValid()) return "N/A";
 
-  return m.format("DD/MM/YYYY, hh:mm:ss A");
+      return m.format("DD/MM/YYYY, hh:mm:ss A");
     };
 
     const deviceData = [
@@ -3002,10 +3019,10 @@ module.exports.exportDeviceDetailsToExcel = async (req, res) => {
       schedule_id: s.schedule_id,
       ad_name: s.Ad?.name || "N/A",
       duration: s.Ad?.duration || "N/A",
-        // start_time: formatDateTime(s.start_time),
-        // end_time: formatDateTime(s.end_time),
-        start_time: s.start_time,
-        end_time: s.end_time,
+      // start_time: formatDateTime(s.start_time),
+      // end_time: formatDateTime(s.end_time),
+      start_time: s.start_time,
+      end_time: s.end_time,
       priority: s.priority,
     }));
 
