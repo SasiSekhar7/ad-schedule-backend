@@ -136,15 +136,15 @@ module.exports.convertToPushReadyJSON = async (
       // TODO: Add filter for content_type when processing different types
       // content_type: 'ad', // For now only processing ads
     },
-    include: [
-      {
-        model: Ad,
-        where: {
-          isDeleted: false, // ✅ only non-deleted ads
-        },
-        required: true, // ✅ ensures Schedule is returned ONLY if Ad exists
-      },
-    ],
+    // include: [
+    //   {
+    //     model: Ad,
+    //     where: {
+    //       isDeleted: false, // ✅ only non-deleted ads
+    //     },
+    //     required: true, // ✅ ensures Schedule is returned ONLY if Ad exists
+    //   },
+    // ],
   });
 
   logger.logDebug(`Found scheduled content for group`, {
@@ -163,7 +163,7 @@ module.exports.convertToPushReadyJSON = async (
   // TODO: Process each content type separately
   // For now, only processing 'ad' content type
   // Filter schedules by content_type = 'ad'
-  const adSchedules = scheduledContent.filter(s => s.content_type === 'ad');
+  const scheduledAds = scheduledContent.filter(s => s.content_type === 'ad');
 
   // Process live_content schedules
   const liveContentSchedules = scheduledContent.filter(s => s.content_type === 'live_content');
@@ -250,10 +250,10 @@ module.exports.convertToPushReadyJSON = async (
   const ads = await Promise.all(
     scheduledAds.map(async (schedule) => {
 
-      if (schedule.Ad.isDeleted || !schedule.Ad.url) {
-        logger.logError(`Ad url is null`, { ad_id: schedule.Ad.ad_id });
-        return null; // Skip this ad
-      }
+      // if (schedule.Ad.isDeleted || !schedule.Ad.url) {
+      //   logger.logError(`Ad url is null`, { ad_id: schedule.Ad.ad_id });
+      //   return null; // Skip this ad
+      // }
       try {
         // Fetch the Ad using content_id
         const ad = await Ad.findOne({ where: { ad_id: schedule.content_id } });
@@ -388,6 +388,7 @@ module.exports.pushToGroupQueue = async (groups, placeholder = null) => {
     logger.logInfo(`Processing groups for MQTT publish`, {
       groupCount: groups.length,
     });
+    console.log("groups", groups);
 
     for (const group_id of groups) {
       logger.logDebug(`Processing group`, { group_id });
@@ -401,7 +402,7 @@ module.exports.pushToGroupQueue = async (groups, placeholder = null) => {
 
       mqttClient.publish(
         topic,
-        JSON.stringify(jsonToSend),
+        JSON.stringify(j+sonToSend),
         { qos: 2, retain: true },
         (err) => {
           if (err) {
@@ -409,7 +410,7 @@ module.exports.pushToGroupQueue = async (groups, placeholder = null) => {
           } else {
             logger.logInfo(`Successfully published ads to MQTT topic`, {
               topic,
-              qos: 2,
+              qos: 2,                                
               retain: true,
             });
           }
@@ -428,6 +429,7 @@ module.exports.pushToGroupQueue = async (groups, placeholder = null) => {
       );
     }
   } catch (error) {
+    console.log(" pushToGroupQueue ",error);
     logger.logError("Error in pushToGroupQueue", error);
   }
 };

@@ -428,16 +428,8 @@ module.exports.getFullSchedule_v2 = async (req, res) => {
     const schedules = await Schedule.findAll({
       where: whereClause,
       include: [
-        {
-          model: Ad,
-          attributes: ["ad_id", "name", "duration"],
-          where: { isDeleted: false }, // ✅ only active ads
-          required: true, // ✅ INNER JOIN
-        },
-        {
-          model: DeviceGroup,
-          attributes: ["group_id", "name", "client_id"],
-        },
+        // { model: Ad, attributes: ["ad_id", "name", "duration"] },
+        { model: DeviceGroup, attributes: ["group_id", "name", "client_id"] },
       ],
       order: [["start_time", "ASC"]],
     });
@@ -448,7 +440,7 @@ module.exports.getFullSchedule_v2 = async (req, res) => {
         end_time: { [Op.gte]: todayStart },
       },
       include: [
-        { model: Ad, attributes: ["ad_id", "name", "duration"] },
+        // { model: Ad, attributes: ["ad_id", "name", "duration"] },
         { model: DeviceGroup, attributes: ["group_id", "name", "client_id"] },
       ],
       order: [["start_time", "ASC"]],
