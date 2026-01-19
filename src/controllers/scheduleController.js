@@ -307,8 +307,28 @@ module.exports.scheduleAd_v2 = async (req, res) => {
       if (shouldIncludeDay) {
         // affectedDates.add(format(tempCurrentDay, "yyyy-MM-dd")); // Add the date string for summary update
 
-        const dayStart = setHours(setMinutes(new Date(tempCurrentDay), 0), 6); // 6:00 AM
-        const dayEnd = setHours(setMinutes(new Date(tempCurrentDay), 0), 22); // 10:00 PM
+        // const dayStart = setHours(setMinutes(new Date(tempCurrentDay), 0), 6); // 6:00 AM
+        const dayStart = new Date(
+          Date.UTC(
+            tempCurrentDay.getUTCFullYear(),
+            tempCurrentDay.getUTCMonth(),
+            tempCurrentDay.getUTCDate(),
+            6,
+            0,
+            0,
+          ),
+        ).toISOString();
+        // const dayEnd = setHours(setMinutes(new Date(tempCurrentDay), 0), 22); // 10:00 PM
+        const dayEnd = new Date(
+          Date.UTC(
+            tempCurrentDay.getUTCFullYear(),
+            tempCurrentDay.getUTCMonth(),
+            tempCurrentDay.getUTCDate(),
+            22,
+            0,
+            0,
+          ),
+        ).toISOString();
 
         // Create a schedule entry for each time slot
         // for (const slot of effectiveTimeSlots) {

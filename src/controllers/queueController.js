@@ -256,7 +256,7 @@ module.exports.convertToPushReadyJSON = async (
       // }
       try {
         // Fetch the Ad using content_id
-        const ad = await Ad.findOne({ where: { ad_id: schedule.content_id } });
+        const ad = await Ad.findOne({ where: { ad_id: schedule.content_id, isDeleted: false } });
         if (!ad) {
           logger.logError(`Ad not found for content_id`, null, { content_id: schedule.content_id });
           return null;
@@ -383,6 +383,154 @@ module.exports.convertToPushReadyJSON = async (
   return jsonToSend;
 };
 
+
+module.exports.OldconvertToPushReadyJSON = async (
+  group_id,
+  placeholder = null
+) => {
+  const today = new Date(getCustomUTCDateTime());
+
+  // Construct the start and end times in ISO format
+  const startOfDay = new Date(
+    Date.UTC(
+      today.getUTCFullYear(),
+      today.getUTCMonth(),
+      today.getUTCDate(),
+      6,
+      0,
+      0,
+      0
+    )
+  ).toISOString(); // 6 AM UTC
+  const endOfDay = new Date(
+    Date.UTC(
+      today.getUTCFullYear(),
+      today.getUTCMonth(),
+      today.getUTCDate(),
+      22,
+      0,
+      0,
+      0
+    )
+  ).toISOString(); // 10 PM UTC
+
+  logger.logDebug(`Filtering ads for group`, {
+    group_id,
+    startOfDay,
+    endOfDay,
+  });
+
+  const scheduledAds = await Schedule.findAll({
+    where: {
+      group_id,
+      start_time: {
+        [Op.between]: [startOfDay, endOfDay],
+      },
+    },
+    include: [
+      {
+        model: Ad,
+        where: {
+          isDeleted: false, // ✅ only non-deleted ads
+        },
+        required: true, // ✅ ensures Schedule is returned ONLY if Ad exists
+      },
+    ],
+  });
+
+  logger.logDebug(`Found scheduled ads for group`, {
+    group_id,
+    count: scheduledAds.length,
+  });
+
+  if (scheduledAds.length === 0) {
+    logger.logDebug(`No ads found for group, skipping`, { group_id });
+  }
+
+  const DeviceGroupData = await DeviceGroup.findOne({
+    where: { group_id }, // Ensure `group_id` is the actual column name
+  });
+
+  // Process ads asynchronously
+  const ads = await Promise.all(
+    scheduledAds.map(async (schedule) => {
+
+      if (schedule.Ad.isDeleted || !schedule.Ad.url) {
+        logger.logError(`Ad url is null`, { ad_id: schedule.Ad.ad_id });
+        return null; // Skip this ad
+      }
+      try {
+        let url;
+        let file_extension;
+        if (use_ad_egress_lambda == "true" || use_ad_egress_lambda == true) {
+          url =
+            ad_Egress_lambda_url +
+            "/" +
+            schedule.Ad.ad_id +
+            "." +
+            schedule.Ad.url.split(".").pop();
+          file_extension = schedule.Ad.url.split(".").pop();
+        } else {
+          const { getBucketURL } = require("./s3Controller"); // Require inside function
+          url = await getBucketURL(schedule.Ad.url);
+          file_extension = schedule.Ad.url.split("?")[0].split(".").pop();
+        }
+        return {
+          ad_id: schedule.Ad.ad_id,
+          name: schedule.Ad.name,
+          url,
+
+          file_extension: file_extension,
+          duration: schedule.Ad.duration,
+          total_plays: schedule.total_duration,
+          start_time: schedule.start_time,
+        };
+      } catch (urlError) {
+        logger.logError(`Error fetching URL for ad`, urlError, {
+          ad_id: schedule.Ad.ad_id,
+        });
+        return null; // Skip this ad
+      }
+    })
+  );
+  let scrollingMessage;
+  const message = await ScrollText.findOne({
+    where: {
+      group_id,
+    },
+    attributes: ["message"],
+  });
+
+  // const matchData = await SelectedSeries.findOne({
+  //   attributes: ["match_list"],
+  //   where: { series_name: "IPL" },
+  // });
+  // const matchList = matchData?.match_list;
+
+  scrollingMessage = message ? message.message : rcs_message_default;
+
+  // if (matchList) {
+  //   scrollingMessage = `${scrollingMessage} | Upcoming Fixtures: ${matchList}`;
+  // }
+
+  // Remove null ads (failed URL fetch)
+  const validAds = ads.filter((ad) => ad !== null);
+  logger.logDebug(`Ready to publish ads for group`, {
+    group_id,
+    validAdsCount: validAds.length,
+  });
+
+  const jsonToSend = {
+    rcs: scrollingMessage,
+    ads: validAds,
+    placeholder: placeholder,
+    rcs_enabled: DeviceGroupData.rcs_enabled ?? false,
+    placeholder_enabled: DeviceGroupData.placeholder_enabled ?? false,
+    logo_enabled: DeviceGroupData.logo_enabled ?? false,
+  };
+  return jsonToSend;
+};
+
 module.exports.pushToGroupQueue = async (groups, placeholder = null) => {
   try {
     logger.logInfo(`Processing groups for MQTT publish`, {
@@ -402,7 +550,7 @@ module.exports.pushToGroupQueue = async (groups, placeholder = null) => {
 
       mqttClient.publish(
         topic,
-        JSON.stringify(j+sonToSend),
+        JSON.stringify(jsonToSend),
         { qos: 2, retain: true },
         (err) => {
           if (err) {
