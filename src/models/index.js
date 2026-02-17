@@ -14,6 +14,58 @@ const defaultTimestamps = {
   },
 };
 
+const Tier = sequelize.define(
+  "Tier",
+  {
+    tier_id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    name: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: true,
+    },
+    description: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    price: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    billing_cycle: {
+      type: DataTypes.STRING, // monthly / yearly
+      allowNull: false,
+      defaultValue: "monthly",
+    },
+    storage_limit_bytes: {
+      type: DataTypes.BIGINT,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    max_devices: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    max_ads: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    is_active: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+    },
+    ...defaultTimestamps,
+  },
+  { tableName: "Tiers", timestamps: false },
+);
+
 const Client = sequelize.define(
   "Client",
   {
@@ -31,11 +83,25 @@ const Client = sequelize.define(
       type: DataTypes.STRING,
       validate: { isNumeric: true },
     },
+
+    tier_id: { type: DataTypes.UUID, allowNull: true },
+    used_storage_bytes: {
+      type: DataTypes.BIGINT,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    subscription_status: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: "active", // active / expired / trial
+    },
+    subscription_expiry: { type: DataTypes.DATE, allowNull: true },
+
     ...defaultTimestamps,
   },
   {
-    timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
-  }
+    timestamps: false, //  disables Sequelize's automatic createdAt/updatedAt
+  },
 );
 
 const Ad = sequelize.define(
@@ -63,8 +129,8 @@ const Ad = sequelize.define(
     ...defaultTimestamps,
   },
   {
-    timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
-  }
+    timestamps: false, //  disables Sequelize's automatic createdAt/updatedAt
+  },
 );
 
 const Device = sequelize.define(
@@ -83,7 +149,7 @@ const Device = sequelize.define(
         "display",
         "tablet",
         "desktop",
-        "signage"
+        "signage",
       ),
       allowNull: false,
       defaultValue: "tv",
@@ -119,7 +185,7 @@ const Device = sequelize.define(
         "webos",
         "ios",
         "windows",
-        "linux"
+        "linux",
       ),
       allowNull: true,
     },
@@ -157,8 +223,8 @@ const Device = sequelize.define(
     ...defaultTimestamps,
   },
   {
-    timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
-  }
+    timestamps: false, //  disables Sequelize's automatic createdAt/updatedAt
+  },
 );
 
 const DeviceGroup = sequelize.define(
@@ -202,8 +268,8 @@ const DeviceGroup = sequelize.define(
     ...defaultTimestamps,
   },
   {
-    timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
-  }
+    timestamps: false, //  disables Sequelize's automatic createdAt/updatedAt
+  },
 );
 
 const ScrollText = sequelize.define(
@@ -224,8 +290,8 @@ const ScrollText = sequelize.define(
     ...defaultTimestamps,
   },
   {
-    timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
-  }
+    timestamps: false, //  disables Sequelize's automatic createdAt/updatedAt
+  },
 );
 
 const Schedule = sequelize.define(
@@ -245,8 +311,8 @@ const Schedule = sequelize.define(
     ...defaultTimestamps,
   },
   {
-    timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
-  }
+    timestamps: false, //  disables Sequelize's automatic createdAt/updatedAt
+  },
 );
 
 const AdPlayback = sequelize.define("AdPlayback", {
@@ -283,8 +349,8 @@ const User = sequelize.define(
     ...defaultTimestamps,
   },
   {
-    timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
-  }
+    timestamps: false, //  disables Sequelize's automatic createdAt/updatedAt
+  },
 );
 
 const SiteUser = sequelize.define(
@@ -314,8 +380,8 @@ const SiteUser = sequelize.define(
     ...defaultTimestamps,
   },
   {
-    timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
-  }
+    timestamps: false, //  disables Sequelize's automatic createdAt/updatedAt
+  },
 );
 
 const Campaign = sequelize.define(
@@ -338,8 +404,8 @@ const Campaign = sequelize.define(
     ...defaultTimestamps,
   },
   {
-    timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
-  }
+    timestamps: false, //  disables Sequelize's automatic createdAt/updatedAt
+  },
 );
 
 const Coupon = sequelize.define(
@@ -362,8 +428,8 @@ const Coupon = sequelize.define(
     ...defaultTimestamps,
   },
   {
-    timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
-  }
+    timestamps: false, //  disables Sequelize's automatic createdAt/updatedAt
+  },
 );
 
 const CampaignInteraction = sequelize.define(
@@ -388,8 +454,8 @@ const CampaignInteraction = sequelize.define(
     ...defaultTimestamps,
   },
   {
-    timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
-  }
+    timestamps: false, //  disables Sequelize's automatic createdAt/updatedAt
+  },
 );
 
 const SelectedSeries = sequelize.define("SelectedSeries", {
@@ -433,7 +499,7 @@ const DailyImpressionSummary = sequelize.define(
     impressions: { type: DataTypes.INTEGER, allowNull: false },
   },
   {
-    timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
+    timestamps: false, //  disables Sequelize's automatic createdAt/updatedAt
   },
   {
     tableName: "DailyImpressionSummaries",
@@ -448,7 +514,7 @@ const DailyImpressionSummary = sequelize.define(
       { fields: ["group_id"] },
       { fields: ["ad_id"] },
     ],
-  }
+  },
 );
 
 const ApkVersion = sequelize.define(
@@ -471,8 +537,8 @@ const ApkVersion = sequelize.define(
     uploaded_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
   },
   {
-    timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
-  }
+    timestamps: false, //  disables Sequelize's automatic createdAt/updatedAt
+  },
 );
 
 const ProofOfPlayLog = sequelize.define(
@@ -505,7 +571,7 @@ const ProofOfPlayLog = sequelize.define(
     duration_played_ms: { type: DataTypes.INTEGER, allowNull: false },
     ...defaultTimestamps,
   },
-  { timestamps: false }
+  { timestamps: false },
 );
 
 const DeviceTelemetryLog = sequelize.define(
@@ -529,7 +595,7 @@ const DeviceTelemetryLog = sequelize.define(
     app_version_code: DataTypes.INTEGER,
     ...defaultTimestamps,
   },
-  { timestamps: false, indexes: [{ fields: ["device_id", "timestamp"] }] }
+  { timestamps: false, indexes: [{ fields: ["device_id", "timestamp"] }] },
 );
 
 const DeviceEventLog = sequelize.define(
@@ -557,8 +623,11 @@ const DeviceEventLog = sequelize.define(
       { fields: ["device_id", "timestamp"] },
       { fields: ["event_type"] },
     ],
-  }
+  },
 );
+
+Tier.hasMany(Client, { foreignKey: "tier_id" });
+Client.belongsTo(Tier, { foreignKey: "tier_id" });
 
 DailyImpressionSummary.belongsTo(DeviceGroup, { foreignKey: "group_id" });
 DailyImpressionSummary.belongsTo(Ad, { foreignKey: "ad_id" });
@@ -625,4 +694,5 @@ module.exports = {
   ProofOfPlayLog,
   DeviceTelemetryLog,
   DeviceEventLog,
+  Tier,
 };

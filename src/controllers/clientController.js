@@ -1,15 +1,44 @@
 const { Op, fn, col } = require("sequelize");
-const { Client, Ad, Schedule, Device, DeviceGroup } = require("../models");
+const {
+  Client,
+  Ad,
+  Schedule,
+  Device,
+  DeviceGroup,
+  Tier,
+} = require("../models");
 const { getBucketURL } = require("./s3Controller");
 const logger = require("../utils/logger");
 
 module.exports.createClient = async (req, res) => {
   try {
     const { name, email, phoneNumber } = req.body;
+    const basicTier = await Tier.findOne({
+      where: { name: "Basic" },
+    });
+
+    if (!basicTier) {
+      return res.status(404).json({
+        message: "Basic tier not found",
+      });
+    }
+
+    const expiry = new Date();
+    expiry.setMonth(expiry.getMonth() + 1);
+
+    // const client = await Client.create({
+    //   name,
+    //   email,
+    //   phone_number: phoneNumber,
+    // });
+
     const client = await Client.create({
       name,
       email,
       phone_number: phoneNumber,
+      tier_id: basicTier?.tier_id || null,
+      subscription_status: "active",
+      subscription_expiry: expiry,
     });
 
     return res.status(200).json({
@@ -45,7 +74,7 @@ module.exports.getAllAds = async (req, res) => {
         ...ad,
         url: await getBucketURL(ad.url),
         client_name: ad.Client?.name || null, // Extracts 'name' from 'Client'
-      }))
+      })),
     );
 
     return res.status(200).json({ ads: flattenedAds });
@@ -63,6 +92,9 @@ module.exports.getAllClients = async (req, res) => {
     const clients = await Client.findAll({
       include: [
         {
+          model: Tier, // ✅ All Tier attributes automatically included
+        },
+        {
           model: Ad,
           attributes: [], // Do not fetch Ad records, only count them
         },
@@ -70,7 +102,7 @@ module.exports.getAllClients = async (req, res) => {
       attributes: {
         include: [[fn("COUNT", col("Ads.ad_id")), "adsCount"]],
       },
-      group: ["Client.client_id"], // Group by client to get correct counts
+      group: ["Client.client_id", "Tier.tier_id"], // Group by client to get correct counts
     });
 
     return res.status(200).json({ clients });
@@ -103,6 +135,49 @@ module.exports.updateClient = async (req, res) => {
     return res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
+  }
+};
+
+module.exports.updateClientNew = async (req, res) => {
+  try {
+    const { client_id } = req.params;
+    const { name, email, phoneNumber, tier_name } = req.body;
+
+    const client = await Client.findByPk(client_id);
+    if (!client) {
+      return res.status(404).json({ message: "Client not found" });
+    }
+
+    // Update basic details
+    if (name) client.name = name;
+    if (email) client.email = email;
+    if (phoneNumber) client.phone_number = phoneNumber;
+
+    // If tier change requested
+    if (tier_name) {
+      const tier = await Tier.findOne({ where: { name: tier_name } });
+      if (!tier) {
+        return res.status(404).json({ message: "Tier not found" });
+      }
+
+      client.tier_id = tier.tier_id;
+      client.subscription_status = "active";
+      client.subscription_expiry = new Date(
+        Date.now() + 30 * 24 * 60 * 60 * 1000,
+      );
+    }
+
+    await client.save();
+
+    return res.status(200).json({
+      message: "Client updated successfully",
+      client,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 };
 
