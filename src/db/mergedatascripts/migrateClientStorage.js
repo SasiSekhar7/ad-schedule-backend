@@ -78,6 +78,10 @@ async function migrateClientStorage() {
       client.used_storage_bytes = totalSize.toString();
       client.subscription_status = "active";
 
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + 30);
+      client.subscription_expiry = expiryDate;
+
       await client.save();
 
       console.log(`    Updated Client → Used Storage: ${totalSize} bytes\n`);

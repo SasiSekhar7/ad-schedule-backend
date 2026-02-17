@@ -3,14 +3,17 @@ const { Client } = require("pg");
 const path = require("path");
 
 const sqliteDb = new sqlite3.Database(
-  path.resolve(__dirname, "backend_service.db")
+  path.resolve(__dirname, "backend_service.db"),
 );
 const pgClient = new Client({
   host: process.env.DB_HOST || "localhost",
   port: process.env.DB_PORT || 5432,
-  user: process.env.DB_USER || "adupuser",
-  password: process.env.DB_PASSWORD || "Birla@1122",
-  database: process.env.DB_NAME || "testdb",
+  // user: process.env.DB_USER || "adupuser",
+  // password: process.env.DB_PASSWORD || "Birla@1122",
+  // database: process.env.DB_NAME || "testdb",
+  user: process.env.DB_USER || "postgres",
+  password: process.env.DB_PASSWORD || "root",
+  database: process.env.DB_NAME || "testconsoledb",
   logging: false, // optional
 });
 async function migrateTable(tableName, columns) {
@@ -18,7 +21,7 @@ async function migrateTable(tableName, columns) {
     // 1. Fetch actual column names from the target PostgreSQL table
     const res = await pgClient.query(
       `SELECT column_name FROM information_schema.columns WHERE table_name = $1`,
-      [tableName.toLowerCase()]
+      [tableName.toLowerCase()],
     );
     const pgColumns = res.rows.map((row) => row.column_name);
 
@@ -50,7 +53,7 @@ async function migrateTable(tableName, columns) {
             .map((_, i) => `$${i + 1}`)
             .join(", ");
           const query = `INSERT INTO "${tableName}" (${finalColumns.join(
-            ", "
+            ", ",
           )}) VALUES (${placeholders})`;
 
           try {
