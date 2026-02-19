@@ -84,7 +84,7 @@ async function migrateClientStorage() {
 
       await client.save();
 
-      console.log(`    Updated Client → Used Storage: ${totalSize} bytes\n`);
+      console.log(`Updated Client → Used Storage: ${totalSize} bytes\n`);
     }
 
     console.log(" Migration Completed Successfully!");

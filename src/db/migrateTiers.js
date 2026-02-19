@@ -11,7 +11,7 @@ const pgClient = new Client({
 async function migrateTiers() {
   try {
     await pgClient.connect();
-    console.log("Connected to PostgreSQL ✅");
+    console.log("Connected to PostgreSQL database.");
 
     const now = new Date();
 
@@ -35,7 +35,7 @@ async function migrateTiers() {
     console.log("🎉 Tiers migrated successfully.");
     await pgClient.end();
   } catch (err) {
-    console.error("❌ Error migrating tiers:", err.message);
+    console.error("Error migrating tiers:", err.message);
   }
 }
 
