@@ -9,6 +9,7 @@ const {
 } = require("../models");
 const { getBucketURL } = require("./s3Controller");
 const logger = require("../utils/logger");
+const { getSubscriptionExpiry } = require("../utils/subscriptionHelper");
 
 module.exports.createClient = async (req, res) => {
   try {
@@ -23,8 +24,7 @@ module.exports.createClient = async (req, res) => {
       });
     }
 
-    const expiry = new Date();
-    expiry.setMonth(expiry.getMonth() + 1);
+    const expiry = getSubscriptionExpiry();
 
     // const client = await Client.create({
     //   name,
@@ -162,9 +162,18 @@ module.exports.updateClientNew = async (req, res) => {
 
       client.tier_id = tier.tier_id;
       client.subscription_status = "active";
-      client.subscription_expiry = new Date(
-        Date.now() + 30 * 24 * 60 * 60 * 1000,
-      );
+
+      // Decide base date for subscription extension
+      // If subscription is still active → extend from current expiry (remaining time safe)
+      // If subscription already expired → start from today
+
+      const base =
+        client.subscription_expiry && client.subscription_expiry > new Date()
+          ? client.subscription_expiry // active → extend from existing expiry
+          : new Date(); // expired → start from now
+
+      // Calculate new expiry (1 year from base date)
+      client.subscription_expiry = getSubscriptionExpiry({ baseDate: base });
     }
 
     await client.save();

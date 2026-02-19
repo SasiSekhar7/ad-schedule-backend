@@ -2,6 +2,7 @@ require("dotenv").config();
 
 const sequelize = require("../../db/index");
 const db = require("../../models"); // adjust path if needed
+const { getSubscriptionExpiry } = require("../../utils/subscriptionHelper");
 const { Client, Tier } = db;
 
 async function assignBasicToExistingClients() {
@@ -16,8 +17,6 @@ async function assignBasicToExistingClients() {
     const basicTier = await Tier.findOne({
       where: { name: "Basic" },
     });
-
-    console.log("Basic Tier Found:", basicTier.name);
 
     if (!basicTier) {
       console.log("Basic tier not found");
@@ -39,8 +38,8 @@ async function assignBasicToExistingClients() {
 
     // Update each client
     for (const client of clients) {
-      const expiry = new Date();
-      expiry.setMonth(expiry.getMonth() + 1);
+      // Subscription starts from today for old clients
+      const expiry = getSubscriptionExpiry();
 
       client.tier_id = basicTier.tier_id;
       client.subscription_status = "active";

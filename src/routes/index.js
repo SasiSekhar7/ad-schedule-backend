@@ -119,7 +119,6 @@ const {
   incrementUsedStorage,
   assignBasicToExistingClients,
   getUserSubscription,
-  purchasePlan,
 } = require("../controllers/subscriptionController");
 
 const {
@@ -136,9 +135,6 @@ router.post("/tiers", createTier);
 router.put("/tiers/:tier_id", updateTier);
 router.patch("/tiers/:tier_id/toggle", toggleTierStatus);
 router.get("/subscription", validateToken, getUserSubscription);
-
-router.post("/subscription/purchase", validateToken, purchasePlan);
-
 router.get("/subscription/client", validateToken, getUserSubscription2);
 
 router.post("/storage/increment", validateToken, incrementUsedStorage);

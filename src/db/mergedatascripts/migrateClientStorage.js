@@ -4,6 +4,7 @@ const { S3Client, HeadObjectCommand } = require("@aws-sdk/client-s3");
 
 // const { sequelize } = require("../../models");
 const { Client, Tier, Ad } = require("../../models");
+const { getSubscriptionExpiry } = require("../../utils/subscriptionHelper");
 
 const s3 = new S3Client({
   region: process.env.AWS_REGION,
@@ -78,9 +79,8 @@ async function migrateClientStorage() {
       client.used_storage_bytes = totalSize.toString();
       client.subscription_status = "active";
 
-      const expiryDate = new Date();
-      expiryDate.setDate(expiryDate.getDate() + 30);
-      client.subscription_expiry = expiryDate;
+      // Start subscription from today (1 year)
+      client.subscription_expiry = getSubscriptionExpiry();
 
       await client.save();
 
