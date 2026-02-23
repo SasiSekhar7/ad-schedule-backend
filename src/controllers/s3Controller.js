@@ -95,7 +95,7 @@ module.exports.getBucketURL = async (fileName) => {
     await s3.send(new HeadObjectCommand(headParams));
     const getCommand = new GetObjectCommand(headParams);
     // const url = await getSignedUrl(s3, getCommand, { expiresIn: 86400 });
-    const url = await getSignedUrl(s3, getCommand, { expiresIn: 259200 });
+    const url = await getSignedUrl(s3, getCommand, { expiresIn: 2592000 });
 
     return url;
   } catch (error) {
