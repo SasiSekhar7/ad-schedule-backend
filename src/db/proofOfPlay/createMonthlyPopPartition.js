@@ -55,4 +55,4 @@ async function createNextMonthPartition() {
   }
 }
 
-createNextMonthPartition();
+module.exports = {createNextMonthPartition };
