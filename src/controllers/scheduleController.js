@@ -723,24 +723,24 @@ module.exports.deleteMultipleSchedule = async (req, res) => {
     });
 
     // Update DailyImpressionSummary for each affected date
-    for (const dateStr of [...new Set(affectedDates)]) {
-      try {
-        logger.logDebug(
-          "Triggering impression summary update due to deletion",
-          {
-            groupId,
-            dateStr,
-          }
-        );
-        await updateImpressionsTable(dateStr, { groupId });
-        logger.logDebug("Summary update triggered", { dateStr });
-      } catch (summaryError) {
-        logger.logError("Error updating summary table", summaryError, {
-          groupId,
-          dateStr,
-        });
-      }
-    }
+    // for (const dateStr of [...new Set(affectedDates)]) {
+    //   try {
+    //     logger.logDebug(
+    //       "Triggering impression summary update due to deletion",
+    //       {
+    //         groupId,
+    //         dateStr,
+    //       }
+    //     );
+    //     await updateImpressionsTable(dateStr, { groupId });
+    //     logger.logDebug("Summary update triggered", { dateStr });
+    //   } catch (summaryError) {
+    //     logger.logError("Error updating summary table", summaryError, {
+    //       groupId,
+    //       dateStr,
+    //     });
+    //   }
+    // }
 
     // Push to device queue
     await pushToGroupQueue([groupId]);
