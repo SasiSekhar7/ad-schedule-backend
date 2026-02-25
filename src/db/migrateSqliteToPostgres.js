@@ -8,9 +8,9 @@ const sqliteDb = new sqlite3.Database(
 const pgClient = new Client({
   host: process.env.DB_HOST || "localhost",
   port: process.env.DB_PORT || 5432,
-  user: process.env.DB_USER || "adupuser",
-  password: process.env.DB_PASSWORD || "Birla@1122",
-  database: process.env.DB_NAME || "testdb",
+  user: process.env.DB_USER || "postgres",
+  password: process.env.DB_PASSWORD || "admin",
+  database: process.env.DB_NAME || "consoledb",
   logging: false, // optional
 });
 async function migrateTable(tableName, columns) {

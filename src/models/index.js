@@ -483,6 +483,11 @@ const ProofOfPlayLog = sequelize.define(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
+    start_time: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      primaryKey: true, // ✅ REQUIRED for partitioning
+    },
     event_id: { type: DataTypes.UUID, allowNull: false, unique: true },
     device_id: {
       type: DataTypes.UUID,
@@ -500,7 +505,7 @@ const ProofOfPlayLog = sequelize.define(
       references: { model: "Schedules", key: "schedule_id" },
     },
 
-    start_time: { type: DataTypes.DATE, allowNull: false },
+    // start_time: { type: DataTypes.DATE, allowNull: false },
     end_time: { type: DataTypes.DATE, allowNull: false },
     duration_played_ms: { type: DataTypes.INTEGER, allowNull: false },
     ...defaultTimestamps,
