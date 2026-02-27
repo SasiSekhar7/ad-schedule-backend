@@ -3,6 +3,7 @@ const { DeviceGroup } = require("../models");
 const { pushToGroupQueue } = require("../controllers/queueController");
 const { updateUpcomingMatches } = require("../controllers/cricketController");
 const logger = require("../utils/logger");
+const { checkClientExpiry } = require("../services/subscriptionService");
 const { createNextMonthPartition } = require("../db/proofOfPlay/createMonthlyPopPartition");
 
 // Function to be executed at 6 AM daily
@@ -34,7 +35,7 @@ cron.schedule(
   {
     scheduled: true,
     timezone: "Asia/Kolkata", // India timezone
-  }
+  },
 );
 
 cron.schedule(
@@ -47,7 +48,7 @@ cron.schedule(
   {
     scheduled: true,
     timezone: "Asia/Kolkata", // India timezone
-  }
+  },
 );
 
 
@@ -90,3 +91,16 @@ logger.logInfo("Cron jobs initialized", {
 //     scheduled: true,
 //     timezone: "Asia/Kolkata" // India timezone
 // });
+
+//client plan expiry check cron ,Subscription expiry cron
+cron.schedule(
+  "30 02 * * *", // 2:30 AM IST (best practice → night)
+  async () => {
+    logger.logInfo("Running subscription expiry cron");
+    await checkClientExpiry();
+  },
+  {
+    scheduled: true,
+    timezone: "Asia/Kolkata",
+  },
+);

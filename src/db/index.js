@@ -11,7 +11,7 @@ const config = {
   dialect: process.env.DB_DIALECT || "postgres",
   host: process.env.DB_HOST || "localhost",
   port: process.env.DB_PORT || 5432,
-  username: process.env.DB_USER || "adupuser",
+  user: process.env.DB_USER || "adupuser",
   password: process.env.DB_PASSWORD || "Birla@1122",
   database: process.env.DB_NAME || "testdb",
   logging: false, // optional
@@ -24,7 +24,7 @@ const sequelize = new Sequelize(
   config.database,
   config.username,
   config.password,
-  config
+  config,
 );
 
 module.exports = sequelize;

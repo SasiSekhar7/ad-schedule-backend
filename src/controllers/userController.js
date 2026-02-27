@@ -178,6 +178,12 @@ module.exports.getUserData = async (req, res) => {
           { title: "New", url: "/campaigns/new" },
         ],
       },
+      {
+        title: "Plans",
+        url: "/all-plans",
+        icon: "QrCode",
+        items: [{ title: "All", url: "/all-plans" }],
+      },
     ];
 
     const navMainClient = [
@@ -206,6 +212,12 @@ module.exports.getUserData = async (req, res) => {
           { title: "Add", url: "/schedule/add" },
           { title: "Placeholder", url: "/schedule/placeholder" },
         ],
+      },
+      {
+        title: "Plans",
+        url: "/plans/all",
+        icon: "QrCode",
+        items: [{ title: "All", url: "/plans/all" }],
       },
     ];
 

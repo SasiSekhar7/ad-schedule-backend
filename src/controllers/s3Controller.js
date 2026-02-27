@@ -13,7 +13,7 @@ const {
   DeleteObjectsCommand,
 } = require("@aws-sdk/client-s3");
 const path = require("path");
-const { Ad, DeviceGroup } = require("../models");
+const { Ad, DeviceGroup, Client, Tier } = require("../models");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const { pushToGroupQueue } = require("./queueController");
 const fs = require("fs/promises"); // For async file system operations
@@ -116,6 +116,22 @@ module.exports.changeFile = async (req, res) => {
     if (!ad) {
       return res.status(404).json({ message: "Ad not found" });
     }
+
+    const client = await Client.findOne({
+      where: { client_id: ad.client_id },
+      include: Tier,
+    });
+
+    if (!client) {
+      return res.status(404).json({ message: "Client not found" });
+    }
+
+    const storageLimit = BigInt(client.Tier.storage_limit_bytes);
+    const currentUsed = BigInt(client.used_storage_bytes);
+
+    let oldFileSize = 0n;
+    let newFileSize = 0n;
+
     const { file_url, isMultipartUpload } = req.body;
 
     logger.logDebug("Change file request", {
@@ -127,6 +143,17 @@ module.exports.changeFile = async (req, res) => {
       if (!file_url) {
         return res.status(400).json({ message: "New file is required." });
       }
+      //  Get OLD file size BEFORE deleting
+      if (ad.url) {
+        const oldHead = new HeadObjectCommand({
+          Bucket: bucketName,
+          Key: ad.url,
+        });
+
+        const oldMeta = await s3.send(oldHead);
+        oldFileSize = BigInt(oldMeta.ContentLength || 0);
+      }
+
       if (ad.url) {
         const deleteParams = {
           Bucket: bucketName,
@@ -140,6 +167,37 @@ module.exports.changeFile = async (req, res) => {
       if (ad_id) {
         await deleteFileFromS3Folder(ad_id);
       }
+
+      //  Get NEW file size
+      const newHead = new HeadObjectCommand({
+        Bucket: bucketName,
+        Key: file_url,
+      });
+
+      const newMeta = await s3.send(newHead);
+      newFileSize = BigInt(newMeta.ContentLength || 0);
+
+      //  Calculate updated storage
+      const updatedUsed = currentUsed - oldFileSize + newFileSize;
+
+      if (updatedUsed > storageLimit) {
+        // Delete newly uploaded file to avoid orphan
+        await s3.send(
+          new DeleteObjectCommand({
+            Bucket: bucketName,
+            Key: file_url,
+          }),
+        );
+
+        return res.status(400).json({
+          message: "Storage limit exceeded",
+        });
+      }
+
+      //  Update client storage
+      client.used_storage_bytes =
+        updatedUsed > 0n ? updatedUsed.toString() : "0";
+      await client.save();
 
       // 2️⃣ Trigger the Lambda after successful upload
       // 2️⃣ Trigger the Lambda after successful upload
@@ -158,10 +216,21 @@ module.exports.changeFile = async (req, res) => {
 
       await Ad.update(
         { url: file_url, status: "processing" },
-        { where: { ad_id } }
+        { where: { ad_id } },
       );
       await lambda.send(invokeCommand);
     } else {
+      //  Get OLD file size BEFORE deleting
+      if (ad.url) {
+        const oldHead = new HeadObjectCommand({
+          Bucket: bucketName,
+          Key: ad.url,
+        });
+
+        const oldMeta = await s3.send(oldHead);
+        oldFileSize = BigInt(oldMeta.ContentLength || 0);
+      }
+
       // If an ad URL exists, delete the previous file from S3
       if (ad.url) {
         const deleteParams = {
@@ -177,10 +246,41 @@ module.exports.changeFile = async (req, res) => {
         await deleteFileFromS3Folder(ad_id);
       }
 
+      //  Get NEW file size
+      const newHead = new HeadObjectCommand({
+        Bucket: bucketName,
+        Key: file_url,
+      });
+
+      const newMeta = await s3.send(newHead);
+      newFileSize = BigInt(newMeta.ContentLength || 0);
+
+      //  Calculate updated storage
+      const updatedUsed = currentUsed - oldFileSize + newFileSize;
+
+      if (updatedUsed > storageLimit) {
+        // Delete newly uploaded file to avoid orphan
+        await s3.send(
+          new DeleteObjectCommand({
+            Bucket: bucketName,
+            Key: file_url,
+          }),
+        );
+
+        return res.status(400).json({
+          message: "Storage limit exceeded",
+        });
+      }
+
+      //  Update client storage
+      client.used_storage_bytes =
+        updatedUsed > 0n ? updatedUsed.toString() : "0";
+      await client.save();
+
       // Update database with the new file URL
       await Ad.update(
         { url: file_url, status: "processing" },
-        { where: { ad_id } }
+        { where: { ad_id } },
       );
 
       // 2️⃣ Trigger the Lambda after successful upload
@@ -421,6 +521,7 @@ module.exports.deleteAd = async (req, res) => {
     logger.logInfo("Delete ad request", { ad_id, userId: req.user?.user_id });
 
     const ad = await Ad.findOne({ where: { ad_id } });
+    let fileSize = 0;
     if (ad.url) {
       const deleteParams = {
         Bucket: bucketName,
@@ -429,12 +530,35 @@ module.exports.deleteAd = async (req, res) => {
 
       //   const deleteCommand = new DeleteObjectCommand(deleteParams);
       //   await s3.send(deleteCommand);
+
+      const headCommand = new HeadObjectCommand({
+        Bucket: bucketName,
+        Key: ad.url,
+      });
+
+      const metadata = await s3.send(headCommand);
+      fileSize = metadata.ContentLength || 0;
+    }
+    // 3 Reduce client storage
+    if (fileSize > 0) {
+      const client = await Client.findOne({
+        where: { client_id: ad.client_id },
+      });
+
+      if (client) {
+        const currentUsed = BigInt(client.used_storage_bytes);
+        const newUsed = currentUsed - BigInt(fileSize);
+
+        client.used_storage_bytes = newUsed > 0n ? newUsed.toString() : "0";
+
+        await client.save();
+      }
     }
 
     // await Ad.destroy({where:{ad_id}})
     await Ad.update(
       { isDeleted: true }, // Assuming you have an isDeleted field
-      { where: { ad_id } }
+      { where: { ad_id } },
     );
 
     logger.logInfo("Ad deleted successfully", {
@@ -586,7 +710,7 @@ module.exports.generateUploadUrls = async (req, res) => {
         });
         const signedUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
         return { partNumber: i + 1, signedUrl };
-      })
+      }),
     );
 
     res.json({ urls });

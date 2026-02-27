@@ -6,6 +6,7 @@ const {
   deleteClient,
   getAllAds,
   getAllDetails,
+  updateClientNew,
 } = require("../controllers/clientController");
 const { sendAdFile, sendAdDetails } = require("../controllers/adController");
 const {
@@ -113,6 +114,33 @@ const {
 } = require("../controllers/mediaConvertController");
 const { sendCustomMQTTMessage } = require("../controllers/queueController");
 
+const {
+  getUserSubscription2,
+  incrementUsedStorage,
+  assignBasicToExistingClients,
+  getUserSubscription,
+} = require("../controllers/subscriptionController");
+
+const {
+  createTier,
+  getAllTiers,
+  updateTier,
+  toggleTierStatus,
+  getAll,
+} = require("../controllers/tierController");
+
+router.get("/tiers", getAllTiers);
+router.get("/all-tiers", getAll);
+router.post("/tiers", createTier);
+router.put("/tiers/:tier_id", updateTier);
+router.patch("/tiers/:tier_id/toggle", toggleTierStatus);
+router.get("/subscription", validateToken, getUserSubscription);
+router.get("/subscription/client", validateToken, getUserSubscription2);
+
+router.post("/storage/increment", validateToken, incrementUsedStorage);
+
+router.post("/assign-basic-to-existing", assignBasicToExistingClients);
+
 router.post("/device/register", registerDevice); // takes group id and location input
 
 router.post("/device/new-register", registerNewDevice);
@@ -120,24 +148,24 @@ router.post("/device/new-register", registerNewDevice);
 router.get(
   "/device/new-register/:pairing_code",
   validateToken,
-  getDeviceByPairingCode
+  getDeviceByPairingCode,
 );
 
 router.post("/device/update/:device_id", validateToken, updateDeviceDetails);
 router.post(
   "/device/update/location/:device_id",
   validateToken,
-  updateDeviceDetailsAndLaunch
+  updateDeviceDetailsAndLaunch,
 );
 router.post(
   "/device/update/metadata/:device_id",
   validateToken,
-  updateDeviceMetadata
+  updateDeviceMetadata,
 );
 
 router.post(
   "/device/update/metadata-confirm/:device_id",
-  confirmUpdateDeviceMetaData
+  confirmUpdateDeviceMetaData,
 );
 router.post("/device/complete-registration", completeRegisterNewDevice);
 router.get("/device/group-list", validateToken, getGroutpList);
@@ -161,7 +189,7 @@ router.get("/device/all", validateToken, getDeviceList);
 router.post(
   "/device/update-schedule/:group_id",
   validateToken,
-  updateGroupSchedule
+  updateGroupSchedule,
 );
 
 router.post("/device/cricket/update-series", validateToken, updateSeries);
@@ -169,13 +197,13 @@ router.post("/device/cricket/update-series", validateToken, updateSeries);
 router.post(
   "/device/update-schedule/:group_id",
   validateToken,
-  updateGroupSchedule
+  updateGroupSchedule,
 );
 
 router.post(
   "/device/update-schedule/:group_id",
   validateToken,
-  updateGroupSchedule
+  updateGroupSchedule,
 );
 
 router.get("/dashboard", validateToken, getAllDetails);
@@ -206,7 +234,7 @@ router.post(
   "/schedule/change-placeholder",
   validateToken,
   uploadMiddleware,
-  changePlaceholder
+  changePlaceholder,
 );
 
 router.get("/ads/clients", validateToken, getAllClients);
@@ -214,13 +242,15 @@ router.get("/ads/all", validateToken, getAllAds);
 
 router.post("/ads/create-client", validateToken, createClient);
 router.post("/ads/update-client/:id", validateToken, updateClient);
+router.put("/update-client/:client_id", validateToken, updateClientNew);
+
 router.post("/ads/delete-client:/id", validateToken, deleteClient);
 
 router.post(
   "/ads/add",
   validateToken,
   // uploadMiddleware,
-  addAd
+  addAd,
 );
 router.post("/ads/update", validateToken, addAd);
 router.post("/ads/delete/:ad_id", validateToken, deleteAd);
@@ -232,7 +262,7 @@ router.post(
   "/ads/file/edit/:ad_id",
   validateToken,
   // uploadMiddleware,
-  changeFile
+  changeFile,
 );
 
 router.get("/campaign/all", validateToken, validateAdmin, allCampaigns);
@@ -241,27 +271,27 @@ router.post(
   "/campaign/create/:client_id",
   validateToken,
   validateAdmin,
-  createCampaign
+  createCampaign,
 );
 
 router.post(
   "/campaign/update/",
   validateToken,
   validateAdmin,
-  updateCampaignWithCoupons
+  updateCampaignWithCoupons,
 );
 router.post(
   "/campaign/delete/:campaign_id",
   validateToken,
   validateAdmin,
-  deleteCampaign
+  deleteCampaign,
 );
 
 router.get(
   "/campaign/interactions",
   validateToken,
   validateAdmin,
-  fetchCampaignInteractions
+  fetchCampaignInteractions,
 );
 
 // router.post('/campaign/add-coupon/:campaign_id', validateToken,validateAdmin, addCoupon)
@@ -270,7 +300,7 @@ router.get(
   "/campaign/get/:campaign_id",
   validateToken,
   validateAdmin,
-  getCampaign
+  getCampaign,
 );
 
 router.get("/campaign/:campaign_id", getCampaignCode);
@@ -287,7 +317,7 @@ router.get(
   "/apk_versions/latest",
   validateToken,
   validateAdmin,
-  getLatestApkVersion
+  getLatestApkVersion,
 );
 router.get("/apk_versions", validateToken, validateAdmin, getAllApkVersions);
 
@@ -298,7 +328,7 @@ router.post(
   validateToken,
   validateAdmin,
   apkUploadMiddleware,
-  addApkVersion
+  addApkVersion,
 );
 router.put("/apk_versions/:id", validateToken, validateAdmin, updateApkVersion);
 
@@ -306,7 +336,7 @@ router.delete(
   "/apk_versions/:id",
   validateToken,
   validateAdmin,
-  deleteApkVersion
+  deleteApkVersion,
 );
 
 // device logs apis
@@ -337,14 +367,18 @@ router.post("/onetime/upload-ads-to-egress-s3", uploadAdsToEgressS3);
 router.post("/webhooks/mediaconvert", triggerMediaConvertWebhook);
 
 router.get("/device/proof-of-play/export", exportProofOfPlayReport);
-router.get("/ads/proof-of-play/export", validateToken, exportAdsProofOfPlayReport);
+router.get(
+  "/ads/proof-of-play/export",
+  validateToken,
+  exportAdsProofOfPlayReport,
+);
 router.get("/device/event-logs/export", exportDeviceEventLogs);
 
 // Export full device details to Excel with multiple sheets
 router.get(
   "/device/:device_id/export-full-details",
   validateToken,
-  exportDeviceDetailsToExcel
+  exportDeviceDetailsToExcel,
 );
 
 router.post("/device/mqtt-custom-message/:device_id", sendCustomMQTTMessage);
