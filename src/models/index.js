@@ -541,6 +541,117 @@ const ApkVersion = sequelize.define(
   },
 );
 
+const ExportJob = sequelize.define(
+  "ExportJob",
+  {
+    job_id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+
+    // who requested
+    client_id: {
+      type: DataTypes.UUID,
+      allowNull: false,
+    },
+
+    // report type (future-proof)
+    job_type: {
+      type: DataTypes.ENUM(
+        "PROOF_OF_PLAY",
+        "DAILY_IMPRESSIONS",
+        "BILLING_REPORT"
+      ),
+      allowNull: false,
+      defaultValue: "PROOF_OF_PLAY",
+    },
+
+    // filters
+    device_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
+
+    ad_id : {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
+
+    start_date: {
+      type: DataTypes.DATE,
+      allowNull: false,
+    },
+
+    end_date: {
+      type: DataTypes.DATE,
+      allowNull: false,
+    },
+
+    // job lifecycle
+    status: {
+      type: DataTypes.ENUM(
+        "PENDING",
+        "QUEUED",
+        "PROCESSING",
+        "COMPLETED",
+        "FAILED",
+        "CANCELLED"
+      ),
+      allowNull: false,
+      defaultValue: "PENDING",
+    },
+
+    progress_percent: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0, // 0 → 100
+    },
+
+   
+    s3_bucket: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+
+    s3_key: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+
+    file_size_bytes: {
+      type: DataTypes.BIGINT,
+      allowNull: true,
+    },
+
+    error_message: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+
+    created_at: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW,
+    },
+
+    updated_at: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW,
+    },
+  },
+  {
+    tableName: "ExportJobs",
+    timestamps: false,
+    indexes: [
+      { fields: ["client_id"] },
+      { fields: ["status"] },
+      { fields: ["job_type"] },
+      { fields: ["created_at"] },
+    ],
+  }
+);
+
+
 const ProofOfPlayLog = sequelize.define(
   "ProofOfPlayLog",
   {
@@ -700,4 +811,5 @@ module.exports = {
   DeviceTelemetryLog,
   DeviceEventLog,
   Tier,
+  ExportJob
 };

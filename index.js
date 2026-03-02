@@ -13,6 +13,8 @@ const {
   notFoundHandler,
 } = require("./src/middleware/errorHandler");
 
+require("./src/workers/exportJobProcessor");
+
 const port = process.env.PORT || 8000;
 
 // Initialize cron jobs
