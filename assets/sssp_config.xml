@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <widget>
     <ver>1.0.0</ver> <!-- Matches your config.xml version -->
-    <size>1120420</size> <!-- Actual size of adupApp.wgt in bytes -->
-    <widgetname>adupApp</widgetname>
+    <size>2451153</size> <!-- Actual size of adupApp.wgt in bytes -->
+    <widgetname>ad96Player</widgetname>
     <widgetid>0lKtwciFfw.ad96</widgetid> <!-- Matches tizen:application id -->
 </widget>
