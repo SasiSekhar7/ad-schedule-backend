@@ -50,6 +50,7 @@ const {
   exportAdsProofOfPlayReport,
   exportDeviceEventLogs,
   exportDeviceDetailsToExcel,
+  toggleLiveContentByGroup,
 } = require("../controllers/deviceController");
 const {
   addUser,
@@ -380,4 +381,8 @@ router.get(
 router.post("/device/mqtt-custom-message/:device_id", sendCustomMQTTMessage);
 
 router.post("/cron/daily-schedule-push", dailySchedulePushManual);
+
+
+
+router.patch("/schedule/live/toggle",validateToken, toggleLiveContentByGroup);
 module.exports = router;

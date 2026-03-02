@@ -35,7 +35,7 @@ const Client = sequelize.define(
   },
   {
     timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
-  }
+  },
 );
 
 const Ad = sequelize.define(
@@ -64,7 +64,7 @@ const Ad = sequelize.define(
   },
   {
     timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
-  }
+  },
 );
 
 const Device = sequelize.define(
@@ -83,7 +83,7 @@ const Device = sequelize.define(
         "display",
         "tablet",
         "desktop",
-        "signage"
+        "signage",
       ),
       allowNull: false,
       defaultValue: "tv",
@@ -119,7 +119,7 @@ const Device = sequelize.define(
         "webos",
         "ios",
         "windows",
-        "linux"
+        "linux",
       ),
       allowNull: true,
     },
@@ -158,7 +158,7 @@ const Device = sequelize.define(
   },
   {
     timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
-  }
+  },
 );
 
 const DeviceGroup = sequelize.define(
@@ -203,7 +203,7 @@ const DeviceGroup = sequelize.define(
   },
   {
     timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
-  }
+  },
 );
 
 const ScrollText = sequelize.define(
@@ -225,7 +225,7 @@ const ScrollText = sequelize.define(
   },
   {
     timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
-  }
+  },
 );
 
 // LiveContent model - for streaming, website, or other live content types
@@ -273,7 +273,7 @@ const LiveContent = sequelize.define(
   },
   {
     timestamps: false,
-  }
+  },
 );
 
 // Carousel model - a collection of ads that play in sequence
@@ -294,7 +294,11 @@ const Carousel = sequelize.define(
       defaultValue: "active",
     },
     // Total duration of carousel (sum of all items) - calculated field
-    total_duration: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+    total_duration: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
     isDeleted: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
@@ -304,7 +308,7 @@ const Carousel = sequelize.define(
   },
   {
     timestamps: false,
-  }
+  },
 );
 
 // CarouselItem model - individual ads within a carousel
@@ -328,12 +332,16 @@ const CarouselItem = sequelize.define(
       references: { model: "Ads", key: "ad_id" },
     },
     // Order of the ad in the carousel (1, 2, 3, etc.)
-    display_order: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
+    display_order: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1,
+    },
     ...defaultTimestamps,
   },
   {
     timestamps: false,
-  }
+  },
 );
 
 const Schedule = sequelize.define(
@@ -352,6 +360,12 @@ const Schedule = sequelize.define(
       allowNull: false,
       defaultValue: "ad",
     },
+    is_enabled: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+    },
+
     group_id: { type: DataTypes.UUID, allowNull: false },
     start_time: { type: DataTypes.DATE, allowNull: false },
     end_time: { type: DataTypes.DATE, allowNull: false },
@@ -376,7 +390,7 @@ const Schedule = sequelize.define(
   },
   {
     timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
-  }
+  },
 );
 
 const AdPlayback = sequelize.define("AdPlayback", {
@@ -414,7 +428,7 @@ const User = sequelize.define(
   },
   {
     timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
-  }
+  },
 );
 
 const SiteUser = sequelize.define(
@@ -445,7 +459,7 @@ const SiteUser = sequelize.define(
   },
   {
     timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
-  }
+  },
 );
 
 const Campaign = sequelize.define(
@@ -469,7 +483,7 @@ const Campaign = sequelize.define(
   },
   {
     timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
-  }
+  },
 );
 
 const Coupon = sequelize.define(
@@ -493,7 +507,7 @@ const Coupon = sequelize.define(
   },
   {
     timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
-  }
+  },
 );
 
 const CampaignInteraction = sequelize.define(
@@ -519,7 +533,7 @@ const CampaignInteraction = sequelize.define(
   },
   {
     timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
-  }
+  },
 );
 
 const SelectedSeries = sequelize.define("SelectedSeries", {
@@ -578,7 +592,7 @@ const DailyImpressionSummary = sequelize.define(
       { fields: ["group_id"] },
       { fields: ["ad_id"] },
     ],
-  }
+  },
 );
 
 const ApkVersion = sequelize.define(
@@ -602,7 +616,7 @@ const ApkVersion = sequelize.define(
   },
   {
     timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
-  }
+  },
 );
 
 const ProofOfPlayLog = sequelize.define(
@@ -635,7 +649,7 @@ const ProofOfPlayLog = sequelize.define(
     duration_played_ms: { type: DataTypes.INTEGER, allowNull: false },
     ...defaultTimestamps,
   },
-  { timestamps: false }
+  { timestamps: false },
 );
 
 const DeviceTelemetryLog = sequelize.define(
@@ -659,7 +673,7 @@ const DeviceTelemetryLog = sequelize.define(
     app_version_code: DataTypes.INTEGER,
     ...defaultTimestamps,
   },
-  { timestamps: false, indexes: [{ fields: ["device_id", "timestamp"] }] }
+  { timestamps: false, indexes: [{ fields: ["device_id", "timestamp"] }] },
 );
 
 const DeviceEventLog = sequelize.define(
@@ -687,7 +701,7 @@ const DeviceEventLog = sequelize.define(
       { fields: ["device_id", "timestamp"] },
       { fields: ["event_type"] },
     ],
-  }
+  },
 );
 
 DailyImpressionSummary.belongsTo(DeviceGroup, { foreignKey: "group_id" });
@@ -714,7 +728,11 @@ LiveContent.belongsTo(Client, { foreignKey: "client_id" });
 // Carousel associations
 Client.hasMany(Carousel, { foreignKey: "client_id" });
 Carousel.belongsTo(Client, { foreignKey: "client_id" });
-Carousel.hasMany(CarouselItem, { foreignKey: "carousel_id", as: "items", onDelete: "CASCADE" });
+Carousel.hasMany(CarouselItem, {
+  foreignKey: "carousel_id",
+  as: "items",
+  onDelete: "CASCADE",
+});
 CarouselItem.belongsTo(Carousel, { foreignKey: "carousel_id" });
 CarouselItem.belongsTo(Ad, { foreignKey: "ad_id" });
 Ad.hasMany(CarouselItem, { foreignKey: "ad_id" });

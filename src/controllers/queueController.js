@@ -133,6 +133,7 @@ module.exports.convertToPushReadyJSON = async (
       start_time: {
         [Op.between]: [startOfDay, endOfDay],
       },
+      is_enabled : true
       // TODO: Add filter for content_type when processing different types
       // content_type: 'ad', // For now only processing ads
     },
@@ -169,7 +170,7 @@ module.exports.convertToPushReadyJSON = async (
   const liveContentSchedules = scheduledContent.filter(s => s.content_type === 'live_content');
   const liveContents = await Promise.all(liveContentSchedules.map(async (schedule) => {
     try {
-      const liveContent = await LiveContent.findOne({ where: { live_content_id: schedule.content_id } });
+      const liveContent = await LiveContent.findOne({ where: { live_content_id: schedule.content_id, status : "active" } });
       if (!liveContent) {
         logger.logError(`LiveContent not found for content_id`, null, { content_id: schedule.content_id });
         return null;
@@ -185,6 +186,7 @@ module.exports.convertToPushReadyJSON = async (
         start_time: schedule.start_time,
         weekdays: schedule.weekdays || null,
         time_slots: schedule.time_slots || null,
+        is_enabled: schedule.is_enabled || true
       };
     } catch (err) {
       logger.logError(`Error processing live content`, err, { content_id: schedule.content_id });

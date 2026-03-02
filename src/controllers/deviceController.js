@@ -520,6 +520,7 @@ module.exports.getFullSchedule_v2 = async (req, res) => {
           fromDate: full?.fromDate || moment(s.start_time),
           toDate: full?.toDate || moment(s.end_time),
           // New fields for weekday and time slot scheduling
+            is_enabled: s.is_enabled,
           weekdays: s.weekdays || null,
           time_slots: s.time_slots || null,
         };
@@ -542,6 +543,7 @@ module.exports.getFullSchedule_v2 = async (req, res) => {
           clientId: g.clientId,
           fromDate: g.fromDate.format("DD-MM-YYYY"),
           toDate: g.toDate.format("DD-MM-YYYY"),
+          is_enabled: g.is_enabled,
           totalDays,
           completedDays,
           completedPercentage: `${completedPercentage}%`,
@@ -3135,5 +3137,67 @@ module.exports.exportDeviceDetailsToExcel = async (req, res) => {
       device_id: req.params.id,
     });
     return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+
+module.exports.toggleLiveContentByGroup = async (req, res) => {
+  try {
+    const { groupIds, content_id, is_enabled } = req.body;
+
+    if (!Array.isArray(groupIds) || groupIds.length === 0) {
+      return res.status(400).json({
+        error: "groupIds must be a non-empty array",
+      });
+    }
+
+    if (!content_id) {
+      return res.status(400).json({
+        error: "content_id is required",
+      });
+    }
+
+    if (typeof is_enabled !== "boolean") {
+      return res.status(400).json({
+        error: "is_enabled must be true or false",
+      });
+    }
+
+    const [updatedCount] = await Schedule.update(
+      { is_enabled },
+      {
+        where: {
+          group_id: { [Op.in]: groupIds },
+          content_type: "live_content",
+          content_id: content_id,
+        },
+      }
+    );
+
+    if (updatedCount === 0) {
+      return res.status(404).json({
+        message: "No matching live schedules found",
+      });
+    }
+
+    // Push changes to devices
+    await pushToGroupQueue(groupIds);
+
+    return res.json({
+      message: `Live content ${
+        is_enabled ? "started" : "stopped"
+      } successfully`,
+      affected_groups: groupIds,
+      updated_count: updatedCount,
+    });
+  } catch (error) {
+    logger.logError("Error toggling live content by group", error, {
+      groupIds: req.body.groupIds,
+      content_id: req.body.content_id,
+    });
+
+    return res.status(500).json({
+      error: "Internal Server Error",
+    });
   }
 };
