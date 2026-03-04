@@ -239,11 +239,15 @@ const LiveContent = sequelize.define(
     },
     client_id: { type: DataTypes.UUID, allowNull: false },
     name: { type: DataTypes.STRING, allowNull: false },
-    // Type of live content: 'streaming', 'website', 'iframe', 'youtube', 'custom'
+    // Type of live content: 'streaming', 'website', 'iframe', 'youtube', 'custom', 'provider'
     content_type: {
       type: DataTypes.STRING,
       allowNull: false,
       defaultValue: "website",
+    },
+    channel_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
     },
     // URL for the content (stream URL, website URL, etc.)
     url: { type: DataTypes.STRING, allowNull: false },
@@ -704,6 +708,150 @@ const DeviceEventLog = sequelize.define(
   },
 );
 
+const StreamingProvider = sequelize.define(
+  "StreamingProvider",
+  {
+    provider_id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+
+    name: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+
+    provider_type: {
+      type: DataTypes.ENUM("dacast", "mux", "aws_ivs", "wowza", "vimeo"),
+      allowNull: false,
+    },
+
+    api_base_url: DataTypes.STRING,
+    isDeleted: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
+
+    is_active: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+    },
+
+    config: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      // store credentials reference
+    },
+
+    ...defaultTimestamps,
+  },
+  {
+    timestamps: false,
+  },
+);
+
+const StreamUsage = sequelize.define(
+  "StreamUsage",
+  {
+    usage_id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+
+    channel_id: {
+      type: DataTypes.UUID,
+      allowNull: false,
+    },
+    client_id: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: { model: "Clients", key: "client_id" },
+    },
+
+    start_time: DataTypes.DATE,
+
+    end_time: DataTypes.DATE,
+
+    duration_seconds: DataTypes.INTEGER,
+
+    bandwidth_mb: DataTypes.FLOAT,
+
+    ...defaultTimestamps,
+  },
+  {
+    timestamps: false,
+  },
+);
+
+const StreamChannel = sequelize.define(
+  "StreamChannel",
+  {
+    channel_id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+
+    metadata: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+    },
+
+    provider_id: {
+      type: DataTypes.UUID,
+      allowNull: false,
+    },
+
+    external_channel_id: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    client_id: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: { model: "Clients", key: "client_id" },
+    },
+
+    name: DataTypes.STRING,
+
+    playback_url: DataTypes.STRING,
+
+    ingest_url: DataTypes.STRING,
+
+    stream_key: DataTypes.STRING,
+
+    status: {
+      type: DataTypes.ENUM("idle", "live", "stopped", "error"),
+      defaultValue: "idle",
+    },
+
+    ...defaultTimestamps,
+  },
+  {
+    timestamps: false,
+  },
+);
+
+
+LiveContent.belongsTo(StreamChannel, {
+  foreignKey: "channel_id",
+  targetKey: "channel_id",
+  as: "channel",
+});
+
+StreamChannel.hasMany(LiveContent, {
+  foreignKey: "channel_id",
+});
+
+Client.hasMany(StreamChannel, { foreignKey: "client_id" });
+StreamChannel.belongsTo(Client, { foreignKey: "client_id" });
+StreamingProvider.hasMany(StreamChannel, { foreignKey: "provider_id" });
+StreamChannel.belongsTo(StreamingProvider, { foreignKey: "provider_id" });
+StreamChannel.hasMany(StreamUsage, { foreignKey: "channel_id" });
+StreamUsage.belongsTo(StreamChannel, { foreignKey: "channel_id" });
+
 DailyImpressionSummary.belongsTo(DeviceGroup, { foreignKey: "group_id" });
 DailyImpressionSummary.belongsTo(Ad, { foreignKey: "ad_id" });
 
@@ -789,4 +937,7 @@ module.exports = {
   LiveContent,
   Carousel,
   CarouselItem,
+  StreamingProvider,
+  StreamChannel,
+  StreamUsage,
 };

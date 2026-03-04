@@ -129,6 +129,11 @@ const {
   deleteCarousel,
 } = require("../controllers/carouselController");
 
+const { dacastWebhook } = require("../controllers/webhookController");
+const { syncChannelAnalytics } = require("../controllers/analyticsController");
+const { deleteStreamChannel, stopStreamChannel, startStreamChannel, updateStreamChannel, createStreamChannel, getStreamChannelById, getAllStreamChannels, syncDacastChannels } = require("../controllers/streamChannelController");
+const { createStreamingProvider, getStreamingProviders, updateStreamingProvider, deleteStreamingProvider } = require("../controllers/streamingProviderController");
+
 router.post("/device/register", registerDevice); // takes group id and location input
 
 router.post("/device/new-register", registerNewDevice);
@@ -385,4 +390,115 @@ router.post("/cron/daily-schedule-push", dailySchedulePushManual);
 
 
 router.patch("/schedule/live/toggle",validateToken, toggleLiveContentByGroup);
+
+
+
+
+// =============================
+// STREAMING PROVIDER ROUTES
+// =============================
+
+router.post(
+  "/streaming/provider",
+  validateToken,
+  validateAdmin,
+  createStreamingProvider
+);
+
+router.get(
+  "/streaming/provider",
+  validateToken,
+  validateAdmin,
+  getStreamingProviders
+);
+
+router.put(
+  "/streaming/provider/:id",
+  validateToken,
+  validateAdmin,
+  updateStreamingProvider
+);
+
+router.delete(
+  "/streaming/provider/:id",
+  validateToken,
+  validateAdmin,
+  deleteStreamingProvider
+);
+
+
+// // =============================
+// // STREAM CHANNEL ROUTES
+// // =============================
+
+router.post(
+  "/streaming/channel",
+  validateToken,
+  createStreamChannel
+);
+
+router.get(
+  "/streaming/channel",
+  validateToken,
+  getAllStreamChannels
+);
+
+router.get(
+  "/streaming/channel/:id",
+  validateToken,
+  getStreamChannelById
+);
+
+router.put(
+  "/streaming/channel/:id",
+  validateToken,
+  updateStreamChannel
+);
+
+router.put(
+  "/streaming/channel/:id/start",
+  validateToken,
+  startStreamChannel
+);
+
+router.put(
+  "/streaming/channel/:id/stop",
+  validateToken,
+  stopStreamChannel
+);
+
+router.delete(
+  "/streaming/channel/:id",
+  validateToken,
+  deleteStreamChannel
+);
+
+router.post("/streaming/channels/sync", validateToken ,syncDacastChannels);
+
+
+
+// =============================
+// STREAM ANALYTICS
+// =============================
+
+router.post(
+  "/streaming/channel/:id/sync-analytics",
+  validateToken,
+  syncChannelAnalytics
+);
+
+
+// =============================
+// DACAST WEBHOOK
+// =============================
+
+router.post("/webhooks/dacast", dacastWebhook);
+
+
+
+
+
+
+
+
 module.exports = router;

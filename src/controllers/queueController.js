@@ -10,6 +10,7 @@ const {
   LiveContent,
   Carousel,
   CarouselItem,
+  StreamChannel,
 } = require("../models");
 const { default: mqtt } = require("mqtt");
 const logger = require("../utils/logger");
@@ -174,6 +175,14 @@ module.exports.convertToPushReadyJSON = async (
       if (!liveContent) {
         logger.logError(`LiveContent not found for content_id`, null, { content_id: schedule.content_id });
         return null;
+      }
+
+      if(liveContent.content_type === "provider"){
+        let channelDetails = await StreamChannel.findOne({where:{channel_id:liveContent.channel_id, status:"live"}})
+        if(!channelDetails){
+          logger.logError(`Error processing live content client try to schedule dacast idle channel`, err, { content_id: schedule.content_id, channel_id:liveContent.channel_id });
+          return null
+        }
       }
       return {
         live_content_id: liveContent.live_content_id,

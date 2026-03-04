@@ -1,4 +1,4 @@
-const { LiveContent, Client } = require("../models");
+const { LiveContent, Client, StreamChannel } = require("../models");
 const logger = require("../utils/logger");
 
 /**
@@ -15,11 +15,24 @@ const logger = require("../utils/logger");
  */
 module.exports.createLiveContent = async (req, res) => {
   try {
-    const { name, content_type, url, duration, start_time, end_time, config } = req.body;
+    const {
+      name,
+      content_type,
+      channel_id,
+      url,
+      duration,
+      start_time,
+      end_time,
+      config,
+    } = req.body;
     const client_id = req.user?.client_id;
 
     if (!client_id) {
       return res.status(400).json({ error: "Client ID is required" });
+    }
+
+    if (content_type === "provider" && !channel_id) {
+      return res.status(400).json({ error: "channel_id is required" });
     }
 
     if (!name || !url) {
@@ -31,7 +44,9 @@ module.exports.createLiveContent = async (req, res) => {
       const startDate = new Date(start_time);
       const endDate = new Date(end_time);
       if (endDate <= startDate) {
-        return res.status(400).json({ error: "End time must be after start time" });
+        return res
+          .status(400)
+          .json({ error: "End time must be after start time" });
       }
     }
 
@@ -40,6 +55,7 @@ module.exports.createLiveContent = async (req, res) => {
       name,
       content_type: content_type || "website",
       url,
+      channel_id: channel_id || null,
       duration: duration || 0,
       start_time: start_time || null,
       end_time: end_time || null,
@@ -47,8 +63,15 @@ module.exports.createLiveContent = async (req, res) => {
       status: "active",
     });
 
-    logger.logInfo("Live content created", { live_content_id: liveContent.live_content_id });
-    return res.status(201).json({ message: "Live content created successfully", data: liveContent });
+    logger.logInfo("Live content created", {
+      live_content_id: liveContent.live_content_id,
+    });
+    return res
+      .status(201)
+      .json({
+        message: "Live content created successfully",
+        data: liveContent,
+      });
   } catch (error) {
     logger.logError("Error creating live content", error);
     return res.status(500).json({ error: "Internal Server Error" });
@@ -68,7 +91,18 @@ module.exports.getAllLiveContent = async (req, res) => {
 
     const liveContents = await LiveContent.findAll({
       where: whereClause,
-      include: [{ model: Client, attributes: ["name"] }],
+      include: [{ model: Client, attributes: ["name"] }, {
+          model: StreamChannel,
+          as: "channel",
+          required: false, // 🔥 VERY IMPORTANT (LEFT JOIN)
+          attributes: [
+            "channel_id",
+            "name",
+            "status",
+            "playback_url",
+            "provider_id",
+          ]
+        },],
       order: [["created_at", "DESC"]],
     });
 
@@ -98,7 +132,9 @@ module.exports.getLiveContentById = async (req, res) => {
 
     return res.json({ data: liveContent });
   } catch (error) {
-    logger.logError("Error fetching live content", error, { live_content_id: req.params.id });
+    logger.logError("Error fetching live content", error, {
+      live_content_id: req.params.id,
+    });
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
@@ -107,7 +143,17 @@ module.exports.getLiveContentById = async (req, res) => {
 module.exports.updateLiveContent = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, content_type, url, duration, start_time, end_time, config, status } = req.body;
+    const {
+      name,
+      content_type,
+      url,
+      duration,
+      start_time,
+      end_time,
+      config,
+      status,
+      channel_id
+    } = req.body;
 
     if (!id) {
       return res.status(400).json({ error: "Live content ID is required" });
@@ -121,14 +167,21 @@ module.exports.updateLiveContent = async (req, res) => {
       return res.status(404).json({ error: "Live content not found" });
     }
 
+    if(liveContent.content_type !== "provider" && content_type === "provider" && !channel_id){
+       return res.status(400).json({ error: "channel_id is required" });
+    }
+
     // Validate start_time and end_time if both provided
-    const newStartTime = start_time !== undefined ? start_time : liveContent.start_time;
+    const newStartTime =
+      start_time !== undefined ? start_time : liveContent.start_time;
     const newEndTime = end_time !== undefined ? end_time : liveContent.end_time;
     if (newStartTime && newEndTime) {
       const startDate = new Date(newStartTime);
       const endDate = new Date(newEndTime);
       if (endDate <= startDate) {
-        return res.status(400).json({ error: "End time must be after start time" });
+        return res
+          .status(400)
+          .json({ error: "End time must be after start time" });
       }
     }
 
@@ -137,16 +190,23 @@ module.exports.updateLiveContent = async (req, res) => {
       content_type: content_type || liveContent.content_type,
       url: url || liveContent.url,
       duration: duration !== undefined ? duration : liveContent.duration,
-      start_time: start_time !== undefined ? start_time : liveContent.start_time,
+      start_time:
+        start_time !== undefined ? start_time : liveContent.start_time,
       end_time: end_time !== undefined ? end_time : liveContent.end_time,
       config: config !== undefined ? config : liveContent.config,
       status: status || liveContent.status,
+      channel_id:channel_id || liveContent.channel_id
     });
 
     logger.logInfo("Live content updated", { live_content_id: id });
-    return res.json({ message: "Live content updated successfully", data: liveContent });
+    return res.json({
+      message: "Live content updated successfully",
+      data: liveContent,
+    });
   } catch (error) {
-    logger.logError("Error updating live content", error, { live_content_id: req.params.id });
+    logger.logError("Error updating live content", error, {
+      live_content_id: req.params.id,
+    });
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
@@ -173,8 +233,11 @@ module.exports.deleteLiveContent = async (req, res) => {
     logger.logInfo("Live content deleted", { live_content_id: id });
     return res.json({ message: "Live content deleted successfully" });
   } catch (error) {
-    logger.logError("Error deleting live content", error, { live_content_id: req.params.id });
+    logger.logError("Error deleting live content", error, {
+      live_content_id: req.params.id,
+    });
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
 
