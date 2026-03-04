@@ -1,6 +1,13 @@
 const axios = require("axios");
-const { StreamChannel, StreamingProvider } = require("../models");
+const {
+  StreamChannel,
+  StreamingProvider,
+  LiveContent,
+  Schedule,
+} = require("../models");
 const logger = require("../utils/logger");
+const { Op } = require("sequelize");
+const { pushToGroupQueue } = require("./queueController");
 
 async function getProvider() {
   return await StreamingProvider.findOne({
@@ -47,7 +54,7 @@ module.exports.createStreamChannel = async (req, res) => {
         headers: {
           "X-Api-Key": api_key,
           "Content-Type": "application/json",
-           "X-Format": "default",
+          "X-Format": "default",
         },
       },
     );
@@ -214,6 +221,13 @@ module.exports.startStreamChannel = async (req, res) => {
   try {
     const { id } = req.params;
     const client_id = req.user?.client_id;
+    const now = new Date();
+
+    const startOfDay = new Date(now);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(now);
+    endOfDay.setHours(23, 59, 59, 999);
 
     const channel = await StreamChannel.findOne({
       where: { channel_id: id, client_id },
@@ -221,6 +235,40 @@ module.exports.startStreamChannel = async (req, res) => {
 
     if (!channel) return res.status(404).json({ error: "Channel not found" });
 
+    // 🔥 1️⃣ Find LiveContents using this channel
+    const liveContents = await LiveContent.findAll({
+      where: {
+        channel_id: channel.channel_id,
+        isDeleted: false,
+      },
+      attributes: ["live_content_id"],
+    });
+
+    const liveContentIds = liveContents.map((lc) => lc.live_content_id);
+
+    let groupIds = [];
+
+    if (liveContentIds.length > 0) {
+      // 🔥 2️⃣ Find active schedules
+      const schedules = await Schedule.findAll({
+        where: {
+          content_type: "live_content",
+          content_id: { [Op.in]: liveContentIds },
+
+          // 🔥 Only schedules that overlap TODAY
+          start_time: { [Op.lte]: endOfDay },
+          end_time: { [Op.gte]: startOfDay },
+        },
+        attributes: ["group_id"],
+      });
+
+      groupIds = [...new Set(schedules.map((s) => s.group_id))];
+    }
+
+    console.log("groupIds,", groupIds)
+     
+
+    
     const provider = await getProvider();
     if (!provider)
       return res
@@ -238,6 +286,8 @@ module.exports.startStreamChannel = async (req, res) => {
     // ⚠️ Do NOT set status to live immediately.
     // Let webhook confirm actual stream start.
     await channel.update({ status: "live" });
+
+     await pushToGroupQueue(groupIds);
 
     return res.json({ message: "Channel set to online (waiting for stream)" });
   } catch (error) {
@@ -261,11 +311,51 @@ module.exports.stopStreamChannel = async (req, res) => {
     const { id } = req.params;
     const client_id = req.user?.client_id;
 
+     const now = new Date();
+
+    const startOfDay = new Date(now);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(now);
+    endOfDay.setHours(23, 59, 59, 999);
+
     const channel = await StreamChannel.findOne({
       where: { channel_id: id, client_id },
     });
 
     if (!channel) return res.status(404).json({ error: "Channel not found" });
+
+      // 🔥 1️⃣ Find LiveContents using this channel
+    const liveContents = await LiveContent.findAll({
+      where: {
+        channel_id: channel.channel_id,
+        isDeleted: false,
+      },
+      attributes: ["live_content_id"],
+    });
+
+    const liveContentIds = liveContents.map((lc) => lc.live_content_id);
+
+    let groupIds = [];
+
+    if (liveContentIds.length > 0) {
+      // 🔥 2️⃣ Find active schedules
+      const schedules = await Schedule.findAll({
+        where: {
+          content_type: "live_content",
+          content_id: { [Op.in]: liveContentIds },
+
+          // 🔥 Only schedules that overlap TODAY
+          start_time: { [Op.lte]: endOfDay },
+          end_time: { [Op.gte]: startOfDay },
+        },
+        attributes: ["group_id"],
+      });
+
+      groupIds = [...new Set(schedules.map((s) => s.group_id))];
+    }
+
+    console.log("groupIds,", groupIds)
 
     const provider = await getProvider();
     if (!provider)
@@ -282,6 +372,8 @@ module.exports.stopStreamChannel = async (req, res) => {
     );
 
     await channel.update({ status: "stopped" });
+
+    await pushToGroupQueue(groupIds);
 
     return res.json({ message: "Channel stopping..." });
   } catch (error) {
@@ -379,45 +471,42 @@ module.exports.syncDacastChannels = async (req, res) => {
           per_page,
         },
       });
-    
 
       const channels = response.data?.data || [];
-
-
 
       if (!channels.length) {
         hasMore = false;
         break;
       }
 
-     for (const item of channels) {
-  const existing = await StreamChannel.findOne({
-    where: {
-      external_channel_id: item.id,
-      client_id,
-    },
-  });
+      for (const item of channels) {
+        const existing = await StreamChannel.findOne({
+          where: {
+            external_channel_id: item.id,
+            client_id,
+          },
+        });
 
-  const mappedData = {
-    provider_id: provider.provider_id,
-    client_id,
-    external_channel_id: item.id,
-    name: item.title,
-    ingest_url: item.config?.publishing_point_primary || null,
-    stream_key: item.config?.stream_name || null,
-    // playback_url: item.hls || null,
-    status: item.online ? "live" : "idle",
-    metadata: item,
-  };
+        const mappedData = {
+          provider_id: provider.provider_id,
+          client_id,
+          external_channel_id: item.id,
+          name: item.title,
+          ingest_url: item.config?.publishing_point_primary || null,
+          stream_key: item.config?.stream_name || null,
+          // playback_url: item.hls || null,
+          status: item.online ? "live" : "idle",
+          metadata: item,
+        };
 
-  if (!existing) {
-    await StreamChannel.create(mappedData);
-    createdCount++;
-  } else {
-    await existing.update(mappedData);
-    updatedCount++;
-  }
-}
+        if (!existing) {
+          await StreamChannel.create(mappedData);
+          createdCount++;
+        } else {
+          await existing.update(mappedData);
+          updatedCount++;
+        }
+      }
 
       page++;
     }
