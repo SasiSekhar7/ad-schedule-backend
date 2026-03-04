@@ -284,8 +284,7 @@ module.exports.changeFile = async (req, res) => {
       );
 
       // 2️⃣ Trigger the Lambda after successful upload
-      // 2️⃣ Trigger the Lambda after successful upload
-      // 2️⃣ Trigger the Lambda after successful upload
+
       const payload = {
         s3Key: file_url,
         ad_id: ad_id,
@@ -398,7 +397,8 @@ module.exports.changePlaceholder = async (req, res) => {
 module.exports.addAd = async (req, res) => {
   let fileBuffer;
   try {
-    let { client_id, name, duration, file_url, isMultipartUpload } = req.body;
+    let { client_id, name, duration, file_url, isMultipartUpload, fileSize } =
+      req.body;
 
     logger.logDebug("Add ad request", {
       client_id,
@@ -436,6 +436,7 @@ module.exports.addAd = async (req, res) => {
         client_id,
         name,
         url: file_url,
+        fileSize,
         duration,
         status: "processing",
       });
@@ -461,6 +462,7 @@ module.exports.addAd = async (req, res) => {
         client_id,
         name,
         url: file_url,
+        fileSize,
         duration,
         status: "processing",
       });

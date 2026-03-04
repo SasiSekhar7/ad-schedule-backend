@@ -1,9 +1,11 @@
 const cron = require("node-cron");
-const { DeviceGroup } = require("../models");
+const { DeviceGroup, DailyReport, Client } = require("../models");
 const { pushToGroupQueue } = require("../controllers/queueController");
 const { updateUpcomingMatches } = require("../controllers/cricketController");
 const logger = require("../utils/logger");
 const { checkClientExpiry } = require("../services/subscriptionService");
+
+const { generateDailyReport } = require("../services/reportGenerator");
 
 // Function to be executed at 6 AM daily
 async function dailySchedulePush() {
@@ -87,3 +89,45 @@ cron.schedule(
     timezone: "Asia/Kolkata",
   },
 );
+
+cron.schedule("11 10 * * *", async () => {
+  //   console.log("Running daily JSON report cron 👉 every day at 3:30 PM...");
+  //   });
+
+  // cron.schedule("0 1 * * *", async () => {
+  console.log("Running Daily Report Cron...");
+
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+
+  const startDate = new Date(yesterday.setHours(0, 0, 0, 0));
+  const endDate = new Date(yesterday.setHours(23, 59, 59, 999));
+
+  try {
+    // GLOBAL REPORT
+    await generateDailyReport({
+      startDate,
+      endDate,
+      client_id: null,
+    });
+
+    // CLIENT REPORTS
+    const clients = await Client.findAll({
+      attributes: ["client_id"],
+      raw: true,
+    });
+
+    for (const client of clients) {
+      await generateDailyReport({
+        startDate,
+        endDate,
+        client_id: client.client_id,
+      });
+    }
+
+    console.log("Daily Reports Generated Successfully");
+  } catch (error) {
+    console.error("Cron Error:", error);
+  }
+});
