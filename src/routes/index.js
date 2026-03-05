@@ -133,6 +133,7 @@ const { dacastWebhook } = require("../controllers/webhookController");
 const { syncChannelAnalytics } = require("../controllers/analyticsController");
 const { deleteStreamChannel, stopStreamChannel, startStreamChannel, updateStreamChannel, createStreamChannel, getStreamChannelById, getAllStreamChannels, syncDacastChannels } = require("../controllers/streamChannelController");
 const { createStreamingProvider, getStreamingProviders, updateStreamingProvider, deleteStreamingProvider } = require("../controllers/streamingProviderController");
+const { startStream, streamChunk, stopStream } = require("../mediaStream/streamController");
 
 router.post("/device/register", registerDevice); // takes group id and location input
 
@@ -497,6 +498,10 @@ router.post("/webhooks/dacast", dacastWebhook);
 
 
 
+
+router.post("/start-stream", startStream);
+router.post("/stream", streamChunk);
+router.post("/stop-stream", stopStream);
 
 
 
