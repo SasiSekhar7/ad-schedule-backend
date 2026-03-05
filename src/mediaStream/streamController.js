@@ -1,13 +1,10 @@
 const { spawn } = require("child_process");
 
 const RTMP_URL = "rtmp://rtmp.us.live.dacast.com/live";
-const STREAM_KEY = "oiUaOZwOFuncQfBc"; // your dacast key
+const STREAM_KEY = "oiUaOZwOFuncQfBc";
 
 let ffmpegProcess = null;
 
-/**
- * Start Stream
- */
 exports.startStream = async (req, res) => {
   try {
     if (ffmpegProcess) {
@@ -15,13 +12,23 @@ exports.startStream = async (req, res) => {
     }
 
     ffmpegProcess = spawn("ffmpeg", [
-      "-i", "pipe:0",
-      "-c:v", "libx264",
-      "-preset", "veryfast",
-      "-tune", "zerolatency",
-      "-c:a", "aac",
-      "-ar", "44100",
-      "-f", "flv",
+      "-i",
+      "pipe:0",
+
+      "-c:v",
+      "libx264",
+      "-preset",
+      "veryfast",
+      "-tune",
+      "zerolatency",
+
+      "-c:a",
+      "aac",
+      "-ar",
+      "44100",
+
+      "-f",
+      "flv",
       `${RTMP_URL}/${STREAM_KEY}`,
     ]);
 
@@ -34,32 +41,24 @@ exports.startStream = async (req, res) => {
       ffmpegProcess = null;
     });
 
-    return res.json({ message: "Streaming started" });
+    res.json({ message: "Streaming started" });
   } catch (err) {
-    return res.status(500).json({ error: "Failed to start stream" });
+    res.status(500).json({ error: "Failed to start stream" });
   }
 };
 
-/**
- * Receive video chunks from browser
- */
 exports.streamChunk = (req, res) => {
   if (!ffmpegProcess) {
     return res.status(400).send("Stream not started");
   }
 
-  req.on("data", (chunk) => {
-    ffmpegProcess.stdin.write(chunk);
-  });
+  req.pipe(ffmpegProcess.stdin);
 
   req.on("end", () => {
     res.end();
   });
 };
 
-/**
- * Stop Stream
- */
 exports.stopStream = async (req, res) => {
   try {
     if (ffmpegProcess) {
@@ -68,8 +67,8 @@ exports.stopStream = async (req, res) => {
       ffmpegProcess = null;
     }
 
-    return res.json({ message: "Stream stopped" });
+    res.json({ message: "Stream stopped" });
   } catch (err) {
-    return res.status(500).json({ error: "Failed to stop stream" });
+    res.status(500).json({ error: "Failed to stop stream" });
   }
 };
