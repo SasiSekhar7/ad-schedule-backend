@@ -834,7 +834,6 @@ const StreamChannel = sequelize.define(
   },
 );
 
-
 LiveContent.belongsTo(StreamChannel, {
   foreignKey: "channel_id",
   targetKey: "channel_id",
@@ -896,6 +895,12 @@ ScrollText.belongsTo(DeviceGroup, { foreignKey: "group_id" });
 Schedule.hasOne(AdPlayback, { foreignKey: "schedule_id" });
 User.belongsTo(Client, { foreignKey: "client_id" });
 Client.hasMany(User, { foreignKey: "client_id" });
+
+Schedule.belongsTo(Ad, {
+  foreignKey: "content_id",
+  targetKey: "ad_id",
+  constraints: false,
+});
 
 Device.hasMany(ProofOfPlayLog, { foreignKey: "device_id" });
 Device.hasMany(DeviceTelemetryLog, { foreignKey: "device_id" });
