@@ -12,6 +12,8 @@ const {
   DailyReport,
   ReportEvent,
   ReportOutlier,
+  DailyAdPerformance,
+  DailyGroupPerformance,
 } = require("../models"); // Adjust path
 const moment = require("moment");
 const logger = require("../utils/logger");
@@ -93,6 +95,136 @@ const getGroupTableOrder = (sortBy, sortOrder = "DESC") => {
 // --- Controller Methods ---
 
 // GET /api/dashboard/performance/ads/table
+// exports.getAdPerformanceTable = asyncHandler(async (req, res) => {
+//   const {
+//     startDate: startDateStr,
+//     endDate: endDateStr,
+//     page = 1,
+//     pageSize = 10,
+//     sortBy,
+//     sortOrder,
+//     search,
+//   } = req.query;
+//   const { role, client_id } = req.user;
+
+//   try {
+//     const { startDate, endDate } = validateDateRange(startDateStr, endDateStr);
+//     const { limit, offset, pageNum, pageSizeNum } = getPagination(
+//       page,
+//       pageSize,
+//     );
+//     const order = getAdTableOrder(sortBy, sortOrder);
+
+//     // Base Where Clause for DailyImpressionSummary
+//     const summaryWhere = {
+//       summary_date: { [Op.between]: [startDate, endDate] },
+//     };
+//     if (role === "Client") {
+//       summaryWhere.client_id = client_id;
+//     }
+
+//     // Where Clause for included Ad model (for search)
+//     const adWhere = {};
+//     if (search) {
+//       adWhere.name = { [Op.like]: `%${search}%` };
+//     }
+
+//     // const { count, rows } = await DailyImpressionSummary.findAndCountAll({
+//     //   attributes: [
+//     //     // Important: Group by Ad attributes, select them via the 'Ad' alias
+//     //     [col("Ad.ad_id"), "adId"], // Get adId from the Ad model
+//     //     [col("Ad.name"), "name"],
+//     //     [col("Ad.duration"), "duration"],
+//     //     // Aggregations from DailyImpressionSummary
+//     //     [fn("SUM", col("DailyImpressionSummary.impressions")), "impressions"],
+//     //     [
+//     //       fn("COUNT", fn("DISTINCT", col("DailyImpressionSummary.group_id"))),
+//     //       "groupsScheduled",
+//     //     ],
+//     //   ],
+//     //   include: [
+//     //     {
+//     //       model: Ad,
+//     //       as: "Ad", // *** Crucial: Must match the alias in your association definition ***
+//     //       attributes: [], // Select Ad attributes in the main attributes array above
+//     //       where: adWhere,
+//     //       required: true, // INNER JOIN to filter by ad name search
+//     //     },
+//     //   ],
+//     //   where: summaryWhere,
+//     //   group: [
+//     //     // Group by the Ad attributes we are selecting/joining on
+//     //     col("Ad.ad_id"),
+//     //     col("Ad.name"),
+//     //     col("Ad.duration"),
+//     //   ],
+//     //   order: order,
+//     //   limit: limit,
+//     //   offset: offset,
+//     //   subQuery: false, // Often needed with limit/offset when including and grouping
+//     // });
+
+//     const { count, rows } = await ProofOfPlayLog.findAndCountAll({
+//       attributes: [
+//         [col("Ad.ad_id"), "adId"],
+//         [col("Ad.name"), "name"],
+//         [col("Ad.duration"), "duration"],
+
+//         [fn("COUNT", col("ProofOfPlayLog.id")), "impressions"],
+
+//         [
+//           fn("COUNT", fn("DISTINCT", col("Device.group_id"))),
+//           "groupsScheduled",
+//         ],
+//       ],
+
+//       include: [
+//         {
+//           model: Ad,
+//           as: "Ad",
+//           attributes: [],
+//           where: adWhere,
+//           required: true,
+//         },
+//         {
+//           model: Device,
+//           attributes: [],
+//           required: true,
+//         },
+//       ],
+
+//       where: {
+//         start_time: { [Op.between]: [startDate, endDate] },
+//       },
+
+//       group: [col("Ad.ad_id"), col("Ad.name"), col("Ad.duration")],
+
+//       order,
+//       limit,
+//       offset,
+//       subQuery: false,
+//     });
+//     const totalItems = count.length; // findAndCountAll with group returns array of counts, length is total unique groups
+//     const totalPages = Math.ceil(totalItems / limit);
+
+//     res.status(200).json({
+//       data: rows.map((row) => row.get({ plain: true })), // Convert Sequelize instances to plain objects
+//       pagination: {
+//         currentPage: pageNum,
+//         pageSize: pageSizeNum,
+//         totalItems: totalItems,
+//         totalPages: totalPages,
+//       },
+//     });
+//   } catch (error) {
+//     logger.logError("Error fetching ads table", error);
+//     // Return specific validation errors or a generic server error
+//     res
+//       .status(error.message.startsWith("Invalid") ? 400 : 500)
+//       .json({ message: error.message || "Internal server error" });
+//   }
+// });
+
 exports.getAdPerformanceTable = asyncHandler(async (req, res) => {
   const {
     startDate: startDateStr,
@@ -103,127 +235,211 @@ exports.getAdPerformanceTable = asyncHandler(async (req, res) => {
     sortOrder,
     search,
   } = req.query;
+
   const { role, client_id } = req.user;
 
   try {
     const { startDate, endDate } = validateDateRange(startDateStr, endDateStr);
+
     const { limit, offset, pageNum, pageSizeNum } = getPagination(
       page,
       pageSize,
     );
+
     const order = getAdTableOrder(sortBy, sortOrder);
 
-    // Base Where Clause for DailyImpressionSummary
-    const summaryWhere = {
-      summary_date: { [Op.between]: [startDate, endDate] },
-    };
-    if (role === "Client") {
-      summaryWhere.client_id = client_id;
-    }
-
-    // Where Clause for included Ad model (for search)
-    const adWhere = {};
-    if (search) {
-      adWhere.name = { [Op.like]: `%${search}%` };
-    }
-
-    // const { count, rows } = await DailyImpressionSummary.findAndCountAll({
-    //   attributes: [
-    //     // Important: Group by Ad attributes, select them via the 'Ad' alias
-    //     [col("Ad.ad_id"), "adId"], // Get adId from the Ad model
-    //     [col("Ad.name"), "name"],
-    //     [col("Ad.duration"), "duration"],
-    //     // Aggregations from DailyImpressionSummary
-    //     [fn("SUM", col("DailyImpressionSummary.impressions")), "impressions"],
-    //     [
-    //       fn("COUNT", fn("DISTINCT", col("DailyImpressionSummary.group_id"))),
-    //       "groupsScheduled",
-    //     ],
-    //   ],
-    //   include: [
-    //     {
-    //       model: Ad,
-    //       as: "Ad", // *** Crucial: Must match the alias in your association definition ***
-    //       attributes: [], // Select Ad attributes in the main attributes array above
-    //       where: adWhere,
-    //       required: true, // INNER JOIN to filter by ad name search
-    //     },
-    //   ],
-    //   where: summaryWhere,
-    //   group: [
-    //     // Group by the Ad attributes we are selecting/joining on
-    //     col("Ad.ad_id"),
-    //     col("Ad.name"),
-    //     col("Ad.duration"),
-    //   ],
-    //   order: order,
-    //   limit: limit,
-    //   offset: offset,
-    //   subQuery: false, // Often needed with limit/offset when including and grouping
-    // });
-
-    const { count, rows } = await ProofOfPlayLog.findAndCountAll({
-      attributes: [
-        [col("Ad.ad_id"), "adId"],
-        [col("Ad.name"), "name"],
-        [col("Ad.duration"), "duration"],
-
-        [fn("COUNT", col("ProofOfPlayLog.id")), "impressions"],
-
-        [
-          fn("COUNT", fn("DISTINCT", col("Device.group_id"))),
-          "groupsScheduled",
-        ],
-      ],
-
-      include: [
-        {
-          model: Ad,
-          as: "Ad",
-          attributes: [],
-          where: adWhere,
-          required: true,
-        },
-        {
-          model: Device,
-          attributes: [],
-          required: true,
-        },
-      ],
-
-      where: {
-        start_time: { [Op.between]: [startDate, endDate] },
+    const whereClause = {
+      summary_date: {
+        [Op.between]: [startDate, endDate],
       },
+    };
 
-      group: [col("Ad.ad_id"), col("Ad.name"), col("Ad.duration")],
+    // CLIENT FILTER
+    if (role === "Client") {
+      whereClause.client_id = client_id;
+    }
 
+    // SEARCH
+    if (search) {
+      whereClause.ad_name = {
+        [Op.like]: `%${search}%`,
+      };
+    }
+
+    const { count, rows } = await DailyAdPerformance.findAndCountAll({
+      attributes: [
+        ["ad_id", "adId"],
+        ["ad_name", "name"],
+        "duration",
+        "impressions",
+        ["groups_scheduled", "groupsScheduled"],
+      ],
+
+      where: whereClause,
       order,
       limit,
       offset,
-      subQuery: false,
     });
-    const totalItems = count.length; // findAndCountAll with group returns array of counts, length is total unique groups
+
+    const totalItems = count;
     const totalPages = Math.ceil(totalItems / limit);
 
     res.status(200).json({
-      data: rows.map((row) => row.get({ plain: true })), // Convert Sequelize instances to plain objects
+      data: rows.map((row) => row.get({ plain: true })),
       pagination: {
         currentPage: pageNum,
         pageSize: pageSizeNum,
-        totalItems: totalItems,
-        totalPages: totalPages,
+        totalItems,
+        totalPages,
       },
     });
   } catch (error) {
     logger.logError("Error fetching ads table", error);
-    // Return specific validation errors or a generic server error
-    res
-      .status(error.message.startsWith("Invalid") ? 400 : 500)
-      .json({ message: error.message || "Internal server error" });
+
+    res.status(500).json({
+      message: error.message || "Internal server error",
+    });
   }
 });
 
 // GET /api/dashboard/performance/groups/table
+// exports.getGroupPerformanceTable = asyncHandler(async (req, res) => {
+//   const {
+//     startDate: startDateStr,
+//     endDate: endDateStr,
+//     page = 1,
+//     pageSize = 10,
+//     sortBy,
+//     sortOrder,
+//     search,
+//   } = req.query;
+//   const { role, client_id } = req.user;
+
+//   try {
+//     const { startDate, endDate } = validateDateRange(startDateStr, endDateStr);
+//     const { limit, offset, pageNum, pageSizeNum } = getPagination(
+//       page,
+//       pageSize,
+//     );
+//     const order = getGroupTableOrder(sortBy, sortOrder);
+
+//     const summaryWhere = {
+//       summary_date: { [Op.between]: [startDate, endDate] },
+//     };
+//     if (role === "Client") {
+//       summaryWhere.client_id = client_id;
+//     }
+
+//     const groupWhere = {};
+//     if (search) {
+//       groupWhere.name = { [Op.like]: `%${search}%` };
+//     }
+
+//     // const { count, rows } = await DailyImpressionSummary.findAndCountAll({
+//     //   attributes: [
+//     //     [col("DeviceGroup.group_id"), "groupId"],
+//     //     [col("DeviceGroup.name"), "name"],
+//     //     [col("DeviceGroup.last_pushed"), "lastPushed"],
+//     //     [fn("SUM", col("DailyImpressionSummary.impressions")), "impressions"],
+//     //     // Count distinct devices associated with the group via the include
+//     //     [
+//     //       fn("COUNT", fn("DISTINCT", col("DeviceGroup.Devices.device_id"))),
+//     //       "deviceCount",
+//     //     ],
+//     //   ],
+//     //   include: [
+//     //     {
+//     //       model: DeviceGroup,
+//     //       as: "DeviceGroup", // *** Crucial: Match association alias ***
+//     //       attributes: [], // Select group attributes in the main attributes list
+//     //       where: groupWhere,
+//     //       required: true, // INNER JOIN
+//     //       include: [
+//     //         {
+//     //           // Include Devices THROUGH DeviceGroup to count them
+//     //           model: Device,
+//     //           as: "Devices", // *** Crucial: Match association alias ***
+//     //           attributes: [], // No need to select device attributes, just counting
+//     //           required: false, // LEFT JOIN - count groups even if they have 0 devices? Or true for INNER? Let's use false for now.
+//     //         },
+//     //       ],
+//     //     },
+//     //   ],
+//     //   where: summaryWhere,
+//     //   group: [
+//     //     col("DeviceGroup.group_id"),
+//     //     col("DeviceGroup.name"),
+//     //     col("DeviceGroup.last_pushed"),
+//     //   ],
+//     //   order: order,
+//     //   limit: limit,
+//     //   offset: offset,
+//     //   subQuery: false, // Important for aggregations + limit with includes
+//     // });
+
+//     const { count, rows } = await ProofOfPlayLog.findAndCountAll({
+//       attributes: [
+//         [col("Device.DeviceGroup.group_id"), "groupId"],
+//         [col("Device.DeviceGroup.name"), "name"],
+//         [col("Device.DeviceGroup.last_pushed"), "lastPushed"],
+
+//         [fn("COUNT", col("ProofOfPlayLog.id")), "impressions"],
+
+//         [fn("COUNT", fn("DISTINCT", col("Device.device_id"))), "deviceCount"],
+//       ],
+
+//       include: [
+//         {
+//           model: Device,
+//           attributes: [],
+//           required: true,
+//           include: [
+//             {
+//               model: DeviceGroup,
+//               as: "DeviceGroup",
+//               attributes: [],
+//               where: groupWhere,
+//               required: true,
+//             },
+//           ],
+//         },
+//       ],
+
+//       where: {
+//         start_time: { [Op.between]: [startDate, endDate] },
+//       },
+
+//       group: [
+//         col("Device.DeviceGroup.group_id"),
+//         col("Device.DeviceGroup.name"),
+//         col("Device.DeviceGroup.last_pushed"),
+//       ],
+
+//       order,
+//       limit,
+//       offset,
+//       subQuery: false,
+//     });
+//     const totalItems = count.length; // findAndCountAll with group returns array
+//     const totalPages = Math.ceil(totalItems / limit);
+
+//     res.status(200).json({
+//       data: rows.map((row) => row.get({ plain: true })),
+//       pagination: {
+//         currentPage: pageNum,
+//         pageSize: pageSizeNum,
+//         totalItems: totalItems,
+//         totalPages: totalPages,
+//       },
+//     });
+//   } catch (error) {
+//     logger.logError("Error fetching groups table", error);
+//     res
+//       .status(error.message.startsWith("Invalid") ? 400 : 500)
+//       .json({ message: error.message || "Internal server error" });
+//   }
+// });
+
 exports.getGroupPerformanceTable = asyncHandler(async (req, res) => {
   const {
     startDate: startDateStr,
@@ -234,114 +450,53 @@ exports.getGroupPerformanceTable = asyncHandler(async (req, res) => {
     sortOrder,
     search,
   } = req.query;
+
   const { role, client_id } = req.user;
 
   try {
     const { startDate, endDate } = validateDateRange(startDateStr, endDateStr);
+
     const { limit, offset, pageNum, pageSizeNum } = getPagination(
       page,
       pageSize,
     );
+
     const order = getGroupTableOrder(sortBy, sortOrder);
 
-    const summaryWhere = {
-      summary_date: { [Op.between]: [startDate, endDate] },
-    };
-    if (role === "Client") {
-      summaryWhere.client_id = client_id;
-    }
-
-    const groupWhere = {};
-    if (search) {
-      groupWhere.name = { [Op.like]: `%${search}%` };
-    }
-
-    // const { count, rows } = await DailyImpressionSummary.findAndCountAll({
-    //   attributes: [
-    //     [col("DeviceGroup.group_id"), "groupId"],
-    //     [col("DeviceGroup.name"), "name"],
-    //     [col("DeviceGroup.last_pushed"), "lastPushed"],
-    //     [fn("SUM", col("DailyImpressionSummary.impressions")), "impressions"],
-    //     // Count distinct devices associated with the group via the include
-    //     [
-    //       fn("COUNT", fn("DISTINCT", col("DeviceGroup.Devices.device_id"))),
-    //       "deviceCount",
-    //     ],
-    //   ],
-    //   include: [
-    //     {
-    //       model: DeviceGroup,
-    //       as: "DeviceGroup", // *** Crucial: Match association alias ***
-    //       attributes: [], // Select group attributes in the main attributes list
-    //       where: groupWhere,
-    //       required: true, // INNER JOIN
-    //       include: [
-    //         {
-    //           // Include Devices THROUGH DeviceGroup to count them
-    //           model: Device,
-    //           as: "Devices", // *** Crucial: Match association alias ***
-    //           attributes: [], // No need to select device attributes, just counting
-    //           required: false, // LEFT JOIN - count groups even if they have 0 devices? Or true for INNER? Let's use false for now.
-    //         },
-    //       ],
-    //     },
-    //   ],
-    //   where: summaryWhere,
-    //   group: [
-    //     col("DeviceGroup.group_id"),
-    //     col("DeviceGroup.name"),
-    //     col("DeviceGroup.last_pushed"),
-    //   ],
-    //   order: order,
-    //   limit: limit,
-    //   offset: offset,
-    //   subQuery: false, // Important for aggregations + limit with includes
-    // });
-
-    const { count, rows } = await ProofOfPlayLog.findAndCountAll({
-      attributes: [
-        [col("Device.DeviceGroup.group_id"), "groupId"],
-        [col("Device.DeviceGroup.name"), "name"],
-        [col("Device.DeviceGroup.last_pushed"), "lastPushed"],
-
-        [fn("COUNT", col("ProofOfPlayLog.id")), "impressions"],
-
-        [fn("COUNT", fn("DISTINCT", col("Device.device_id"))), "deviceCount"],
-      ],
-
-      include: [
-        {
-          model: Device,
-          attributes: [],
-          required: true,
-          include: [
-            {
-              model: DeviceGroup,
-              as: "DeviceGroup",
-              attributes: [],
-              where: groupWhere,
-              required: true,
-            },
-          ],
-        },
-      ],
-
-      where: {
-        start_time: { [Op.between]: [startDate, endDate] },
+    const whereClause = {
+      summary_date: {
+        [Op.between]: [startDate, endDate],
       },
+    };
 
-      group: [
-        col("Device.DeviceGroup.group_id"),
-        col("Device.DeviceGroup.name"),
-        col("Device.DeviceGroup.last_pushed"),
+    // CLIENT FILTER
+    if (role === "Client") {
+      whereClause.client_id = client_id;
+    }
+
+    // SEARCH
+    if (search) {
+      whereClause.group_name = {
+        [Op.like]: `%${search}%`,
+      };
+    }
+
+    const { count, rows } = await DailyGroupPerformance.findAndCountAll({
+      attributes: [
+        ["group_id", "groupId"],
+        ["group_name", "name"],
+        ["last_pushed", "lastPushed"],
+        "impressions",
+        ["device_count", "deviceCount"],
       ],
 
+      where: whereClause,
       order,
       limit,
       offset,
-      subQuery: false,
     });
-    const totalItems = count.length; // findAndCountAll with group returns array
+
+    const totalItems = count;
     const totalPages = Math.ceil(totalItems / limit);
 
     res.status(200).json({
@@ -349,15 +504,16 @@ exports.getGroupPerformanceTable = asyncHandler(async (req, res) => {
       pagination: {
         currentPage: pageNum,
         pageSize: pageSizeNum,
-        totalItems: totalItems,
-        totalPages: totalPages,
+        totalItems,
+        totalPages,
       },
     });
   } catch (error) {
     logger.logError("Error fetching groups table", error);
-    res
-      .status(error.message.startsWith("Invalid") ? 400 : 500)
-      .json({ message: error.message || "Internal server error" });
+
+    res.status(500).json({
+      message: error.message || "Internal server error",
+    });
   }
 });
 

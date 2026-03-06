@@ -7,25 +7,25 @@ require("dotenv").config(); // Load environment variables from .env
 //     storage: path.resolve(__dirname,'backend_service.db')
 // }
 
-const config = {
-  dialect: process.env.DB_DIALECT || "postgres",
-  host: process.env.DB_HOST || "localhost",
-  port: process.env.DB_PORT || 5432,
-  username: process.env.DB_USER || "adupuser",
-  password: process.env.DB_PASSWORD || "Birla@1122",
-  database: process.env.DB_NAME || "testdb",
-  logging: false, // optional
-};
-
 // const config = {
 //   dialect: process.env.DB_DIALECT || "postgres",
 //   host: process.env.DB_HOST || "localhost",
 //   port: process.env.DB_PORT || 5432,
-//   username: process.env.DB_USER || "postgres",
-//   password: process.env.DB_PASSWORD || "root",
-//   database: process.env.DB_NAME || "consoledb",
+//   username: process.env.DB_USER || "adupuser",
+//   password: process.env.DB_PASSWORD || "Birla@1122",
+//   database: process.env.DB_NAME || "testdb",
 //   logging: false, // optional
 // };
+
+const config = {
+  dialect: process.env.DB_DIALECT || "postgres",
+  host: process.env.DB_HOST || "localhost",
+  port: process.env.DB_PORT || 5432,
+  username: process.env.DB_USER || "postgres",
+  password: process.env.DB_PASSWORD || "root",
+  database: process.env.DB_NAME || "consoledb",
+  logging: false, // optional
+};
 
 console.log("Database configuration:", config);
 

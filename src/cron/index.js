@@ -4,6 +4,9 @@ const { pushToGroupQueue } = require("../controllers/queueController");
 const { updateUpcomingMatches } = require("../controllers/cricketController");
 const logger = require("../utils/logger");
 const { checkClientExpiry } = require("../services/subscriptionService");
+const {
+  generateDailyPerformanceReports,
+} = require("../services/generatePerformanceSummary");
 
 const { generateDailyReport } = require("../services/reportGenerator");
 
@@ -130,4 +133,8 @@ cron.schedule("11 10 * * *", async () => {
   } catch (error) {
     console.error("Cron Error:", error);
   }
+});
+
+cron.schedule("28 12 * * *", async () => {
+  await generateDailyPerformanceReports();
 });

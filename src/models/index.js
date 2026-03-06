@@ -14,6 +14,50 @@ const defaultTimestamps = {
   },
 };
 
+const DailyAdPerformance = sequelize.define(
+  "DailyAdPerformance",
+  {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+
+    summary_date: DataTypes.DATEONLY,
+    client_id: DataTypes.UUID,
+
+    ad_id: DataTypes.UUID,
+    ad_name: DataTypes.STRING,
+    duration: DataTypes.INTEGER,
+
+    impressions: DataTypes.BIGINT,
+    groups_scheduled: DataTypes.INTEGER,
+  },
+  { timestamps: false },
+);
+
+const DailyGroupPerformance = sequelize.define(
+  "DailyGroupPerformance",
+  {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+
+    summary_date: DataTypes.DATEONLY,
+    client_id: DataTypes.UUID,
+
+    group_id: DataTypes.UUID,
+    group_name: DataTypes.STRING,
+    last_pushed: DataTypes.DATE,
+
+    impressions: DataTypes.BIGINT,
+    device_count: DataTypes.INTEGER,
+  },
+  { timestamps: false },
+);
+
 const DailyReport = sequelize.define(
   "DailyReport",
   {
@@ -873,4 +917,6 @@ module.exports = {
   DailyReport,
   ReportEvent,
   ReportOutlier,
+  DailyAdPerformance,
+  DailyGroupPerformance,
 };
