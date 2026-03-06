@@ -500,7 +500,7 @@ router.post("/webhooks/dacast", dacastWebhook);
 
 
 router.post("/start-stream", startStream);
-router.post("/stream", streamChunk);
+router.post("/stream/:channel_id", streamChunk);
 router.post("/stop-stream", stopStream);
 
 
