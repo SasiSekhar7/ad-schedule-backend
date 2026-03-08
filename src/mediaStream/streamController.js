@@ -89,6 +89,7 @@
 const { spawn } = require("child_process");
 const { StreamChannel, LiveContent, Schedule } = require("../models");
 const { pushToGroupQueue } = require("../controllers/queueController");
+const { Op } = require("sequelize");
 
 // Store FFmpeg processes by channel
 const ffmpegProcesses = new Map();
