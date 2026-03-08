@@ -448,7 +448,9 @@ const moment = require("moment");
 const { ExportJob, sequelize } = require("../models");
 
 const s3 = new AWS.S3({
-  
+   region: process.env.AWS_BUCKET_REGION,
+  accessKeyId: process.env.AWS_ACCESS_KEY,
+  secretAccessKey: process.env.AWS_SECRET_KEY,
 });
 const ARCHIVE_PREFIX = "proof-of-play-archive";
 
@@ -505,7 +507,7 @@ async function runExportJob() {
       while (m.isBefore(archiveCutoff)) {
 
         const table = `ProofOfPlayLogs_${m.format("YYYY_MM")}`;
-        const key = `${ARCHIVE_PREFIX}/${table}.csv.gz`;
+        const key = `ad96-pop/${ARCHIVE_PREFIX}/${table}.csv.gz`;
 
         console.log("📦 Reading archive:", key);
 
@@ -637,7 +639,7 @@ async function runExportJob() {
     // ================= S3 UPLOAD =================
     const upload = await s3.upload({
       Bucket: process.env.S3_BUCKET,
-      Key: `exports/${job.job_id}.xlsx`,
+      Key: `ad96-pop/exports/${job.job_id}.xlsx`,
       Body: fs.createReadStream(filePath)
     }).promise();
 

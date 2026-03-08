@@ -35,7 +35,7 @@ exports.createExportJob = async (req, res) => {
     }
 
     // 3️⃣ Max range validation (prevent heavy exports)
-    const maxMonths = 6;
+    const maxMonths = 13;
     if (end.diff(start, "months", true) > maxMonths) {
       return res.status(400).json({
         error: `Date range cannot exceed ${maxMonths} months`

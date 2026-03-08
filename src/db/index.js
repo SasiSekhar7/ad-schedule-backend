@@ -13,7 +13,7 @@ const config = {
   port: process.env.DB_PORT || 5432,
   username: process.env.DB_USER || "consoleuser",
   password: process.env.DB_PASSWORD || "StrongPassword123",
-  database: process.env.DB_NAME || "consoledb",
+  database: process.env.DB_NAME || "consoledbb",
   logging: false, // optional
 };
 
