@@ -86,16 +86,9 @@
 //   }
 // };
 
-
-
-
-
-
-
-
-
 const { spawn } = require("child_process");
-const { StreamChannel } = require("../models");
+const { StreamChannel, LiveContent, Schedule } = require("../models");
+const { pushToGroupQueue } = require("../controllers/queueController");
 
 // Store FFmpeg processes by channel
 const ffmpegProcesses = new Map();
@@ -110,6 +103,13 @@ exports.startStream = async (req, res) => {
     if (!channel_id) {
       return res.status(400).json({ error: "channel_id is required" });
     }
+    const now = new Date();
+
+    const startOfDay = new Date(now);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(now);
+    endOfDay.setHours(23, 59, 59, 999);
 
     // Prevent duplicate stream
     if (ffmpegProcesses.has(channel_id)) {
@@ -123,6 +123,19 @@ exports.startStream = async (req, res) => {
     if (!channel) {
       return res.status(404).json({ error: "Channel not found" });
     }
+
+    // 🔥 1️⃣ Find LiveContents using this channel
+    const liveContents = await LiveContent.findAll({
+      where: {
+        channel_id: channel.channel_id,
+        isDeleted: false,
+      },
+      attributes: ["live_content_id"],
+    });
+
+    const liveContentIds = liveContents.map((lc) => lc.live_content_id);
+
+    let groupIds = [];
 
     const { ingest_url, stream_key } = channel;
 
@@ -154,6 +167,25 @@ exports.startStream = async (req, res) => {
     // Save process
     ffmpegProcesses.set(channel_id, ffmpegProcess);
 
+    if (liveContentIds.length > 0) {
+      // 🔥 2️⃣ Find active schedules
+      const schedules = await Schedule.findAll({
+        where: {
+          content_type: "live_content",
+          content_id: { [Op.in]: liveContentIds },
+
+          // 🔥 Only schedules that overlap TODAY
+          start_time: { [Op.lte]: endOfDay },
+          end_time: { [Op.gte]: startOfDay },
+        },
+        attributes: ["group_id"],
+      });
+
+      groupIds = [...new Set(schedules.map((s) => s.group_id))];
+    }
+
+    console.log("groupIds,", groupIds);
+
     ffmpegProcess.stderr.on("data", (data) => {
       console.log(`FFmpeg (${channel_id}):`, data.toString());
     });
@@ -167,6 +199,8 @@ exports.startStream = async (req, res) => {
       console.error(`FFmpeg error for channel ${channel_id}:`, err);
       ffmpegProcesses.delete(channel_id);
     });
+
+    await pushToGroupQueue(groupIds);
 
     res.json({
       message: "Streaming started",
@@ -212,6 +246,14 @@ exports.stopStream = async (req, res) => {
 
     const ffmpegProcess = ffmpegProcesses.get(channel_id);
 
+    const now = new Date();
+
+    const startOfDay = new Date(now);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(now);
+    endOfDay.setHours(23, 59, 59, 999);
+
     if (!ffmpegProcess) {
       return res.json({ message: "No stream running for this channel" });
     }
@@ -222,6 +264,40 @@ exports.stopStream = async (req, res) => {
     ffmpegProcess.kill("SIGINT");
 
     ffmpegProcesses.delete(channel_id);
+
+    // 🔥 1️⃣ Find LiveContents using this channel
+    const liveContents = await LiveContent.findAll({
+      where: {
+        channel_id: channel.channel_id,
+        isDeleted: false,
+      },
+      attributes: ["live_content_id"],
+    });
+
+    const liveContentIds = liveContents.map((lc) => lc.live_content_id);
+
+    let groupIds = [];
+
+    if (liveContentIds.length > 0) {
+      // 🔥 2️⃣ Find active schedules
+      const schedules = await Schedule.findAll({
+        where: {
+          content_type: "live_content",
+          content_id: { [Op.in]: liveContentIds },
+
+          // 🔥 Only schedules that overlap TODAY
+          start_time: { [Op.lte]: endOfDay },
+          end_time: { [Op.gte]: startOfDay },
+        },
+        attributes: ["group_id"],
+      });
+
+      groupIds = [...new Set(schedules.map((s) => s.group_id))];
+    }
+
+    console.log("groupIds,", groupIds);
+
+    await pushToGroupQueue(groupIds);
 
     res.json({
       message: "Stream stopped",
