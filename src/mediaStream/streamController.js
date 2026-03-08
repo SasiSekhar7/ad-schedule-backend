@@ -269,7 +269,7 @@ exports.stopStream = async (req, res) => {
     // 🔥 1️⃣ Find LiveContents using this channel
     const liveContents = await LiveContent.findAll({
       where: {
-        channel_id: channel.channel_id,
+        channel_id: channel_id,
         isDeleted: false,
       },
       attributes: ["live_content_id"],
