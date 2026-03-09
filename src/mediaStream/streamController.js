@@ -370,34 +370,40 @@ exports.startStream = async (req, res) => {
     console.log(`🚀 Starting stream for channel ${channel_id}`);
 
     const ffmpegProcess = spawn("ffmpeg", [
-      "-re",
-      "-fflags",
-      "nobuffer",
+  "-fflags",
+  "+genpts",
+  "-use_wallclock_as_timestamps",
+  "1",
 
-      "-f",
-      "matroska", // better compatibility than webm
-      "-i",
-      "pipe:0",
+  "-f",
+  "matroska",
+  "-probesize",
+  "32",
+  "-analyzeduration",
+  "0",
 
-      "-c:v",
-      "libx264",
-      "-preset",
-      "veryfast",
-      "-tune",
-      "zerolatency",
+  "-i",
+  "pipe:0",
 
-      "-pix_fmt",
-      "yuv420p",
+  "-c:v",
+  "libx264",
+  "-preset",
+  "veryfast",
+  "-tune",
+  "zerolatency",
 
-      "-c:a",
-      "aac",
-      "-ar",
-      "44100",
+  "-pix_fmt",
+  "yuv420p",
 
-      "-f",
-      "flv",
-      `${ingest_url}/${stream_key}`,
-    ]);
+  "-c:a",
+  "aac",
+  "-ar",
+  "44100",
+
+  "-f",
+  "flv",
+  `${ingest_url}/${stream_key}`,
+]);
 
     ffmpegProcesses.set(channel_id, ffmpegProcess);
 
@@ -483,11 +489,25 @@ exports.streamChunk = (req, res) => {
     return res.status(400).send("Stream not started for this channel");
   }
 
+  // req.on("data", (chunk) => {
+  //   if (ffmpegProcess.stdin && !ffmpegProcess.stdin.destroyed) {
+  //     ffmpegProcess.stdin.write(chunk);
+  //   }
+  // });
+
   req.on("data", (chunk) => {
-    if (ffmpegProcess.stdin && !ffmpegProcess.stdin.destroyed) {
-      ffmpegProcess.stdin.write(chunk);
-    }
-  });
+  if (!ffmpegProcess.stdin || ffmpegProcess.stdin.destroyed) return;
+
+  const canWrite = ffmpegProcess.stdin.write(chunk);
+
+  if (!canWrite) {
+    req.pause();
+
+    ffmpegProcess.stdin.once("drain", () => {
+      req.resume();
+    });
+  }
+});
 
   req.on("end", () => {
     res.end("chunk received");
