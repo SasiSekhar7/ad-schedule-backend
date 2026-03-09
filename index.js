@@ -6,6 +6,8 @@ const { Server } = require("socket.io");
 const initWebRTC = require("./src/mediaStream/webrtcServer");
 const http = require("http");
 
+const { StreamChannel } = require("./src/models");
+
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const router = require("./src/routes");
@@ -21,13 +23,12 @@ const port = process.env.PORT || 8000;
 // Initialize cron jobs
 require("./src/cron");
 
-
 // Middleware
 app.use(bodyParser.json());
 
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: "*" }
+  cors: { origin: "*" },
 });
 
 const corsOptions = ["http://localhost:5174", "https://console.adup.live"];
@@ -53,7 +54,6 @@ async function getChannelData(channelId) {
 
 initWebRTC(io, getChannelData);
 
-
 // 404 handler - must be after all routes
 app.use(notFoundHandler);
 
@@ -69,17 +69,26 @@ server.listen(port, () => {
 });
 
 // Handle unhandled promise rejections
-process.on("unhandledRejection", (reason, promise) => {
-  logger.logError("Unhandled Rejection", reason, {
-    promise: promise.toString(),
-  });
+// process.on("unhandledRejection", (reason, promise) => {
+//   logger.logError("Unhandled Rejection", reason, {
+//     promise: promise.toString(),
+//   });
+// });
+
+process.on("unhandledRejection", (err) => {
+  console.error("Unhandled Rejection:", err);
 });
 
 // Handle uncaught exceptions
+// process.on("uncaughtException", (error) => {
+//   logger.logError("Uncaught Exception", error);
+//   // Give logger time to write before exiting
+//   setTimeout(() => {
+//     process.exit(1);
+//   }, 1000);
+// });
+
 process.on("uncaughtException", (error) => {
-  logger.logError("Uncaught Exception", error);
-  // Give logger time to write before exiting
-  setTimeout(() => {
-    process.exit(1);
-  }, 1000);
+  console.error("Uncaught Exception:", error);
+  process.exit(1);
 });
