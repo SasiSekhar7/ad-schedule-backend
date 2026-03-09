@@ -1,4 +1,9 @@
-const { DailyReport, ReportEvent, ReportOutlier } = require("../models");
+const {
+  DailyReport,
+  ReportEvent,
+  ReportOutlier,
+  Client,
+} = require("../models");
 const { generateStats } = require("./generateStats");
 
 async function generateDailyReport({ startDate, endDate, client_id = null }) {
@@ -60,4 +65,35 @@ async function generateDailyReport({ startDate, endDate, client_id = null }) {
   return report;
 }
 
-module.exports = { generateDailyReport };
+async function generateDailyReportsForAllClients() {
+  const today = new Date();
+  const yesterday = new Date(today);
+
+  yesterday.setDate(today.getDate() - 1);
+
+  const startDate = new Date(yesterday.setHours(0, 0, 0, 0));
+  const endDate = new Date(yesterday.setHours(23, 59, 59, 999));
+
+  // GLOBAL REPORT
+  await generateDailyReport({
+    startDate,
+    endDate,
+    client_id: null,
+  });
+
+  // CLIENT REPORTS
+  const clients = await Client.findAll({
+    attributes: ["client_id"],
+    raw: true,
+  });
+
+  for (const client of clients) {
+    await generateDailyReport({
+      startDate,
+      endDate,
+      client_id: client.client_id,
+    });
+  }
+}
+
+module.exports = { generateDailyReport, generateDailyReportsForAllClients };

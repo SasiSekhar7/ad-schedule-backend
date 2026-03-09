@@ -8,7 +8,9 @@ const {
   generateDailyPerformanceReports,
 } = require("../services/generatePerformanceSummary");
 
-const { generateDailyReport } = require("../services/reportGenerator");
+const {
+  generateDailyReportsForAllClients,
+} = require("../services/reportGenerator");
 
 // Function to be executed at 6 AM daily
 async function dailySchedulePush() {
@@ -93,41 +95,11 @@ cron.schedule(
   },
 );
 
-cron.schedule("11 10 * * *", async () => {
-  //   console.log("Running daily JSON report cron 👉 every day at 3:30 PM...");
-  //   });
-
-  // cron.schedule("0 1 * * *", async () => {
+cron.schedule("0 1 * * *", async () => {
   console.log("Running Daily Report Cron...");
 
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-
-  const startDate = new Date(yesterday.setHours(0, 0, 0, 0));
-  const endDate = new Date(yesterday.setHours(23, 59, 59, 999));
-
   try {
-    // GLOBAL REPORT
-    await generateDailyReport({
-      startDate,
-      endDate,
-      client_id: null,
-    });
-
-    // CLIENT REPORTS
-    const clients = await Client.findAll({
-      attributes: ["client_id"],
-      raw: true,
-    });
-
-    for (const client of clients) {
-      await generateDailyReport({
-        startDate,
-        endDate,
-        client_id: client.client_id,
-      });
-    }
+    await generateDailyReportsForAllClients();
 
     console.log("Daily Reports Generated Successfully");
   } catch (error) {
@@ -135,6 +107,12 @@ cron.schedule("11 10 * * *", async () => {
   }
 });
 
-cron.schedule("28 12 * * *", async () => {
-  await generateDailyPerformanceReports();
+cron.schedule("0 1 * * *", async () => {
+  console.log("Running Performance Summary Cron...");
+  try {
+    await generateDailyPerformanceReports();
+    console.log("Performance Summary Cron Completed");
+  } catch (error) {
+    console.error("Cron Error:", error);
+  }
 });

@@ -17,7 +17,7 @@ const defaultTimestamps = {
 const DailyAdPerformance = sequelize.define(
   "DailyAdPerformance",
   {
-    id: {
+    dailyAdPerformance_id: {
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
@@ -32,6 +32,8 @@ const DailyAdPerformance = sequelize.define(
 
     impressions: DataTypes.BIGINT,
     groups_scheduled: DataTypes.INTEGER,
+
+    ...defaultTimestamps,
   },
   { timestamps: false },
 );
@@ -39,7 +41,7 @@ const DailyAdPerformance = sequelize.define(
 const DailyGroupPerformance = sequelize.define(
   "DailyGroupPerformance",
   {
-    id: {
+    dailyGroupPerformance_id: {
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
@@ -54,6 +56,8 @@ const DailyGroupPerformance = sequelize.define(
 
     impressions: DataTypes.BIGINT,
     device_count: DataTypes.INTEGER,
+
+    ...defaultTimestamps,
   },
   { timestamps: false },
 );
@@ -136,6 +140,8 @@ const DailyReport = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true,
     },
+
+    ...defaultTimestamps,
   },
   {
     tableName: "DailyReports",
@@ -152,7 +158,7 @@ const DailyReport = sequelize.define(
 const ReportEvent = sequelize.define(
   "ReportEvent",
   {
-    id: {
+    reportEvent_id: {
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
@@ -181,6 +187,8 @@ const ReportEvent = sequelize.define(
       type: DataTypes.DATE,
       allowNull: false,
     },
+
+    ...defaultTimestamps,
   },
   {
     tableName: "ReportEvents",
@@ -191,7 +199,7 @@ const ReportEvent = sequelize.define(
 const ReportOutlier = sequelize.define(
   "ReportOutlier",
   {
-    id: {
+    reportOutlier_id: {
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
@@ -218,6 +226,8 @@ const ReportOutlier = sequelize.define(
     severity: {
       type: DataTypes.ENUM("warning", "critical"),
     },
+
+    ...defaultTimestamps,
   },
   {
     tableName: "ReportOutliers",
