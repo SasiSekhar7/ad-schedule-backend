@@ -2,6 +2,9 @@ const express = require("express");
 const app = express();
 require("dotenv").config(); // Load environment variables from .env
 const path = require("path");
+const { Server } = require("socket.io");
+const initWebRTC = require("./src/mediaStream/webrtcServer");
+const http = require("http");
 
 const bodyParser = require("body-parser");
 const cors = require("cors");
@@ -18,8 +21,14 @@ const port = process.env.PORT || 8000;
 // Initialize cron jobs
 require("./src/cron");
 
+
 // Middleware
 app.use(bodyParser.json());
+
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: { origin: "*" }
+});
 
 const corsOptions = ["http://localhost:5174", "https://console.adup.live"];
 app.use(cors({ corsOptions }));
@@ -34,6 +43,17 @@ app.use("/api/wgt", express.static(staticFolder));
 // API routes
 app.use("/api", router);
 
+async function getChannelData(channelId) {
+  const channel = await StreamChannel.findOne({
+    where: { channel_id: channelId },
+  });
+
+  return channel;
+}
+
+initWebRTC(io, getChannelData);
+
+
 // 404 handler - must be after all routes
 app.use(notFoundHandler);
 
@@ -41,7 +61,7 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 // Start server
-app.listen(port, () => {
+server.listen(port, () => {
   logger.logInfo(`Server running on http://localhost:${port}`, {
     port,
     environment: process.env.NODE_ENV || "development",
