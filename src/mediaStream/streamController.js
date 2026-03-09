@@ -485,6 +485,10 @@ exports.streamChunk = (req, res) => {
 
   req.on("data", (chunk) => {
     if (ffmpegProcess.stdin && !ffmpegProcess.stdin.destroyed) {
+      console.log("chunk received");
+      console.log("chunk length", chunk.length);
+      console.log("request type", req.headers["data-type"]);
+      console.log("request type", req.headers["content-type"]);
       ffmpegProcess.stdin.write(chunk);
     }
   });
