@@ -225,20 +225,91 @@ async function generateStats({ startDate, endDate, client_id = null }) {
     // 7️Recent Critical Events
     // ----------------------------------
 
+    const EVENT_TYPES = {
+      APP_LIFECYCLE: [
+        "APP_STARTED",
+        "APP_PAUSED",
+        "APP_RESUMED",
+        "APP_STOPPED",
+        "APP_CRASH",
+      ],
+
+      CONTENT: [
+        "CONTENT_DOWNLOAD_STARTED",
+        "CONTENT_DOWNLOAD_PROGRESS",
+        "CONTENT_DOWNLOAD_COMPLETED",
+        "CONTENT_DOWNLOAD_FAILED",
+      ],
+
+      PLAYBACK: [
+        "PLAYBACK_STARTED",
+        "PLAYBACK_COMPLETED",
+        "PLAYBACK_ERROR",
+        "PLAYBACK_SKIPPED",
+      ],
+
+      NETWORK: [
+        "NETWORK_CONNECTED",
+        "NETWORK_DISCONNECTED",
+        "NETWORK_ERROR",
+        "NETWORK_SLOW",
+      ],
+
+      DIAGNOSTICS: [
+        "DIAGNOSTIC_INFO",
+        "DIAGNOSTIC_WARNING",
+        "DIAGNOSTIC_ERROR",
+      ],
+
+      USER_INTERACTION: ["USER_INPUT", "NAVIGATION", "SETTINGS_CHANGED"],
+
+      SYSTEM: ["MEMORY_WARNING", "STORAGE_WARNING", "PERFORMANCE_ISSUE"],
+    };
+    const ALL_EVENTS = Object.values(EVENT_TYPES).flat();
+    // const recentEventsRaw = await DeviceEventLog.findAll({
+    //   attributes: ["event_type", "timestamp", "device_id"],
+    //   where: {
+    //     timestamp: { [Op.between]: [startDate, endDate] },
+    //     event_type: {
+    //       [Op.in]: [
+    //         "APP_CRASH",
+    //         "NETWORK_ERROR",
+    //         "PLAYBACK_ERROR",
+    //         "DIAGNOSTIC_ERROR",
+    //         "STORAGE_WARNING",
+    //       ],
+    //     },
+    //   },
+    //   include: [
+    //     {
+    //       model: Device,
+    //       attributes: ["device_name", "location"],
+    //       required: true,
+    //       include: client_id
+    //         ? [
+    //             {
+    //               model: DeviceGroup,
+    //               attributes: [],
+    //               required: true,
+    //               where: { client_id },
+    //             },
+    //           ]
+    //         : [],
+    //     },
+    //   ],
+    //   order: [["timestamp", "DESC"]],
+    //   limit: 10,
+    //   raw: true,
+    // });
+
     const recentEventsRaw = await DeviceEventLog.findAll({
       attributes: ["event_type", "timestamp", "device_id"],
+
       where: {
         timestamp: { [Op.between]: [startDate, endDate] },
-        event_type: {
-          [Op.in]: [
-            "APP_CRASH",
-            "NETWORK_ERROR",
-            "PLAYBACK_ERROR",
-            "DIAGNOSTIC_ERROR",
-            "STORAGE_WARNING",
-          ],
-        },
+        event_type: { [Op.in]: ALL_EVENTS },
       },
+
       include: [
         {
           model: Device,
@@ -256,6 +327,7 @@ async function generateStats({ startDate, endDate, client_id = null }) {
             : [],
         },
       ],
+
       order: [["timestamp", "DESC"]],
       limit: 10,
       raw: true,
