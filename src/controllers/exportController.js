@@ -1,6 +1,7 @@
 const { ExportJob } = require("../models");
 const { Op } = require("sequelize");
 const moment = require("moment");
+const { getBucketURL } = require("./s3Controller");
 
 exports.createExportJob = async (req, res) => {
   try {
@@ -93,36 +94,68 @@ exports.createExportJob = async (req, res) => {
 };
 
 exports.getJobStatus = async (req, res) => {
+  try {
+    const job = await ExportJob.findOne({
+      where: {
+        job_id: req.params.job_id,
+        client_id: req.user.client_id
+      }
+    });
 
-  const job = await ExportJob.findOne({
-    where: {
-      job_id: req.params.job_id,
-      client_id: req.user.client_id
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
     }
-  });
 
-  if (!job) {
-    return res.status(404).json({ error: "Job not found" });
+    const data = job.toJSON();
+
+    if (data.s3_key) {
+      data.download_url = await getBucketURL(data.s3_key);
+    } else {
+      data.download_url = null;
+    }
+
+    res.json(data);
+
+  } catch (error) {
+    console.error("Error fetching job status:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
-
-  res.json(job);
 };
+
 
 exports.listJobs = async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = parseInt(req.query.offset) || 0;
 
-  const limit = parseInt(req.query.limit) || 10;
-  const offset = parseInt(req.query.offset) || 0;
+    const jobs = await ExportJob.findAll({
+      where: { client_id: req.user.client_id },
+      order: [["created_at", "DESC"]],
+      limit,
+      offset
+    });
 
-  const jobs = await ExportJob.findAll({
-    where: { client_id: req.user.client_id },
-    order: [["created_at", "DESC"]],
-    limit,
-    offset
-  });
+    const jobsWithUrl = await Promise.all(
+      jobs.map(async (job) => {
+        const data = job.toJSON();
 
-  res.json(jobs);
+        if (data.s3_key) {
+          data.download_url = await getBucketURL(data.s3_key);
+        } else {
+          data.download_url = null;
+        }
+
+        return data;
+      })
+    );
+
+    res.json(jobsWithUrl);
+
+  } catch (error) {
+    console.error("Error listing export jobs:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
 };
-
 exports.updateJobStatus = async (req, res) => {
   const t = await ExportJob.sequelize.transaction();
 
