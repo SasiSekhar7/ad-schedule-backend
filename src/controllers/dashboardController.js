@@ -1,6 +1,7 @@
 // controllers/dashboardController.js
 const asyncHandler = require("express-async-handler");
 const { Op, sequelize, fn, col, literal } = require("sequelize"); // Import necessary Sequelize components
+
 const {
   DailyImpressionSummary,
   Ad,
@@ -225,6 +226,84 @@ const getGroupTableOrder = (sortBy, sortOrder = "DESC") => {
 //   }
 // });
 
+// GET /api/dashboard/ad-performance
+// exports.getAdPerformanceTable = asyncHandler(async (req, res) => {
+//   const {
+//     startDate: startDateStr,
+//     endDate: endDateStr,
+//     page = 1,
+//     pageSize = 10,
+//     sortBy,
+//     sortOrder,
+//     search,
+//   } = req.query;
+
+//   const { role, client_id } = req.user;
+
+//   try {
+//     const { startDate, endDate } = validateDateRange(startDateStr, endDateStr);
+
+//     const { limit, offset, pageNum, pageSizeNum } = getPagination(
+//       page,
+//       pageSize,
+//     );
+
+//     const order = getAdTableOrder(sortBy, sortOrder);
+
+//     const whereClause = {
+//       summary_date: {
+//         [Op.between]: [startDate, endDate],
+//       },
+//     };
+
+//     // CLIENT FILTER
+//     if (role === "Client") {
+//       whereClause.client_id = client_id;
+//     }
+
+//     // SEARCH
+//     if (search) {
+//       whereClause.ad_name = {
+//         [Op.like]: `%${search}%`,
+//       };
+//     }
+
+//     const { count, rows } = await DailyAdPerformance.findAndCountAll({
+//       attributes: [
+//         ["ad_id", "adId"],
+//         ["ad_name", "name"],
+//         "duration",
+//         "impressions",
+//         ["groups_scheduled", "groupsScheduled"],
+//       ],
+
+//       where: whereClause,
+//       order,
+//       limit,
+//       offset,
+//     });
+
+//     const totalItems = count;
+//     const totalPages = Math.ceil(totalItems / limit);
+
+//     res.status(200).json({
+//       data: rows.map((row) => row.get({ plain: true })),
+//       pagination: {
+//         currentPage: pageNum,
+//         pageSize: pageSizeNum,
+//         totalItems,
+//         totalPages,
+//       },
+//     });
+//   } catch (error) {
+//     logger.logError("Error fetching ads table", error);
+
+//     res.status(500).json({
+//       message: error.message || "Internal server error",
+//     });
+//   }
+// });
+
 exports.getAdPerformanceTable = asyncHandler(async (req, res) => {
   const {
     startDate: startDateStr,
@@ -266,22 +345,46 @@ exports.getAdPerformanceTable = asyncHandler(async (req, res) => {
       };
     }
 
-    const { count, rows } = await DailyAdPerformance.findAndCountAll({
-      attributes: [
+    let queryOptions = {
+      where: whereClause,
+      order,
+      limit,
+      offset,
+    };
+
+    // -------------------------
+    // CLIENT VIEW (NO MERGE)
+    // -------------------------
+    if (role === "Client") {
+      queryOptions.attributes = [
         ["ad_id", "adId"],
         ["ad_name", "name"],
         "duration",
         "impressions",
         ["groups_scheduled", "groupsScheduled"],
-      ],
+      ];
+    }
 
-      where: whereClause,
-      order,
-      limit,
-      offset,
-    });
+    // -------------------------
+    // ADMIN VIEW (MERGED ADS)
+    // -------------------------
+    else {
+      queryOptions.attributes = [
+        ["ad_id", "adId"],
+        ["ad_name", "name"],
+        "duration",
+        [fn("SUM", col("impressions")), "impressions"],
+        [fn("SUM", col("groups_scheduled")), "groupsScheduled"],
+      ];
 
-    const totalItems = count;
+      queryOptions.group = ["ad_id", "ad_name", "duration"];
+    }
+
+    const { count, rows } =
+      await DailyAdPerformance.findAndCountAll(queryOptions);
+
+    // FIX count when GROUP BY used
+    const totalItems = Array.isArray(count) ? count.length : count;
     const totalPages = Math.ceil(totalItems / limit);
 
     res.status(200).json({
@@ -440,6 +543,84 @@ exports.getAdPerformanceTable = asyncHandler(async (req, res) => {
 //   }
 // });
 
+// GROUP PERFORMANCE
+// exports.getGroupPerformanceTable = asyncHandler(async (req, res) => {
+//   const {
+//     startDate: startDateStr,
+//     endDate: endDateStr,
+//     page = 1,
+//     pageSize = 10,
+//     sortBy,
+//     sortOrder,
+//     search,
+//   } = req.query;
+
+//   const { role, client_id } = req.user;
+
+//   try {
+//     const { startDate, endDate } = validateDateRange(startDateStr, endDateStr);
+
+//     const { limit, offset, pageNum, pageSizeNum } = getPagination(
+//       page,
+//       pageSize,
+//     );
+
+//     const order = getGroupTableOrder(sortBy, sortOrder);
+
+//     const whereClause = {
+//       summary_date: {
+//         [Op.between]: [startDate, endDate],
+//       },
+//     };
+
+//     // CLIENT FILTER
+//     if (role === "Client") {
+//       whereClause.client_id = client_id;
+//     }
+
+//     // SEARCH
+//     if (search) {
+//       whereClause.group_name = {
+//         [Op.like]: `%${search}%`,
+//       };
+//     }
+
+//     const { count, rows } = await DailyGroupPerformance.findAndCountAll({
+//       attributes: [
+//         ["group_id", "groupId"],
+//         ["group_name", "name"],
+//         ["last_pushed", "lastPushed"],
+//         "impressions",
+//         ["device_count", "deviceCount"],
+//       ],
+
+//       where: whereClause,
+//       order,
+//       limit,
+//       offset,
+//     });
+
+//     const totalItems = count;
+//     const totalPages = Math.ceil(totalItems / limit);
+
+//     res.status(200).json({
+//       data: rows.map((row) => row.get({ plain: true })),
+//       pagination: {
+//         currentPage: pageNum,
+//         pageSize: pageSizeNum,
+//         totalItems,
+//         totalPages,
+//       },
+//     });
+//   } catch (error) {
+//     logger.logError("Error fetching groups table", error);
+
+//     res.status(500).json({
+//       message: error.message || "Internal server error",
+//     });
+//   }
+// });
+
 exports.getGroupPerformanceTable = asyncHandler(async (req, res) => {
   const {
     startDate: startDateStr,
@@ -481,22 +662,46 @@ exports.getGroupPerformanceTable = asyncHandler(async (req, res) => {
       };
     }
 
-    const { count, rows } = await DailyGroupPerformance.findAndCountAll({
-      attributes: [
+    let queryOptions = {
+      where: whereClause,
+      order,
+      limit,
+      offset,
+    };
+
+    // ------------------------
+    // CLIENT VIEW (NO MERGE)
+    // ------------------------
+    if (role === "Client") {
+      queryOptions.attributes = [
         ["group_id", "groupId"],
         ["group_name", "name"],
         ["last_pushed", "lastPushed"],
         "impressions",
         ["device_count", "deviceCount"],
-      ],
+      ];
+    }
 
-      where: whereClause,
-      order,
-      limit,
-      offset,
-    });
+    // ------------------------
+    // ADMIN VIEW (MERGED DATA)
+    // ------------------------
+    else {
+      queryOptions.attributes = [
+        ["group_id", "groupId"],
+        ["group_name", "name"],
+        [fn("MAX", col("last_pushed")), "lastPushed"],
+        [fn("SUM", col("impressions")), "impressions"],
+        [fn("SUM", col("device_count")), "deviceCount"],
+      ];
 
-    const totalItems = count;
+      queryOptions.group = ["group_id", "group_name"];
+    }
+
+    const { count, rows } =
+      await DailyGroupPerformance.findAndCountAll(queryOptions);
+
+    // Fix count when GROUP BY is used
+    const totalItems = Array.isArray(count) ? count.length : count;
     const totalPages = Math.ceil(totalItems / limit);
 
     res.status(200).json({
