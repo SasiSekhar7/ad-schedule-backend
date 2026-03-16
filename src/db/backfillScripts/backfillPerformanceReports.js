@@ -20,7 +20,7 @@ async function backfillPerformanceReports() {
   try {
     console.log("Starting Performance Backfill...");
 
-    const startDate = await getEarliestDate();
+    const startDate = new Date('2025-01-01');
 
     if (!startDate) {
       console.log("No ProofOfPlayLog data found.");

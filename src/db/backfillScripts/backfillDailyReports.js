@@ -33,7 +33,7 @@ async function backfillDailyReports() {
   try {
     console.log("Starting Automatic Backfill...");
 
-    const startDate = await getEarliestDate();
+    const startDate = new Date('2025-01-01');
 
     if (!startDate) {
       console.log("No logs found in database.");
