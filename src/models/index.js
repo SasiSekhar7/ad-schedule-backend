@@ -14,6 +14,227 @@ const defaultTimestamps = {
   },
 };
 
+const DailyAdPerformance = sequelize.define(
+  "DailyAdPerformance",
+  {
+    dailyAdPerformance_id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+
+    summary_date: DataTypes.DATEONLY,
+    client_id: DataTypes.UUID,
+
+    ad_id: DataTypes.UUID,
+    ad_name: DataTypes.STRING,
+    duration: DataTypes.INTEGER,
+
+    impressions: DataTypes.BIGINT,
+    groups_scheduled: DataTypes.INTEGER,
+
+    ...defaultTimestamps,
+  },
+  { timestamps: false },
+);
+
+const DailyGroupPerformance = sequelize.define(
+  "DailyGroupPerformance",
+  {
+    dailyGroupPerformance_id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+
+    summary_date: DataTypes.DATEONLY,
+    client_id: DataTypes.UUID,
+
+    group_id: DataTypes.UUID,
+    group_name: DataTypes.STRING,
+    last_pushed: DataTypes.DATE,
+
+    impressions: DataTypes.BIGINT,
+    device_count: DataTypes.INTEGER,
+
+    ...defaultTimestamps,
+  },
+  { timestamps: false },
+);
+
+const DailyReport = sequelize.define(
+  "DailyReport",
+  {
+    report_id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+
+    report_date: {
+      type: DataTypes.DATEONLY,
+      allowNull: false,
+    },
+
+    client_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
+
+    total_impressions: {
+      type: DataTypes.BIGINT,
+      defaultValue: 0,
+    },
+
+    ads_scheduled: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+
+    active_devices: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+
+    network_issues: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+
+    storage_issues: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+
+    device_crashes: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+
+    diagnostic_errors: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+
+    playback_errors: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+
+    avg_cpu_usage: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
+
+    avg_ram_free: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
+
+    avg_storage_free: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
+
+    network_health: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+
+    ...defaultTimestamps,
+  },
+  {
+    tableName: "DailyReports",
+    timestamps: true,
+    indexes: [
+      {
+        unique: true,
+        fields: ["report_date", "client_id"],
+      },
+    ],
+  },
+);
+
+const ReportEvent = sequelize.define(
+  "ReportEvent",
+  {
+    reportEvent_id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+
+    report_id: {
+      type: DataTypes.UUID,
+      allowNull: false,
+    },
+
+    device_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
+
+    device_name: DataTypes.STRING,
+
+    location: DataTypes.STRING,
+
+    event_type: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+
+    event_timestamp: {
+      type: DataTypes.DATE,
+      allowNull: false,
+    },
+
+    ...defaultTimestamps,
+  },
+  {
+    tableName: "ReportEvents",
+    timestamps: false,
+  },
+);
+
+const ReportOutlier = sequelize.define(
+  "ReportOutlier",
+  {
+    reportOutlier_id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+
+    report_id: {
+      type: DataTypes.UUID,
+      allowNull: false,
+    },
+
+    device_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
+
+    device_name: DataTypes.STRING,
+
+    location: DataTypes.STRING,
+
+    metric: DataTypes.STRING,
+
+    value: DataTypes.STRING,
+
+    severity: {
+      type: DataTypes.ENUM("warning", "critical"),
+    },
+
+    ...defaultTimestamps,
+  },
+  {
+    tableName: "ReportOutliers",
+    timestamps: false,
+  },
+);
+
 const Tier = sequelize.define(
   "Tier",
   {
@@ -120,6 +341,8 @@ const Ad = sequelize.define(
       allowNull: false,
       defaultValue: "pending",
     },
+
+    fileSize: { type: DataTypes.BIGINT, allowNull: true },
     duration: { type: DataTypes.INTEGER, allowNull: false },
     isDeleted: {
       type: DataTypes.BOOLEAN,
@@ -626,6 +849,12 @@ const DeviceEventLog = sequelize.define(
   },
 );
 
+DailyReport.hasMany(ReportEvent, { foreignKey: "report_id" });
+ReportEvent.belongsTo(DailyReport, { foreignKey: "report_id" });
+
+DailyReport.hasMany(ReportOutlier, { foreignKey: "report_id" });
+ReportOutlier.belongsTo(DailyReport, { foreignKey: "report_id" });
+
 Tier.hasMany(Client, { foreignKey: "tier_id" });
 Client.belongsTo(Tier, { foreignKey: "tier_id" });
 
@@ -695,4 +924,9 @@ module.exports = {
   DeviceTelemetryLog,
   DeviceEventLog,
   Tier,
+  DailyReport,
+  ReportEvent,
+  ReportOutlier,
+  DailyAdPerformance,
+  DailyGroupPerformance,
 };
