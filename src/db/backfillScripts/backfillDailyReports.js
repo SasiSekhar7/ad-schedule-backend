@@ -62,11 +62,11 @@ async function backfillDailyReports() {
       console.log(`Generating report for ${start.toISOString().split("T")[0]}`);
 
       // GLOBAL
-      await generateDailyReport({
-        startDate: start,
-        endDate: end,
-        client_id: null,
-      });
+      // await generateDailyReport({
+      //   startDate: start,
+      //   endDate: end,
+      //   client_id: null,
+      // });
 
       // CLIENT REPORTS
       for (const client of clients) {

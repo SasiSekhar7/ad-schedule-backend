@@ -75,11 +75,11 @@ async function generateDailyReportsForAllClients() {
   const endDate = new Date(yesterday.setHours(23, 59, 59, 999));
 
   // GLOBAL REPORT
-  await generateDailyReport({
-    startDate,
-    endDate,
-    client_id: null,
-  });
+  // await generateDailyReport({
+  //   startDate,
+  //   endDate,
+  //   client_id: null,
+  // });
 
   // CLIENT REPORTS
   const clients = await Client.findAll({
