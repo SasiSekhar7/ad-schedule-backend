@@ -128,6 +128,7 @@ const {
   toggleTierStatus,
   getAll,
 } = require("../controllers/tierController");
+const { createExportJob, getJobStatus, listJobs, updateJobStatus } = require("../controllers/exportController");
 
 router.get("/tiers", getAllTiers);
 router.get("/all-tiers", getAll);
@@ -384,4 +385,36 @@ router.get(
 router.post("/device/mqtt-custom-message/:device_id", sendCustomMQTTMessage);
 
 router.post("/cron/daily-schedule-push", dailySchedulePushManual);
+
+
+// ===============================
+// 📦 REPORT / EXPORT JOB ROUTES
+// ===============================
+
+// Create export job (async, background)
+router.post(
+  "/exports",
+  validateToken,
+  createExportJob
+);
+
+// Get single export job status
+router.get(
+  "/exports/:job_id",
+  validateToken,
+  getJobStatus
+);
+
+router.put("/exports/:job_id", validateToken, updateJobStatus)
+
+
+
+// List export jobs (pagination)
+router.get(
+  "/exports",
+  validateToken,
+  listJobs
+);
+
+
 module.exports = router;

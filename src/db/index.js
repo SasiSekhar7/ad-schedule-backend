@@ -9,7 +9,7 @@ require("dotenv").config(); // Load environment variables from .env
 
 const config = {
   dialect: process.env.DB_DIALECT || "postgres",
-  host: process.env.DB_HOST || "localhost",
+  host: process.env.DB_HOST || "13.232.17.134",
   port: process.env.DB_PORT || 5432,
   username: process.env.DB_USER || "adupuser",
   password: process.env.DB_PASSWORD || "Birla@1122",
@@ -35,6 +35,7 @@ const sequelize = new Sequelize(
   config.username,
   config.password,
   config,
+  
 );
 
 module.exports = sequelize;

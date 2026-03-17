@@ -11,6 +11,7 @@ const {
 const {
   generateDailyReportsForAllClients,
 } = require("../services/reportGenerator");
+const { createNextMonthPartition } = require("../db/proofOfPlay/createMonthlyPopPartition");
 
 // Function to be executed at 6 AM daily
 async function dailySchedulePush() {
@@ -55,6 +56,22 @@ cron.schedule(
     scheduled: true,
     timezone: "Asia/Kolkata", // India timezone
   },
+);
+
+
+cron.schedule(
+  "05 06 25 * *",   // 6:05 AM on 25th of every month
+  async () => {
+    logger.logInfo("Running monthly partition creation job");
+
+    await createNextMonthPartition();
+
+    logger.logInfo("Monthly partition job completed");
+  },
+  {
+    scheduled: true,
+    timezone: "Asia/Kolkata",
+  }
 );
 
 logger.logInfo("Cron jobs initialized", {
