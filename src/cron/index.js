@@ -1,9 +1,16 @@
 const cron = require("node-cron");
-const { DeviceGroup } = require("../models");
+const { DeviceGroup, DailyReport, Client } = require("../models");
 const { pushToGroupQueue } = require("../controllers/queueController");
 const { updateUpcomingMatches } = require("../controllers/cricketController");
 const logger = require("../utils/logger");
 const { checkClientExpiry } = require("../services/subscriptionService");
+const {
+  generateDailyPerformanceReports,
+} = require("../services/generatePerformanceSummary");
+
+const {
+  generateDailyReportsForAllClients,
+} = require("../services/reportGenerator");
 const { createNextMonthPartition } = require("../db/proofOfPlay/createMonthlyPopPartition");
 
 // Function to be executed at 6 AM daily
@@ -104,3 +111,25 @@ cron.schedule(
     timezone: "Asia/Kolkata",
   },
 );
+
+cron.schedule("0 1 * * *", async () => {
+  console.log("Running Daily Report Cron...");
+
+  try {
+    await generateDailyReportsForAllClients();
+
+    console.log("Daily Reports Generated Successfully");
+  } catch (error) {
+    console.error("Cron Error:", error);
+  }
+});
+
+cron.schedule("0 1 * * *", async () => {
+  console.log("Running Performance Summary Cron...");
+  try {
+    await generateDailyPerformanceReports();
+    console.log("Performance Summary Cron Completed");
+  } catch (error) {
+    console.error("Cron Error:", error);
+  }
+});
