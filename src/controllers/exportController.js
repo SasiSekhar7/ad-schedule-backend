@@ -1,7 +1,7 @@
 const { ExportJob } = require("../models");
 const { Op } = require("sequelize");
 const moment = require("moment");
-const { getBucketURL } = require("./s3Controller");
+const { getBucketURL, getBucketURLForExports } = require("./s3Controller");
 
 exports.createExportJob = async (req, res) => {
   try {
@@ -109,7 +109,7 @@ exports.getJobStatus = async (req, res) => {
     const data = job.toJSON();
 
     if (data.s3_key) {
-      data.download_url = await getBucketURL(data.s3_key);
+      data.download_url = await getBucketURLForExports(data.s3_key);
     } else {
       data.download_url = null;
     }
@@ -140,7 +140,7 @@ exports.listJobs = async (req, res) => {
         const data = job.toJSON();
 
         if (data.s3_key) {
-          data.download_url = await getBucketURL(data.s3_key);
+          data.download_url = await getBucketURLForExports(data.s3_key);
         } else {
           data.download_url = null;
         }

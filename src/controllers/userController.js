@@ -184,6 +184,12 @@ module.exports.getUserData = async (req, res) => {
         icon: "QrCode",
         items: [{ title: "All", url: "/all-plans" }],
       },
+      {
+        title: "Export Details",
+        url: "/all-exports",
+        icon: "QrCode",
+        items: [{ title: "All", url: "/all-exports" }],
+      },
     ];
 
     const navMainClient = [
@@ -218,6 +224,12 @@ module.exports.getUserData = async (req, res) => {
         url: "/plans/all",
         icon: "QrCode",
         items: [{ title: "All", url: "/plans/all" }],
+      },
+      {
+        title: "Export Details",
+        url: "/all-exports",
+        icon: "QrCode",
+        items: [{ title: "All", url: "/all-exports" }],
       },
     ];
 

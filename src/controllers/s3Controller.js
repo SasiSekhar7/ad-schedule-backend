@@ -25,6 +25,7 @@ const folderPath = process.env.AWS_FOLDER_PATH;
 const accessKeyId = process.env.AWS_ACCESS_KEY;
 const secretAccessKey = process.env.AWS_SECRET_KEY;
 const bucketName = process.env.AWS_BUCKET_NAME;
+const bucketNameForExports = process.env.AWS_LOG_BUCKET_NAME;
 const lambdaName = process.env.LAMBDA_TRIGGER_NAME; // your Lambda function name
 const s3 = new S3Client({
   region,
@@ -106,6 +107,31 @@ module.exports.getBucketURL = async (fileName) => {
     return null;
   }
 };
+
+
+
+module.exports.getBucketURLForExports = async (fileName) => {
+  try {
+    const headParams = {
+      Bucket: bucketNameForExports,
+      Key: fileName,
+    };
+
+    await s3.send(new HeadObjectCommand(headParams));
+    const getCommand = new GetObjectCommand(headParams);
+    // const url = await getSignedUrl(s3, getCommand, { expiresIn: 86400 });
+    const url = await getSignedUrl(s3, getCommand, { expiresIn: 259200 });
+    return url;
+  } catch (error) {
+    if (error.name === "NotFound" || error.$metadata?.httpStatusCode === 404) {
+      logger.logWarn(`S3 file not found`, { fileName });
+    } else {
+      logger.logError("S3 getBucketURL error", error, { fileName });
+    }
+    return null;
+  }
+};
+
 
 module.exports.changeFile = async (req, res) => {
   let fileBuffer;

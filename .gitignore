@@ -1,6 +1,7 @@
 node_modules
 .env
 scripts
+archive_pop_to_s3.sh
 
 # Winston logs
 logs/
