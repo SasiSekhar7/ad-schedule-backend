@@ -1,5 +1,5 @@
 const { Op } = require("sequelize");
-const { Ad, Schedule, Device, LiveContent, Carousel } = require("../models");
+const { Ad, Schedule, Device, LiveContent, Carousel,DeviceGroup  } = require("../models");
 const {
   parseISO,
   isBefore,
@@ -761,6 +761,173 @@ module.exports.deleteMultipleSchedule = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
+module.exports.deleteMultipleScheduleLive = async (req, res) => {
+  try {
+    const { contentId, adId, contentType, startDate, endDate } = req.body;
+
+    const effectiveContentId = contentId || adId;
+    const effectiveContentType = contentType || "ad";
+
+    if (!effectiveContentId || !startDate || !endDate) {
+      return res.status(400).json({
+        error:
+          "Missing required parameters: contentId (or adId), startDate, endDate",
+      });
+    }
+
+    // Normalize dates
+    const startOfDay = moment(startDate)
+      .startOf("day")
+      .format("YYYY-MM-DD HH:mm:ss");
+
+    const endOfDay = moment(endDate)
+      .endOf("day")
+      .format("YYYY-MM-DD HH:mm:ss");
+
+    // 🔹 STEP 1: Find all schedules (NO group filter)
+    const schedulesToDelete = await Schedule.findAll({
+      where: {
+        content_id: effectiveContentId,
+        content_type: effectiveContentType,
+        start_time: {
+          [Op.between]: [startOfDay, endOfDay],
+        },
+      },
+    });
+
+    if (!schedulesToDelete || schedulesToDelete.length === 0) {
+      return res
+        .status(404)
+        .json({ error: "No schedules found for the given parameters" });
+    }
+
+    // 🔹 STEP 2: Extract UNIQUE group IDs
+    const groupIds = [
+      ...new Set(schedulesToDelete.map((s) => s.group_id)),
+    ];
+
+    // 🔹 STEP 3: Collect affected dates
+    const affectedDates = schedulesToDelete.map((s) =>
+      format(new Date(s.start_time), "yyyy-MM-dd")
+    );
+
+    // 🔹 STEP 4: Delete all matching schedules
+    await Schedule.destroy({
+      where: {
+        content_id: effectiveContentId,
+        content_type: effectiveContentType,
+        start_time: {
+          [Op.between]: [startOfDay, endOfDay],
+        },
+      },
+    });
+
+    logger.logInfo("Multiple schedule entries deleted", {
+      count: schedulesToDelete.length,
+      groupIds,
+      contentId: effectiveContentId,
+    });
+
+    // 🔹 STEP 5: Push ALL group IDs
+    await pushToGroupQueue(groupIds);
+
+    res.json({
+      message: "Schedules deleted successfully",
+      deleted_count: schedulesToDelete.length,
+      affected_group_ids: groupIds,
+      affected_content_id: effectiveContentId,
+      affected_content_type: effectiveContentType,
+      affected_dates: [...new Set(affectedDates)],
+    });
+  } catch (error) {
+    logger.logError("Error deleting schedules", error, {
+      contentId: req.body.contentId || req.body.adId,
+    });
+
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+module.exports.getScheduledGroupDetailsByContent = async (req, res) => {
+  try {
+    const { contentId, adId, contentType, startDate, endDate } = req.body;
+
+    const effectiveContentId = contentId || adId;
+    const effectiveContentType = contentType || "ad";
+
+    if (!effectiveContentId || !startDate || !endDate) {
+      return res.status(400).json({
+        error:
+          "Missing required parameters: contentId (or adId), startDate, endDate",
+      });
+    }
+
+    // Normalize dates
+    const startOfDay = moment(startDate)
+      .startOf("day")
+      .format("YYYY-MM-DD HH:mm:ss");
+
+    const endOfDay = moment(endDate)
+      .endOf("day")
+      .format("YYYY-MM-DD HH:mm:ss");
+
+    // 🔹 Fetch schedules WITH group details
+    const schedules = await Schedule.findAll({
+      where: {
+        content_id: effectiveContentId,
+        content_type: effectiveContentType,
+        start_time: {
+          [Op.between]: [startOfDay, endOfDay],
+        },
+      },
+      include: [
+        {
+          model: DeviceGroup,
+          attributes: ["id", "name"], // add more fields if needed
+        },
+      ],
+    });
+
+    if (!schedules || schedules.length === 0) {
+      return res.status(404).json({
+        message: "No groups found for this content in given time range",
+        groups: [],
+      });
+    }
+
+    // 🔹 Extract unique groups
+    const uniqueGroupsMap = new Map();
+
+    schedules.forEach((s) => {
+      if (s.Group) {
+        uniqueGroupsMap.set(s.Group.id, {
+          id: s.Group.id,
+          name: s.Group.name,
+        });
+      }
+    });
+
+    const groups = Array.from(uniqueGroupsMap.values());
+
+    res.json({
+      message: "Groups fetched successfully",
+      content_id: effectiveContentId,
+      content_type: effectiveContentType,
+      startDate,
+      endDate,
+      total_groups: groups.length,
+      groups,
+    });
+  } catch (error) {
+    logger.logError("Error fetching group details", error, {
+      contentId: req.body.contentId || req.body.adId,
+    });
+
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
 
 module.exports.getPlaceholder = async (req, res) => {
   try {
