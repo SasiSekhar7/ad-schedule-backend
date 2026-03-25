@@ -9,13 +9,23 @@ require("dotenv").config(); // Load environment variables from .env
 
 const config = {
   dialect: process.env.DB_DIALECT || "postgres",
-  host: process.env.DB_HOST || "localhost",
+  host: process.env.DB_HOST || "13.232.17.134",
   port: process.env.DB_PORT || 5432,
   username: process.env.DB_USER || "postgres",
   password: process.env.DB_PASSWORD || "admin",
   database: process.env.DB_NAME || "consoledb",
   logging: false, // optional
 };
+
+// const config = {
+//   dialect: process.env.DB_DIALECT || "postgres",
+//   host: process.env.DB_HOST || "localhost",
+//   port: process.env.DB_PORT || 5432,
+//   username: process.env.DB_USER || "postgres",
+//   password: process.env.DB_PASSWORD || "root",
+//   database: process.env.DB_NAME || "consoledb",
+//   logging: false, // optional
+// };
 
 console.log("Database configuration:", config);
 
@@ -24,7 +34,8 @@ const sequelize = new Sequelize(
   config.database,
   config.username,
   config.password,
-  config
+  config,
+  
 );
 
 module.exports = sequelize;

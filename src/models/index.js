@@ -14,6 +14,279 @@ const defaultTimestamps = {
   },
 };
 
+const DailyAdPerformance = sequelize.define(
+  "DailyAdPerformance",
+  {
+    dailyAdPerformance_id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+
+    summary_date: DataTypes.DATEONLY,
+    client_id: DataTypes.UUID,
+
+    ad_id: DataTypes.UUID,
+    ad_name: DataTypes.STRING,
+    duration: DataTypes.INTEGER,
+
+    impressions: DataTypes.BIGINT,
+    groups_scheduled: DataTypes.INTEGER,
+
+    ...defaultTimestamps,
+  },
+  { timestamps: false },
+);
+
+const DailyGroupPerformance = sequelize.define(
+  "DailyGroupPerformance",
+  {
+    dailyGroupPerformance_id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+
+    summary_date: DataTypes.DATEONLY,
+    client_id: DataTypes.UUID,
+
+    group_id: DataTypes.UUID,
+    group_name: DataTypes.STRING,
+    last_pushed: DataTypes.DATE,
+
+    impressions: DataTypes.BIGINT,
+    device_count: DataTypes.INTEGER,
+
+    ...defaultTimestamps,
+  },
+  { timestamps: false },
+);
+
+const DailyReport = sequelize.define(
+  "DailyReport",
+  {
+    report_id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+
+    report_date: {
+      type: DataTypes.DATEONLY,
+      allowNull: false,
+    },
+
+    client_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
+
+    total_impressions: {
+      type: DataTypes.BIGINT,
+      defaultValue: 0,
+    },
+
+    ads_scheduled: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+
+    active_devices: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+
+    network_issues: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+
+    storage_issues: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+
+    device_crashes: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+
+    diagnostic_errors: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+
+    playback_errors: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+
+    avg_cpu_usage: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
+
+    avg_ram_free: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
+
+    avg_storage_free: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
+
+    network_health: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+
+    ...defaultTimestamps,
+  },
+  {
+    tableName: "DailyReports",
+    timestamps: true,
+    indexes: [
+      {
+        unique: true,
+        fields: ["report_date", "client_id"],
+      },
+    ],
+  },
+);
+
+const ReportEvent = sequelize.define(
+  "ReportEvent",
+  {
+    reportEvent_id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+
+    report_id: {
+      type: DataTypes.UUID,
+      allowNull: false,
+    },
+
+    device_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
+
+    device_name: DataTypes.STRING,
+
+    location: DataTypes.STRING,
+
+    event_type: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+
+    event_timestamp: {
+      type: DataTypes.DATE,
+      allowNull: false,
+    },
+
+    ...defaultTimestamps,
+  },
+  {
+    tableName: "ReportEvents",
+    timestamps: false,
+  },
+);
+
+const ReportOutlier = sequelize.define(
+  "ReportOutlier",
+  {
+    reportOutlier_id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+
+    report_id: {
+      type: DataTypes.UUID,
+      allowNull: false,
+    },
+
+    device_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
+
+    device_name: DataTypes.STRING,
+
+    location: DataTypes.STRING,
+
+    metric: DataTypes.STRING,
+
+    value: DataTypes.STRING,
+
+    severity: {
+      type: DataTypes.ENUM("warning", "critical"),
+    },
+
+    ...defaultTimestamps,
+  },
+  {
+    tableName: "ReportOutliers",
+    timestamps: false,
+  },
+);
+
+const Tier = sequelize.define(
+  "Tier",
+  {
+    tier_id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    name: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: true,
+    },
+    description: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    price: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    billing_cycle: {
+      type: DataTypes.STRING, // monthly / yearly
+      allowNull: false,
+      defaultValue: "monthly",
+    },
+    storage_limit_bytes: {
+      type: DataTypes.BIGINT,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    max_devices: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    max_ads: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    is_active: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+    },
+    ...defaultTimestamps,
+  },
+  { tableName: "Tiers", timestamps: false },
+);
+
 const Client = sequelize.define(
   "Client",
   {
@@ -31,10 +304,24 @@ const Client = sequelize.define(
       type: DataTypes.STRING,
       validate: { isNumeric: true },
     },
+
+    tier_id: { type: DataTypes.UUID, allowNull: true },
+    used_storage_bytes: {
+      type: DataTypes.BIGINT,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    subscription_status: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: "active", // active / expired / trial
+    },
+    subscription_expiry: { type: DataTypes.DATE, allowNull: true },
+
     ...defaultTimestamps,
   },
   {
-    timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
+    timestamps: false, //  disables Sequelize's automatic createdAt/updatedAt
   },
 );
 
@@ -54,6 +341,8 @@ const Ad = sequelize.define(
       allowNull: false,
       defaultValue: "pending",
     },
+
+    fileSize: { type: DataTypes.BIGINT, allowNull: true },
     duration: { type: DataTypes.INTEGER, allowNull: false },
     isDeleted: {
       type: DataTypes.BOOLEAN,
@@ -63,7 +352,7 @@ const Ad = sequelize.define(
     ...defaultTimestamps,
   },
   {
-    timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
+    timestamps: false, //  disables Sequelize's automatic createdAt/updatedAt
   },
 );
 
@@ -83,6 +372,7 @@ const Device = sequelize.define(
         "display",
         "tablet",
         "desktop",
+        "signage",
         "signage",
       ),
       allowNull: false,
@@ -462,7 +752,7 @@ const SiteUser = sequelize.define(
     ...defaultTimestamps,
   },
   {
-    timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
+    timestamps: false, //  disables Sequelize's automatic createdAt/updatedAt
   },
 );
 
@@ -581,7 +871,7 @@ const DailyImpressionSummary = sequelize.define(
     impressions: { type: DataTypes.INTEGER, allowNull: false },
   },
   {
-    timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
+    timestamps: false, //  disables Sequelize's automatic createdAt/updatedAt
   },
   {
     tableName: "DailyImpressionSummaries",
@@ -619,7 +909,118 @@ const ApkVersion = sequelize.define(
     uploaded_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
   },
   {
-    timestamps: false, // ✅ disables Sequelize's automatic createdAt/updatedAt
+    timestamps: false, //  disables Sequelize's automatic createdAt/updatedAt
+  },
+);
+
+const ExportJob = sequelize.define(
+  "ExportJob",
+  {
+    job_id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+
+    // who requested
+    client_id: {
+      type: DataTypes.UUID,
+      allowNull: false,
+    },
+
+    // report type (future-proof)
+    job_type: {
+      type: DataTypes.ENUM(
+        "PROOF_OF_PLAY",
+        "DEVICE_TELEMETRY",
+        "DEVICE_EVENTS",
+        "DAILY_IMPRESSIONS",
+        "BILLING_REPORT",
+      ),
+      allowNull: false,
+      defaultValue: "PROOF_OF_PLAY",
+    },
+
+    // filters
+    device_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
+
+    ad_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
+
+    start_date: {
+      type: DataTypes.DATE,
+      allowNull: false,
+    },
+
+    end_date: {
+      type: DataTypes.DATE,
+      allowNull: false,
+    },
+
+    // job lifecycle
+    status: {
+      type: DataTypes.ENUM(
+        "PENDING",
+        "QUEUED",
+        "PROCESSING",
+        "COMPLETED",
+        "FAILED",
+        "CANCELLED",
+      ),
+      allowNull: false,
+      defaultValue: "PENDING",
+    },
+
+    progress_percent: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0, // 0 → 100
+    },
+
+    s3_bucket: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+
+    s3_key: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+
+    file_size_bytes: {
+      type: DataTypes.BIGINT,
+      allowNull: true,
+    },
+
+    error_message: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+
+    created_at: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW,
+    },
+
+    updated_at: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW,
+    },
+  },
+  {
+    tableName: "ExportJobs",
+    timestamps: false,
+    indexes: [
+      { fields: ["client_id"] },
+      { fields: ["status"] },
+      { fields: ["job_type"] },
+      { fields: ["created_at"] },
+    ],
   },
 );
 
@@ -631,7 +1032,12 @@ const ProofOfPlayLog = sequelize.define(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-    event_id: { type: DataTypes.UUID, allowNull: false, unique: true },
+    start_time: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      primaryKey: true, // ✅ REQUIRED for partitioning
+    },
+    event_id: { type: DataTypes.UUID },
     device_id: {
       type: DataTypes.UUID,
       allowNull: false,
@@ -648,12 +1054,41 @@ const ProofOfPlayLog = sequelize.define(
       references: { model: "Schedules", key: "schedule_id" },
     },
 
-    start_time: { type: DataTypes.DATE, allowNull: false },
+    // start_time: { type: DataTypes.DATE, allowNull: false },
     end_time: { type: DataTypes.DATE, allowNull: false },
     duration_played_ms: { type: DataTypes.INTEGER, allowNull: false },
     ...defaultTimestamps,
   },
-  { timestamps: false },
+  {
+    timestamps: false,
+    // indexes: [
+    //   {
+    //     unique: true,
+    //     fields: ["event_id", "start_time"], // required for partition tables
+    //   },
+    //   {
+    //     fields: ["device_id", "start_time"],
+    //   },
+    //   {
+    //     fields: ["ad_id", "start_time"],
+    //   },
+    // ],
+    indexes: [
+  {
+    unique: true,
+    name: "pop_event_start_unique",
+    fields: ["event_id", "start_time"],
+  },
+  {
+    name: "pop_device_start_idx",
+    fields: ["device_id", "start_time"],
+  },
+  {
+    name: "pop_ad_start_idx",
+    fields: ["ad_id", "start_time"],
+  },
+]
+  },
 );
 
 const DeviceTelemetryLog = sequelize.define(
@@ -669,7 +1104,7 @@ const DeviceTelemetryLog = sequelize.define(
       allowNull: false,
       references: { model: "Devices", key: "device_id" },
     },
-    timestamp: { type: DataTypes.DATE, allowNull: false },
+    timestamp: { type: DataTypes.DATE, allowNull: false, primaryKey: true,  },
     cpu_usage: DataTypes.FLOAT,
     ram_free_mb: DataTypes.INTEGER,
     storage_free_mb: DataTypes.INTEGER,
@@ -677,7 +1112,15 @@ const DeviceTelemetryLog = sequelize.define(
     app_version_code: DataTypes.INTEGER,
     ...defaultTimestamps,
   },
-  { timestamps: false, indexes: [{ fields: ["device_id", "timestamp"] }] },
+  { timestamps: false, 
+    // indexes: [{unique: true, fields: ["device_id", "timestamp"] }]
+    indexes: [
+  {
+    name: "telemetry_device_timestamp_idx",
+    fields: ["device_id", "timestamp"],
+  },
+]
+   },
 );
 
 const DeviceEventLog = sequelize.define(
@@ -694,16 +1137,26 @@ const DeviceEventLog = sequelize.define(
       allowNull: false,
       references: { model: "Devices", key: "device_id" },
     },
-    timestamp: { type: DataTypes.DATE, allowNull: false },
+    timestamp: { type: DataTypes.DATE, allowNull: false , primaryKey: true, },
     event_type: { type: DataTypes.STRING, allowNull: false },
     payload: { type: DataTypes.JSONB, allowNull: false },
     ...defaultTimestamps,
   },
   {
     timestamps: false,
+    // indexes: [
+    //   { fields: ["device_id", "timestamp"] },
+    //   { fields: ["event_type"] },
+    // ],
     indexes: [
-      { fields: ["device_id", "timestamp"] },
-      { fields: ["event_type"] },
+      {
+    name: "device_event_device_timestamp_idx",
+    fields: ["device_id", "timestamp"],
+  },
+  {
+    name: "device_event_type_idx",
+    fields: ["event_type"],
+  },
     ],
   },
 );
@@ -850,6 +1303,16 @@ StreamingProvider.hasMany(StreamChannel, { foreignKey: "provider_id" });
 StreamChannel.belongsTo(StreamingProvider, { foreignKey: "provider_id" });
 StreamChannel.hasMany(StreamUsage, { foreignKey: "channel_id" });
 StreamUsage.belongsTo(StreamChannel, { foreignKey: "channel_id" });
+ 
+
+DailyReport.hasMany(ReportEvent, { foreignKey: "report_id" });
+ReportEvent.belongsTo(DailyReport, { foreignKey: "report_id" });
+
+DailyReport.hasMany(ReportOutlier, { foreignKey: "report_id" });
+ReportOutlier.belongsTo(DailyReport, { foreignKey: "report_id" });
+
+Tier.hasMany(Client, { foreignKey: "tier_id" });
+Client.belongsTo(Tier, { foreignKey: "tier_id" });
 
 DailyImpressionSummary.belongsTo(DeviceGroup, { foreignKey: "group_id" });
 DailyImpressionSummary.belongsTo(Ad, { foreignKey: "ad_id" });
@@ -939,6 +1402,13 @@ module.exports = {
   ProofOfPlayLog,
   DeviceTelemetryLog,
   DeviceEventLog,
+  Tier,
+  DailyReport,
+  ReportEvent,
+  ReportOutlier,
+  DailyAdPerformance,
+  DailyGroupPerformance,
+  ExportJob,
   LiveContent,
   Carousel,
   CarouselItem,

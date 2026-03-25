@@ -1,8 +1,17 @@
 const cron = require("node-cron");
-const { DeviceGroup } = require("../models");
+const { DeviceGroup, DailyReport, Client } = require("../models");
 const { pushToGroupQueue } = require("../controllers/queueController");
 const { updateUpcomingMatches } = require("../controllers/cricketController");
 const logger = require("../utils/logger");
+const { checkClientExpiry } = require("../services/subscriptionService");
+const {
+  generateDailyPerformanceReports,
+} = require("../services/generatePerformanceSummary");
+
+const {
+  generateDailyReportsForAllClients,
+} = require("../services/reportGenerator");
+const { createNextMonthPartition } = require("../db/proofOfPlay/createMonthlyPopPartition");
 
 // Function to be executed at 6 AM daily
 async function dailySchedulePush() {
@@ -33,7 +42,7 @@ cron.schedule(
   {
     scheduled: true,
     timezone: "Asia/Kolkata", // India timezone
-  }
+  },
 );
 
 cron.schedule(
@@ -46,6 +55,22 @@ cron.schedule(
   {
     scheduled: true,
     timezone: "Asia/Kolkata", // India timezone
+  },
+);
+
+
+cron.schedule(
+  "05 06 25 * *",   // 6:05 AM on 25th of every month
+  async () => {
+    logger.logInfo("Running monthly partition creation job");
+
+    await createNextMonthPartition();
+
+    logger.logInfo("Monthly partition job completed");
+  },
+  {
+    scheduled: true,
+    timezone: "Asia/Kolkata",
   }
 );
 
@@ -73,3 +98,38 @@ logger.logInfo("Cron jobs initialized", {
 //     scheduled: true,
 //     timezone: "Asia/Kolkata" // India timezone
 // });
+
+//client plan expiry check cron ,Subscription expiry cron
+cron.schedule(
+  "30 02 * * *", // 2:30 AM IST (best practice → night)
+  async () => {
+    logger.logInfo("Running subscription expiry cron");
+    await checkClientExpiry();
+  },
+  {
+    scheduled: true,
+    timezone: "Asia/Kolkata",
+  },
+);
+
+cron.schedule("0 1 * * *", async () => {
+  console.log("Running Daily Report Cron...");
+
+  try {
+    await generateDailyReportsForAllClients();
+
+    console.log("Daily Reports Generated Successfully");
+  } catch (error) {
+    console.error("Cron Error:", error);
+  }
+});
+
+cron.schedule("0 1 * * *", async () => {
+  console.log("Running Performance Summary Cron...");
+  try {
+    await generateDailyPerformanceReports();
+    console.log("Performance Summary Cron Completed");
+  } catch (error) {
+    console.error("Cron Error:", error);
+  }
+});
