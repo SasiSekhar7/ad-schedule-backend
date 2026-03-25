@@ -796,6 +796,8 @@ module.exports.deleteMultipleScheduleLive = async (req, res) => {
       },
     });
 
+    console.log("schedules...........", schedulesToDelete)
+
     if (!schedulesToDelete || schedulesToDelete.length === 0) {
       return res
         .status(404)
@@ -851,7 +853,7 @@ module.exports.deleteMultipleScheduleLive = async (req, res) => {
 
 module.exports.getScheduledGroupDetailsByContent = async (req, res) => {
   try {
-    const { contentId, adId, contentType, startDate, endDate } = req.body;
+    const { contentId, adId, contentType, startDate, endDate } = req.query;
 
     const effectiveContentId = contentId || adId;
     const effectiveContentType = contentType || "ad";
@@ -863,7 +865,6 @@ module.exports.getScheduledGroupDetailsByContent = async (req, res) => {
       });
     }
 
-    // Normalize dates
     const startOfDay = moment(startDate)
       .startOf("day")
       .format("YYYY-MM-DD HH:mm:ss");
@@ -872,7 +873,6 @@ module.exports.getScheduledGroupDetailsByContent = async (req, res) => {
       .endOf("day")
       .format("YYYY-MM-DD HH:mm:ss");
 
-    // 🔹 Fetch schedules WITH group details
     const schedules = await Schedule.findAll({
       where: {
         content_id: effectiveContentId,
@@ -884,26 +884,25 @@ module.exports.getScheduledGroupDetailsByContent = async (req, res) => {
       include: [
         {
           model: DeviceGroup,
-          attributes: ["id", "name"], // add more fields if needed
+          attributes: ["group_id", "name"],
         },
       ],
     });
 
     if (!schedules || schedules.length === 0) {
       return res.status(404).json({
-        message: "No groups found for this content in given time range",
+        message: "No groups found",
         groups: [],
       });
     }
 
-    // 🔹 Extract unique groups
     const uniqueGroupsMap = new Map();
 
     schedules.forEach((s) => {
-      if (s.Group) {
-        uniqueGroupsMap.set(s.Group.id, {
-          id: s.Group.id,
-          name: s.Group.name,
+      if (s.DeviceGroup) {
+        uniqueGroupsMap.set(s.DeviceGroup.id, {
+          id: s.DeviceGroup.id,
+          name: s.DeviceGroup.name,
         });
       }
     });
@@ -912,18 +911,10 @@ module.exports.getScheduledGroupDetailsByContent = async (req, res) => {
 
     res.json({
       message: "Groups fetched successfully",
-      content_id: effectiveContentId,
-      content_type: effectiveContentType,
-      startDate,
-      endDate,
-      total_groups: groups.length,
       groups,
     });
   } catch (error) {
-    logger.logError("Error fetching group details", error, {
-      contentId: req.body.contentId || req.body.adId,
-    });
-
+    logger.logError("Error fetching group details", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
