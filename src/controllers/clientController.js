@@ -6,6 +6,7 @@ const {
   Device,
   DeviceGroup,
   Tier,
+  StreamChannel,
 } = require("../models");
 const { getBucketURL } = require("./s3Controller");
 const logger = require("../utils/logger");
@@ -111,6 +112,42 @@ module.exports.getAllClients = async (req, res) => {
     return res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
+  }
+};
+
+module.exports.getEligibleClientsForStreaming = async (req, res) => {
+  try {
+    const clients = await Client.findAll({
+      attributes: ["client_id", "name"],
+
+      include: [
+        {
+          model: Tier,
+          required: true, //must have tier
+          attributes: ["tier_id", "name", "is_livestream"],
+          where: {
+            is_livestream: true, //tier condition
+          },
+        },
+        {
+          model: StreamChannel,
+          required: false, // LEFT JOIN
+          attributes: [],
+        },
+      ],
+
+      where: {
+        "$StreamChannel.client_id$": null, //no channel
+      },
+    });
+
+    return res.status(200).json({ clients });
+  } catch (error) {
+    logger.logError("Error fetching eligible clients", error);
+    return res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 };
 

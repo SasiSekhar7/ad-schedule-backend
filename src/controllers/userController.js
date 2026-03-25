@@ -258,13 +258,13 @@ module.exports.getUserData = async (req, res) => {
         items: [{ title: "All", url: "/all-exports" }],
       },
 
-      {
-        title: "Stream Providers",
-        url: "/stream-providers",
-        icon: "Radio",
+      // {
+      //   title: "Stream Providers",
+      //   url: "/stream-providers",
+      //   icon: "Radio",
 
-        items: [{ title: "All", url: "/stream-providers" }],
-      },
+      //   items: [{ title: "All", url: "/stream-providers" }],
+      // },
     ];
 
     // Example teams (same for both roles here, but you can customize)

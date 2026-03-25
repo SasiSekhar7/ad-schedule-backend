@@ -23,10 +23,24 @@ exports.getAll = async (req, res) => {
 
 exports.createTier = async (req, res) => {
   try {
+    if (!req.body.name) {
+      return res.status(400).json({ message: "Name is required" });
+    }
+
+    const existingTier = await Tier.findOne({
+      where: {
+        name: req.body.name,
+      },
+    });
+
+    if (existingTier) {
+      return res.status(400).json({ message: "Tier already exists" });
+    }
     const tier = await Tier.create(req.body);
+
     res.status(201).json(tier);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: error });
   }
 };
 

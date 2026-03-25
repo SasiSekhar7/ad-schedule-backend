@@ -7,6 +7,7 @@ const {
   getAllAds,
   getAllDetails,
   updateClientNew,
+  getEligibleClientsForStreaming,
 } = require("../controllers/clientController");
 const { sendAdFile, sendAdDetails } = require("../controllers/adController");
 const {
@@ -130,7 +131,12 @@ const {
   toggleTierStatus,
   getAll,
 } = require("../controllers/tierController");
-const { createExportJob, getJobStatus, listJobs, updateJobStatus } = require("../controllers/exportController");
+const {
+  createExportJob,
+  getJobStatus,
+  listJobs,
+  updateJobStatus,
+} = require("../controllers/exportController");
 
 router.get("/tiers", getAllTiers);
 router.get("/all-tiers", getAll);
@@ -160,9 +166,27 @@ const {
 
 const { dacastWebhook } = require("../controllers/webhookController");
 const { syncChannelAnalytics } = require("../controllers/analyticsController");
-const { deleteStreamChannel, stopStreamChannel, startStreamChannel, updateStreamChannel, createStreamChannel, getStreamChannelById, getAllStreamChannels, syncDacastChannels } = require("../controllers/streamChannelController");
-const { createStreamingProvider, getStreamingProviders, updateStreamingProvider, deleteStreamingProvider } = require("../controllers/streamingProviderController");
-const { startStream, streamChunk, stopStream } = require("../mediaStream/streamController");
+const {
+  deleteStreamChannel,
+  stopStreamChannel,
+  startStreamChannel,
+  updateStreamChannel,
+  createStreamChannel,
+  getStreamChannelById,
+  getAllStreamChannels,
+  syncDacastChannels,
+} = require("../controllers/streamChannelController");
+const {
+  createStreamingProvider,
+  getStreamingProviders,
+  updateStreamingProvider,
+  deleteStreamingProvider,
+} = require("../controllers/streamingProviderController");
+const {
+  startStream,
+  streamChunk,
+  stopStream,
+} = require("../mediaStream/streamController");
 
 router.post("/device/register", registerDevice); // takes group id and location input
 
@@ -262,6 +286,8 @@ router.post(
 );
 
 router.get("/ads/clients", validateToken, getAllClients);
+router.get("/eligible-streaming-clients", getEligibleClientsForStreaming);
+
 router.get("/ads/all", validateToken, getAllAds);
 
 router.post("/ads/create-client", validateToken, createClient);
@@ -423,44 +449,22 @@ router.post("/device/mqtt-custom-message/:device_id", sendCustomMQTTMessage);
 
 router.post("/cron/daily-schedule-push", dailySchedulePushManual);
 
-
 // ===============================
 // 📦 REPORT / EXPORT JOB ROUTES
 // ===============================
 
 // Create export job (async, background)
-router.post(
-  "/exports",
-  validateToken,
-  createExportJob
-);
+router.post("/exports", validateToken, createExportJob);
 
 // Get single export job status
-router.get(
-  "/exports/:job_id",
-  validateToken,
-  getJobStatus
-);
+router.get("/exports/:job_id", validateToken, getJobStatus);
 
-router.put("/exports/:job_id", validateToken, updateJobStatus)
-
-
+router.put("/exports/:job_id", validateToken, updateJobStatus);
 
 // List export jobs (pagination)
-router.get(
-  "/exports",
-  validateToken,
-  listJobs
-);
+router.get("/exports", validateToken, listJobs);
 
-
-
-
-
-router.patch("/schedule/live/toggle",validateToken, toggleLiveContentByGroup);
-
-
-
+router.patch("/schedule/live/toggle", validateToken, toggleLiveContentByGroup);
 
 // =============================
 // STREAMING PROVIDER ROUTES
@@ -470,80 +474,49 @@ router.post(
   "/streaming/provider",
   validateToken,
   validateAdmin,
-  createStreamingProvider
+  createStreamingProvider,
 );
 
 router.get(
   "/streaming/provider",
   validateToken,
   validateAdmin,
-  getStreamingProviders
+  getStreamingProviders,
 );
 
 router.put(
   "/streaming/provider/:id",
   validateToken,
   validateAdmin,
-  updateStreamingProvider
+  updateStreamingProvider,
 );
 
 router.delete(
   "/streaming/provider/:id",
   validateToken,
   validateAdmin,
-  deleteStreamingProvider
+  deleteStreamingProvider,
 );
-
 
 // // =============================
 // // STREAM CHANNEL ROUTES
 // // =============================
 
-router.post(
-  "/streaming/channel",
-  validateToken,
-  createStreamChannel
-);
+router.post("/streaming/channel", validateToken, createStreamChannel);
 
-router.get(
-  "/streaming/channel",
-  validateToken,
-  getAllStreamChannels
-);
+router.get("/streaming/channel", validateToken, getAllStreamChannels);
 
-router.get(
-  "/streaming/channel/:id",
-  validateToken,
-  getStreamChannelById
-);
+router.get("/streaming/channel/:id", validateToken, getStreamChannelById);
 
-router.put(
-  "/streaming/channel/:id",
-  validateToken,
-  updateStreamChannel
-);
+router.put("/streaming/channel/:id", validateToken, updateStreamChannel);
 
-router.put(
-  "/streaming/channel/:id/start",
-  validateToken,
-  startStreamChannel
-);
+router.put("/streaming/channel/:id/start", validateToken, startStreamChannel);
 
-router.put(
-  "/streaming/channel/:id/stop",
-  validateToken,
-  stopStreamChannel
-);
+router.put("/streaming/channel/:id/stop", validateToken, stopStreamChannel);
 
-router.delete(
-  "/streaming/channel/:id",
-  validateToken,
-  deleteStreamChannel
-);
+router.delete("/streaming/channel/:id", validateToken, deleteStreamChannel);
 
-router.post("/streaming/channels/sync", validateToken ,syncDacastChannels);
-
-
+router.post("/streaming/channels/sync", validateToken, syncDacastChannels);
 
 // =============================
 // STREAM ANALYTICS
@@ -552,9 +525,8 @@ router.post("/streaming/channels/sync", validateToken ,syncDacastChannels);
 router.post(
   "/streaming/channel/:id/sync-analytics",
   validateToken,
-  syncChannelAnalytics
+  syncChannelAnalytics,
 );
-
 
 // =============================
 // DACAST WEBHOOK
@@ -562,15 +534,8 @@ router.post(
 
 router.post("/webhooks/dacast", dacastWebhook);
 
-
-
-
-
 router.post("/start-stream", startStream);
 router.post("/stream/:channel_id", streamChunk);
 router.post("/stop-stream", stopStream);
-
-
-
 
 module.exports = router;

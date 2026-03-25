@@ -4,6 +4,7 @@ const {
   StreamingProvider,
   LiveContent,
   Schedule,
+  Client,
 } = require("../models");
 const logger = require("../utils/logger");
 const { Op } = require("sequelize");
@@ -20,14 +21,29 @@ async function getProvider() {
  */
 module.exports.createStreamChannel = async (req, res) => {
   try {
-    const { name, description } = req.body;
-    const client_id = req.user?.client_id;
+    const { name, description, client_id } = req.body;
+    // const client_id = req.user?.client_id;
 
     if (!client_id)
       return res.status(400).json({ error: "Client ID is required" });
 
     if (!name)
       return res.status(400).json({ error: "Channel name is required" });
+
+    //CHECK IF CHANNEL ALREADY EXISTS
+    const existingChannel = await StreamChannel.findOne({
+      where: { client_id },
+    });
+
+    if (existingChannel) {
+      return res.status(400).json({
+        error: "Channel already exists for this client",
+        data: {
+          channel_id: existingChannel.channel_id,
+          name: existingChannel.name,
+        },
+      });
+    }
 
     // 1️⃣ Get provider
     const provider = await getProvider();
@@ -61,7 +77,7 @@ module.exports.createStreamChannel = async (req, res) => {
 
     const data = response.data;
 
-    // 3️⃣ Save in DB
+    //  Save in DB
     const channel = await StreamChannel.create({
       provider_id: provider.provider_id,
       client_id,
@@ -72,6 +88,24 @@ module.exports.createStreamChannel = async (req, res) => {
       playback_url: data.hls || null,
       status: "idle",
       metadata: data,
+    });
+
+    // CREATE LIVE CONTENT ENTRY
+    await LiveContent.create({
+      client_id,
+      name: `${name} Live`,
+      content_type: "provider", // ✅ important
+      channel_id: channel.channel_id,
+      url: channel.playback_url, // HLS / playback URL
+      duration: 0,
+      status: "active",
+      start_time: null, // current time
+      end_time: null, // +24 hours
+
+      config: {
+        autoplay: true,
+        mute: false,
+      },
     });
 
     logger.logInfo("Stream channel created", {
@@ -110,6 +144,12 @@ module.exports.getAllStreamChannels = async (req, res) => {
     const channels = await StreamChannel.findAll({
       where: { client_id },
       order: [["created_at", "DESC"]],
+      include: [
+        {
+          model: Client,
+          attributes: [],
+        },
+      ],
       attributes: [
         "channel_id",
         "name",
@@ -265,10 +305,8 @@ module.exports.startStreamChannel = async (req, res) => {
       groupIds = [...new Set(schedules.map((s) => s.group_id))];
     }
 
-    console.log("groupIds,", groupIds)
-     
+    console.log("groupIds,", groupIds);
 
-    
     const provider = await getProvider();
     if (!provider)
       return res
@@ -287,7 +325,7 @@ module.exports.startStreamChannel = async (req, res) => {
     // Let webhook confirm actual stream start.
     await channel.update({ status: "live" });
 
-     await pushToGroupQueue(groupIds);
+    await pushToGroupQueue(groupIds);
 
     return res.json({ message: "Channel set to online (waiting for stream)" });
   } catch (error) {
@@ -311,7 +349,7 @@ module.exports.stopStreamChannel = async (req, res) => {
     const { id } = req.params;
     const client_id = req.user?.client_id;
 
-     const now = new Date();
+    const now = new Date();
 
     const startOfDay = new Date(now);
     startOfDay.setHours(0, 0, 0, 0);
@@ -325,7 +363,7 @@ module.exports.stopStreamChannel = async (req, res) => {
 
     if (!channel) return res.status(404).json({ error: "Channel not found" });
 
-      // 🔥 1️⃣ Find LiveContents using this channel
+    // 🔥 1️⃣ Find LiveContents using this channel
     const liveContents = await LiveContent.findAll({
       where: {
         channel_id: channel.channel_id,
@@ -355,7 +393,7 @@ module.exports.stopStreamChannel = async (req, res) => {
       groupIds = [...new Set(schedules.map((s) => s.group_id))];
     }
 
-    console.log("groupIds,", groupIds)
+    console.log("groupIds,", groupIds);
 
     const provider = await getProvider();
     if (!provider)

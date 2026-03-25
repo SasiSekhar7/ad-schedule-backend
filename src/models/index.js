@@ -277,6 +277,19 @@ const Tier = sequelize.define(
       allowNull: false,
       defaultValue: 0,
     },
+
+    // NEW FIELDS
+    is_livestream: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
+    is_proof_of_play_logs: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
+
     is_active: {
       type: DataTypes.BOOLEAN,
       allowNull: false,
@@ -1074,20 +1087,20 @@ const ProofOfPlayLog = sequelize.define(
     //   },
     // ],
     indexes: [
-  {
-    unique: true,
-    name: "pop_event_start_unique",
-    fields: ["event_id", "start_time"],
-  },
-  {
-    name: "pop_device_start_idx",
-    fields: ["device_id", "start_time"],
-  },
-  {
-    name: "pop_ad_start_idx",
-    fields: ["ad_id", "start_time"],
-  },
-]
+      {
+        unique: true,
+        name: "pop_event_start_unique",
+        fields: ["event_id", "start_time"],
+      },
+      {
+        name: "pop_device_start_idx",
+        fields: ["device_id", "start_time"],
+      },
+      {
+        name: "pop_ad_start_idx",
+        fields: ["ad_id", "start_time"],
+      },
+    ],
   },
 );
 
@@ -1104,7 +1117,7 @@ const DeviceTelemetryLog = sequelize.define(
       allowNull: false,
       references: { model: "Devices", key: "device_id" },
     },
-    timestamp: { type: DataTypes.DATE, allowNull: false, primaryKey: true,  },
+    timestamp: { type: DataTypes.DATE, allowNull: false, primaryKey: true },
     cpu_usage: DataTypes.FLOAT,
     ram_free_mb: DataTypes.INTEGER,
     storage_free_mb: DataTypes.INTEGER,
@@ -1112,15 +1125,16 @@ const DeviceTelemetryLog = sequelize.define(
     app_version_code: DataTypes.INTEGER,
     ...defaultTimestamps,
   },
-  { timestamps: false, 
+  {
+    timestamps: false,
     // indexes: [{unique: true, fields: ["device_id", "timestamp"] }]
     indexes: [
-  {
-    name: "telemetry_device_timestamp_idx",
-    fields: ["device_id", "timestamp"],
+      {
+        name: "telemetry_device_timestamp_idx",
+        fields: ["device_id", "timestamp"],
+      },
+    ],
   },
-]
-   },
 );
 
 const DeviceEventLog = sequelize.define(
@@ -1137,7 +1151,7 @@ const DeviceEventLog = sequelize.define(
       allowNull: false,
       references: { model: "Devices", key: "device_id" },
     },
-    timestamp: { type: DataTypes.DATE, allowNull: false , primaryKey: true, },
+    timestamp: { type: DataTypes.DATE, allowNull: false, primaryKey: true },
     event_type: { type: DataTypes.STRING, allowNull: false },
     payload: { type: DataTypes.JSONB, allowNull: false },
     ...defaultTimestamps,
@@ -1150,13 +1164,13 @@ const DeviceEventLog = sequelize.define(
     // ],
     indexes: [
       {
-    name: "device_event_device_timestamp_idx",
-    fields: ["device_id", "timestamp"],
-  },
-  {
-    name: "device_event_type_idx",
-    fields: ["event_type"],
-  },
+        name: "device_event_device_timestamp_idx",
+        fields: ["device_id", "timestamp"],
+      },
+      {
+        name: "device_event_type_idx",
+        fields: ["event_type"],
+      },
     ],
   },
 );
@@ -1297,13 +1311,14 @@ StreamChannel.hasMany(LiveContent, {
   foreignKey: "channel_id",
 });
 
-Client.hasMany(StreamChannel, { foreignKey: "client_id" });
+// Client.hasMany(StreamChannel, { foreignKey: "client_id" });
+Client.hasOne(StreamChannel, { foreignKey: "client_id" });
+
 StreamChannel.belongsTo(Client, { foreignKey: "client_id" });
 StreamingProvider.hasMany(StreamChannel, { foreignKey: "provider_id" });
 StreamChannel.belongsTo(StreamingProvider, { foreignKey: "provider_id" });
 StreamChannel.hasMany(StreamUsage, { foreignKey: "channel_id" });
 StreamUsage.belongsTo(StreamChannel, { foreignKey: "channel_id" });
- 
 
 DailyReport.hasMany(ReportEvent, { foreignKey: "report_id" });
 ReportEvent.belongsTo(DailyReport, { foreignKey: "report_id" });
