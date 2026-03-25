@@ -17,6 +17,8 @@ const {
   getPlaceholder,
   deleteMultipleSchedule,
   scheduleAd_v2,
+  deleteMultipleScheduleLive,
+  getScheduledGroupDetailsByContent,
 } = require("../controllers/scheduleController");
 const {
   getFullSchedule,
@@ -276,6 +278,8 @@ router.post("/schedule/add_v2", validateToken, scheduleAd_v2);
 router.post("/schedule/update/:id", updateSchedule);
 router.post("/schedule/delete/:id", validateToken, deleteSchedule);
 router.post("/schedule/multiple-delete", validateToken, deleteMultipleSchedule);
+router.post("/schedule/live/multiple-delete", validateToken, deleteMultipleScheduleLive);
+router.get("/schedule/live/content-groups", validateToken, getScheduledGroupDetailsByContent)
 
 router.get("/schedule/placeholder", validateToken, getPlaceholder);
 router.post(
