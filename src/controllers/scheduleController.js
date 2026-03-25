@@ -901,9 +901,9 @@ module.exports.getScheduledGroupDetailsByContent = async (req, res) => {
     schedules.forEach((s) => {
       if (s.DeviceGroup) {
         uniqueGroupsMap.set(s.DeviceGroup.group_id, {
-          id: s.DeviceGroup.group_id,
+          group_id: s.DeviceGroup.group_id,
           name: s.DeviceGroup.name,
-          
+
         });
       }
     });
