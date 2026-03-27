@@ -8,7 +8,8 @@ const path = require("path");
 const QueryStream = require("pg-query-stream");
 const csv = require("csv-parser");
 const zlib = require("zlib");
-const moment = require("moment");
+// const moment = require("moment");
+const moment = require("moment-timezone");
 
 const { ExportJob, sequelize } = require("../models");
 
@@ -108,9 +109,37 @@ async function runExportJob() {
       if (!sheets[sheetName]) {
         const sheet = workbook.addWorksheet(sheetName);
 
+        // sheet.columns = Object.keys(row).map((key) => ({
+        //   header: key,
+        //   key,
+        // }));
+
+        // sheet.columns = Object.keys(row).map((key) => ({
+        //   header: key,
+        //   key,
+        //   width: 22, // ✅ FIX: increase width
+        //   style:
+        //     key.includes("time") || key.includes("date") || key.includes("at")
+        //       ? { numFmt: "yyyy-mm-dd hh:mm:ss" }
+        //       : {},
+        // }));
+
+        const DATE_FIELDS = [
+          "start_time",
+          "end_time",
+          "timestamp",
+          "created_at",
+          "updated_at",
+          "played_at",
+        ];
+
         sheet.columns = Object.keys(row).map((key) => ({
           header: key,
           key,
+          width: 22,
+          // style: DATE_FIELDS.includes(key)
+          //   ? { numFmt: "yyyy-mm-dd hh:mm:ss" }
+          //   : {},
         }));
 
         sheets[sheetName] = sheet;
@@ -126,9 +155,27 @@ async function runExportJob() {
 
         const sheet = workbook.addWorksheet(sheetName);
 
+        // sheet.columns = Object.keys(row).map((key) => ({
+        //   header: key,
+        //   key,
+        // }));
+
+        const DATE_FIELDS = [
+          "start_time",
+          "end_time",
+          "timestamp",
+          "created_at",
+          "updated_at",
+          "played_at",
+        ];
+
         sheet.columns = Object.keys(row).map((key) => ({
           header: key,
           key,
+          width: 22,
+          // style: DATE_FIELDS.includes(key)
+          //   ? { numFmt: "yyyy-mm-dd hh:mm:ss" }
+          //   : {},
         }));
 
         sheets[sheetName] = sheet;
@@ -138,10 +185,54 @@ async function runExportJob() {
       return sheets[sheetName];
     }
 
+    function convertToIST(row) {
+      const newRow = {};
+
+      const DATE_FIELDS = [
+        "start_time",
+        "end_time",
+        "timestamp",
+        "created_at",
+        "updated_at",
+        "played_at",
+      ];
+
+      for (const key in row) {
+        let value = row[key];
+
+        if (value && DATE_FIELDS.includes(key)) {
+          value = moment(value)
+            .tz("Asia/Kolkata")
+            .format("DD/MM/YYYY, hh:mm:ss A"); // ✅ STRING like your API
+        }
+
+        newRow[key] = value;
+      }
+
+      return newRow;
+    }
+
     function writeRow(row) {
       const sheet = getMonthlySheet(row);
 
-      sheet.addRow(row).commit();
+      const formattedRow = convertToIST(row);
+
+      const rowObj = sheet.addRow(formattedRow);
+
+      // 🔥 Force format (extra safe)
+      rowObj.eachCell((cell, colNumber) => {
+        const key = sheet.columns[colNumber - 1].key;
+
+        if (
+          key.includes("time") ||
+          key.includes("date") ||
+          key.includes("at")
+        ) {
+          cell.numFmt = "yyyy-mm-dd hh:mm:ss";
+        }
+      });
+
+      rowObj.commit();
 
       sheetRowCount[sheet.name]++;
     }
