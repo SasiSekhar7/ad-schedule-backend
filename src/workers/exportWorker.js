@@ -981,7 +981,7 @@ async function runExportJob() {
 
     const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
       filename: filePath,
-      useStyles: false,
+      useStyles: true,
       useSharedStrings: false,
     });
 
@@ -999,11 +999,19 @@ async function runExportJob() {
       deviceMap[d.device_id] = d.device_name;
     });
 
-    const ads = await sequelize.query(`SELECT ad_id, name FROM "Ads"`, {
-      type: sequelize.QueryTypes.SELECT,
-    });
+    const ads = await sequelize.query(
+      `SELECT ad_id, duration, name FROM "Ads"`,
+      {
+        type: sequelize.QueryTypes.SELECT,
+      },
+    );
+
     ads.forEach((a) => {
-      adMap[a.ad_id] = a.name;
+      // adMap[a.ad_id] = a.name;
+      adMap[a.ad_id] = {
+        name: a.name,
+        duration: a.duration,
+      };
     });
 
     // ================= DEVICE SHEETS =================
@@ -1014,6 +1022,10 @@ async function runExportJob() {
     const summaryMap = {};
 
     function getDeviceKey(row) {
+      if (row.device_name && row.device_id) {
+        return `${row.device_name} (${row.device_id})`;
+      }
+
       return row.device_name || row.device_id || "Unknown";
     }
 
@@ -1032,11 +1044,45 @@ async function runExportJob() {
       if (!sheets[sheetName]) {
         const sheet = workbook.addWorksheet(sheetName);
 
-        sheet.columns = Object.keys(row).map((key) => ({
-          header: key,
-          key,
-          width: 22,
-        }));
+        if (job.job_type === "PROOF_OF_PLAY") {
+          sheet.columns = [
+            { header: "Event ID", key: "event_id", width: 30 },
+            { header: "Ad ID", key: "ad_id", width: 35 },
+            { header: "Ad Name", key: "ad_name", width: 30 },
+            { header: "Play Start Time", key: "start_time", width: 25 },
+            { header: "Play End Time", key: "end_time", width: 25 },
+            { header: "Ad Duration (sec)", key: "duration", width: 18 },
+          ];
+        } else {
+          sheet.columns = Object.keys(row).map((key) => ({
+            header: key,
+            key,
+            width: 22,
+          }));
+        }
+
+        // ✅ 🔥 ADD HEADER COLOR HERE
+        const headerRow = sheet.getRow(1);
+
+        headerRow.eachCell((cell) => {
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: "FF1F4E78" }, // 🔵 Dark Blue (nice professional)
+          };
+
+          cell.font = {
+            bold: true,
+            color: { argb: "FFFFFFFF" }, // ⚪ White text
+          };
+
+          cell.alignment = {
+            vertical: "middle",
+            horizontal: "center",
+          };
+        });
+
+        headerRow.commit();
 
         sheets[sheetName] = sheet;
         sheetRowCount[sheetName] = 0;
@@ -1055,6 +1101,29 @@ async function runExportJob() {
           key,
           width: 22,
         }));
+
+        // ✅ ALSO APPLY HEADER STYLE FOR NEW SPLIT SHEET
+        const headerRow = sheet.getRow(1);
+
+        headerRow.eachCell((cell) => {
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: "FF1F4E78" },
+          };
+
+          cell.font = {
+            bold: true,
+            color: { argb: "FFFFFFFF" },
+          };
+
+          cell.alignment = {
+            vertical: "middle",
+            horizontal: "center",
+          };
+        });
+
+        headerRow.commit();
 
         sheets[sheetName] = sheet;
         sheetRowCount[sheetName] = 0;
@@ -1105,22 +1174,43 @@ async function runExportJob() {
         row.device_name = deviceMap[row.device_id] || row.device_id;
       }
       if (row.ad_id) {
-        row.ad_name = adMap[row.ad_id] || row.ad_id;
+        const ad = adMap[row.ad_id];
+
+        row.ad_name = ad?.name || row.ad_id;
+        row.duration = ad?.duration || row.duration || 0;
       }
 
       const sheet = getDeviceSheet(row);
       const formattedRow = convertToIST(row);
 
-      const rowObj = sheet.addRow(formattedRow);
+      let rowObj;
+
+      if (job.job_type === "PROOF_OF_PLAY") {
+        rowObj = sheet.addRow({
+          event_id: row.event_id || "N/A",
+          ad_id: row.ad_id,
+          ad_name: row.ad_name,
+          // device_id: row.device_id,
+          // device_name: row.device_name,
+          start_time: formattedRow.start_time,
+          end_time: formattedRow.end_time,
+          duration: row.duration || "N/A",
+        });
+      } else {
+        rowObj = sheet.addRow(formattedRow);
+      }
+
+      const DATE_COLUMNS = [
+        "start_time",
+        "end_time",
+        "timestamp",
+        "created_at",
+      ];
 
       rowObj.eachCell((cell, colNumber) => {
         const key = sheet.columns[colNumber - 1].key;
 
-        if (
-          key.includes("time") ||
-          key.includes("date") ||
-          key.includes("at")
-        ) {
+        if (DATE_COLUMNS.includes(key)) {
           cell.numFmt = "yyyy-mm-dd hh:mm:ss";
         }
       });
@@ -1134,15 +1224,19 @@ async function runExportJob() {
 
         if (!summaryMap[key]) {
           summaryMap[key] = {
+            device_id: row.device_id,
             device_name: row.device_name,
+            ad_id: row.ad_id,
             ad_name: row.ad_name,
+            duration: row.duration || 0,
             total_plays: 0,
             total_time: 0,
           };
         }
 
         summaryMap[key].total_plays += 1;
-        summaryMap[key].total_time += row.duration_played_ms || 0;
+        // summaryMap[key].total_time += row.duration_played_ms || 0;
+        summaryMap[key].total_time += (row.duration_played_ms || 0) / 1000;
       }
     }
 
@@ -1202,7 +1296,7 @@ async function runExportJob() {
 
     await ExportJob.update(
       { progress_percent: 40 },
-      { where: { job_id: job.job_id } }
+      { where: { job_id: job.job_id } },
     );
 
     // ================= POSTGRES STREAM =================
@@ -1265,7 +1359,7 @@ async function runExportJob() {
       sheet.columns = [{ header: "message", key: "message" }];
       sheet.addRow({ message: "No data found" }).commit();
       sheet.commit();
-    }    // ================= COMMIT =================
+    } // ================= COMMIT =================
 
     for (const sheet of Object.values(sheets)) {
       sheet.commit();
@@ -1276,9 +1370,19 @@ async function runExportJob() {
     const summarySheet = workbook.addWorksheet("Summary");
 
     if (job.job_type === "PROOF_OF_PLAY") {
+      // summarySheet.columns = [
+      //   { header: "Device Name", key: "device_name" },
+      //   { header: "Ad Name", key: "ad_name" },
+      //   { header: "Total Plays", key: "total_plays" },
+      //   { header: "Total Time (sec)", key: "total_time" },
+      // ];
+
       summarySheet.columns = [
+        { header: "Device ID", key: "device_id" },
         { header: "Device Name", key: "device_name" },
+        { header: "Ad ID", key: "ad_id" },
         { header: "Ad Name", key: "ad_name" },
+        { header: "Ad Duration (sec)", key: "duration" },
         { header: "Total Plays", key: "total_plays" },
         { header: "Total Time (sec)", key: "total_time" },
       ];
@@ -1286,10 +1390,13 @@ async function runExportJob() {
       Object.values(summaryMap).forEach((item) => {
         summarySheet
           .addRow({
+            device_id: item.device_id,
             device_name: item.device_name,
+            ad_id: item.ad_id,
             ad_name: item.ad_name,
+            duration: item.duration,
             total_plays: item.total_plays,
-            total_time: (item.total_time / 1000).toFixed(2),
+            total_time: item.total_time.toFixed(2),
           })
           .commit();
       });
