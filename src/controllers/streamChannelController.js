@@ -204,6 +204,38 @@ module.exports.getStreamChannelById = async (req, res) => {
   }
 };
 
+module.exports.getStreamChannelsByClientId = async (req, res) => {
+  try {
+    const client_id = req.user?.client_id;
+
+    if (!client_id) {
+      return res.status(400).json({ error: "Client ID is required" });
+    }
+
+    const channels = await StreamChannel.findAll({
+      where: { client_id },
+      order: [["created_at", "DESC"]],
+    });
+
+    return res.json({
+      data: channels.map((channel) => ({
+        channel_id: channel.channel_id,
+        name: channel.name,
+        status: channel.status,
+        ingest_url: channel.ingest_url,
+        stream_key: channel.stream_key,
+        playback_url: channel.playback_url,
+        metadata: channel.metadata,
+        createdAt: channel.created_at,
+      })),
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: "Failed to fetch channels",
+    });
+  }
+};
+
 /**
  * Update Stream Channel (Title / Metadata)
  */

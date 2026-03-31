@@ -177,6 +177,7 @@ const {
   getStreamChannelById,
   getAllStreamChannels,
   syncDacastChannels,
+  getStreamChannelsByClientId,
 } = require("../controllers/streamChannelController");
 const {
   createStreamingProvider,
@@ -278,8 +279,16 @@ router.post("/schedule/add_v2", validateToken, scheduleAd_v2);
 router.post("/schedule/update/:id", updateSchedule);
 router.post("/schedule/delete/:id", validateToken, deleteSchedule);
 router.post("/schedule/multiple-delete", validateToken, deleteMultipleSchedule);
-router.post("/schedule/live/multiple-delete", validateToken, deleteMultipleScheduleLive);
-router.get("/schedule/live/content-groups", validateToken, getScheduledGroupDetailsByContent)
+router.post(
+  "/schedule/live/multiple-delete",
+  validateToken,
+  deleteMultipleScheduleLive,
+);
+router.get(
+  "/schedule/live/content-groups",
+  validateToken,
+  getScheduledGroupDetailsByContent,
+);
 
 router.get("/schedule/placeholder", validateToken, getPlaceholder);
 router.post(
@@ -511,6 +520,11 @@ router.post("/streaming/channel", validateToken, createStreamChannel);
 router.get("/streaming/channel", validateToken, getAllStreamChannels);
 
 router.get("/streaming/channel/:id", validateToken, getStreamChannelById);
+router.get(
+  "/streaming/client-channel",
+  validateToken,
+  getStreamChannelsByClientId,
+);
 
 router.put("/streaming/channel/:id", validateToken, updateStreamChannel);
 

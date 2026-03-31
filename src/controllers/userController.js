@@ -236,6 +236,25 @@ module.exports.getUserData = async (req, res) => {
       },
 
       {
+        title: "Live Content",
+        url: "/live-content",
+        icon: "Bot",
+        items: [
+          { title: "All", url: "/live-content" },
+          { title: "Add", url: "/live-content/add" },
+        ],
+      },
+      {
+        title: "Carousels",
+        url: "/carousels",
+        icon: "Bot",
+        items: [
+          { title: "All", url: "/carousels" },
+          { title: "Add", url: "/carousels/add" },
+        ],
+      },
+
+      {
         title: "Schedule",
         url: "/schedule",
         icon: "BookOpen",
@@ -258,13 +277,13 @@ module.exports.getUserData = async (req, res) => {
         items: [{ title: "All", url: "/all-exports" }],
       },
 
-      // {
-      //   title: "Stream Providers",
-      //   url: "/stream-providers",
-      //   icon: "Radio",
+      {
+        title: "Stream Providers",
+        url: "/stream-providers/dacast/channel",
+        icon: "Radio",
 
-      //   items: [{ title: "All", url: "/stream-providers" }],
-      // },
+        items: [{ title: "All", url: "/stream-providers/dacast/channel" }],
+      },
     ];
 
     // Example teams (same for both roles here, but you can customize)
