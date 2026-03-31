@@ -520,11 +520,6 @@ router.post("/streaming/channel", validateToken, createStreamChannel);
 router.get("/streaming/channel", validateToken, getAllStreamChannels);
 
 router.get("/streaming/channel/:id", validateToken, getStreamChannelById);
-router.get(
-  "/streaming/client-channel",
-  validateToken,
-  getStreamChannelsByClientId,
-);
 
 router.put("/streaming/channel/:id", validateToken, updateStreamChannel);
 
