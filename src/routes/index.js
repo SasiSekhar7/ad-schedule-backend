@@ -8,7 +8,12 @@ const {
   getAllDetails,
   updateClientNew,
 } = require("../controllers/clientController");
-const { sendAdFile, sendAdDetails } = require("../controllers/adController");
+const {
+  sendAdFile,
+  sendAdDetails,
+  getAdDetails,
+  getDeviceDetailsStatistics,
+} = require("../controllers/adController");
 const {
   scheduleAd,
   deleteSchedule,
@@ -128,7 +133,12 @@ const {
   toggleTierStatus,
   getAll,
 } = require("../controllers/tierController");
-const { createExportJob, getJobStatus, listJobs, updateJobStatus } = require("../controllers/exportController");
+const {
+  createExportJob,
+  getJobStatus,
+  listJobs,
+  updateJobStatus,
+} = require("../controllers/exportController");
 
 router.get("/tiers", getAllTiers);
 router.get("/all-tiers", getAll);
@@ -259,6 +269,9 @@ router.post("/ads/delete/:ad_id", validateToken, deleteAd);
 router.get("/ads/:id", validateToken, sendAdDetails);
 
 router.get("/ads/file/get/:path", validateToken, sendAdFile);
+
+router.get("/ads/details/:ad_id", validateToken, getAdDetails);
+
 router.post(
   "/ads/file/edit/:ad_id",
   validateToken,
@@ -351,6 +364,11 @@ router.get("/device/:id/event-logs", validateToken, getDeviceEventLog);
 router.post("/device/events", addDeviceEvent);
 
 router.get("/device/:id", getDeviceDetails);
+router.get(
+  "/device/:device_id/details",
+  validateToken,
+  getDeviceDetailsStatistics,
+);
 
 // router.post('/apk/extract_data',validateToken,validateAdmin, apkUploadMiddleware, uploadTempApk);
 
@@ -386,35 +404,19 @@ router.post("/device/mqtt-custom-message/:device_id", sendCustomMQTTMessage);
 
 router.post("/cron/daily-schedule-push", dailySchedulePushManual);
 
-
 // ===============================
 // 📦 REPORT / EXPORT JOB ROUTES
 // ===============================
 
 // Create export job (async, background)
-router.post(
-  "/exports",
-  validateToken,
-  createExportJob
-);
+router.post("/exports", validateToken, createExportJob);
 
 // Get single export job status
-router.get(
-  "/exports/:job_id",
-  validateToken,
-  getJobStatus
-);
+router.get("/exports/:job_id", validateToken, getJobStatus);
 
-router.put("/exports/:job_id", validateToken, updateJobStatus)
-
-
+router.put("/exports/:job_id", validateToken, updateJobStatus);
 
 // List export jobs (pagination)
-router.get(
-  "/exports",
-  validateToken,
-  listJobs
-);
-
+router.get("/exports", validateToken, listJobs);
 
 module.exports = router;
