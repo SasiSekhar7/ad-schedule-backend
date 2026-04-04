@@ -478,11 +478,11 @@ module.exports.getFullSchedule_v2 = async (req, res) => {
       } else {
         fullRanges[key].fromDate = moment.min(
           fullRanges[key].fromDate,
-          moment(s.start_time)
+          moment(s.start_time),
         );
         fullRanges[key].toDate = moment.max(
           fullRanges[key].toDate,
-          moment(s.end_time)
+          moment(s.end_time),
         );
       }
     });
@@ -526,7 +526,7 @@ module.exports.getFullSchedule_v2 = async (req, res) => {
           : Math.min(today.diff(g.fromDate, "days") + 1, totalDays);
 
         const completedPercentage = ((completedDays / totalDays) * 100).toFixed(
-          2
+          2,
         );
 
         return {
@@ -645,7 +645,7 @@ module.exports.getWgt = async (req, res) => {
       "..",
       "..",
       "assets",
-      "adupPlayer.wgt"
+      "adupPlayer.wgt",
     );
 
     // Check if file exists before sending
@@ -715,7 +715,7 @@ module.exports.registerDevice = async (req, res) => {
           where: {
             android_id,
           },
-        }
+        },
       );
 
       const payload = {
@@ -851,7 +851,7 @@ module.exports.registerNewDevice = async (req, res) => {
     if (
       device_os &&
       !["tizen", "android", "webos", "ios", "windows", "linux"].includes(
-        device_os
+        device_os,
       )
     ) {
       return res.status(400).json({
@@ -892,7 +892,7 @@ module.exports.registerNewDevice = async (req, res) => {
 
     if (!group) {
       group = await createGroupWithDummyClient(
-        process.env.DUMMY_GROUP_NAME || "Default Group"
+        process.env.DUMMY_GROUP_NAME || "Default Group",
       );
     }
 
@@ -923,7 +923,7 @@ module.exports.registerNewDevice = async (req, res) => {
           where: {
             android_id,
           },
-        }
+        },
       );
 
       return res.status(201).json({
@@ -1532,7 +1532,7 @@ module.exports.confirmDeviceExit = async (req, res) => {
       { group_id: process.env.DUMMY_GROUP_ID },
       {
         where: { device_id },
-      }
+      },
     );
     return res.json({
       message: "Successfully Deleted record",
@@ -1722,8 +1722,8 @@ module.exports.fetchGroupsOld = async (req, res) => {
         6,
         0,
         0,
-        0
-      )
+        0,
+      ),
     ).toISOString(); // 6 AM UTC
     const endOfDay = new Date(
       Date.UTC(
@@ -1733,8 +1733,8 @@ module.exports.fetchGroupsOld = async (req, res) => {
         22,
         0,
         0,
-        0
-      )
+        0,
+      ),
     ).toISOString(); // 10 PM UTC
 
     const groups = await DeviceGroup.findAll({
@@ -2013,7 +2013,7 @@ module.exports.addDeviceEvent = async (req, res) => {
             duration_played_ms: log.durationPlayedMs || 0,
             device_id: deviceId,
             sent_at: sentAt || new Date(),
-          }))
+          })),
         );
         result.proofOfPlay = "success";
       } catch (err) {
@@ -2032,7 +2032,7 @@ module.exports.addDeviceEvent = async (req, res) => {
             ram_free_mb: log.ramFreeMb ?? null,
             device_id: deviceId,
             sent_at: sentAt || new Date(),
-          }))
+          })),
         );
         result.telemetry = "success";
       } catch (err) {
@@ -2053,7 +2053,7 @@ module.exports.addDeviceEvent = async (req, res) => {
             payload: JSON.stringify(log.payload || {}),
             device_id: deviceId,
             sent_at: sentAt || new Date(),
-          }))
+          })),
         );
         result.events = "success";
       } catch (err) {
@@ -2198,6 +2198,7 @@ module.exports.getDeviceDetails = async (req, res) => {
       },
     });
   } catch (error) {
+    // console.error("Error fetching device details:", error);
     logger.logError("Error fetching device details", error, {
       device_id: req.params.id,
     });
@@ -2334,7 +2335,7 @@ module.exports.exportProofOfPlayReport = async (req, res) => {
     res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
     res.setHeader(
       "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
 
     return res.send(buffer);
@@ -2529,7 +2530,7 @@ module.exports.exportAdsProofOfPlayReport = async (req, res) => {
     logs.forEach((log) => {
       const existing = summaryData.find(
         (item) =>
-          item.device_id === log.Device.device_id && item.ad_id === log.ad_id
+          item.device_id === log.Device.device_id && item.ad_id === log.ad_id,
       );
 
       if (existing) {
@@ -2584,7 +2585,7 @@ module.exports.exportAdsProofOfPlayReport = async (req, res) => {
       while (existingSheets.includes(finalSheetName)) {
         finalSheetName = `${sheetName.substring(0, 25)}_${counter}`.substring(
           0,
-          31
+          31,
         );
         counter++;
       }
@@ -2642,13 +2643,13 @@ module.exports.exportAdsProofOfPlayReport = async (req, res) => {
         : ad_id.replace(/,/g, "_").substring(0, 20);
     const filename = `ads_proof_of_play_${adLabel}_${filterLabel.replace(
       / /g,
-      "_"
+      "_",
     )}.xlsx`;
 
     res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
     res.setHeader(
       "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
 
     return res.send(buffer);
@@ -2765,7 +2766,7 @@ module.exports.exportDeviceEventLogs = async (req, res) => {
     res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
     res.setHeader(
       "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
 
     return res.send(buffer);
@@ -3098,7 +3099,7 @@ module.exports.exportDeviceDetailsToExcel = async (req, res) => {
     // Send file
     res.setHeader(
       "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
