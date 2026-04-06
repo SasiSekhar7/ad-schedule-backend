@@ -11,6 +11,8 @@ const {
   Carousel,
   CarouselItem,
   StreamChannel,
+  Client,
+  Tier,
 } = require("../models");
 const { default: mqtt } = require("mqtt");
 const logger = require("../utils/logger");
@@ -88,7 +90,7 @@ mqttClient.on("error", (err) => logger.logError("MQTT Connection Error", err));
  */
 module.exports.convertToPushReadyJSON = async (
   group_id,
-  placeholder = null
+  placeholder = null,
 ) => {
   const today = new Date(getCustomUTCDateTime());
 
@@ -101,8 +103,8 @@ module.exports.convertToPushReadyJSON = async (
       6,
       0,
       0,
-      0
-    )
+      0,
+    ),
   ).toISOString(); // 6 AM UTC
   const endOfDay = new Date(
     Date.UTC(
@@ -112,8 +114,8 @@ module.exports.convertToPushReadyJSON = async (
       22,
       0,
       0,
-      0
-    )
+      0,
+    ),
   ).toISOString(); // 10 PM UTC
 
   logger.logDebug(`Filtering content for group`, {
@@ -134,7 +136,7 @@ module.exports.convertToPushReadyJSON = async (
       start_time: {
         [Op.between]: [startOfDay, endOfDay],
       },
-      is_enabled : true
+      is_enabled: true,
       // TODO: Add filter for content_type when processing different types
       // content_type: 'ad', // For now only processing ads
     },
@@ -158,118 +160,171 @@ module.exports.convertToPushReadyJSON = async (
     logger.logDebug(`No content found for group, skipping`, { group_id });
   }
 
+  // const DeviceGroupData = await DeviceGroup.findOne({
+  //   where: { group_id },
+  // });
+
   const DeviceGroupData = await DeviceGroup.findOne({
     where: { group_id },
+    include: {
+      model: Client,
+      include: {
+        model: Tier,
+        attributes: ["is_proof_of_play_logs"],
+      },
+    },
   });
 
   // TODO: Process each content type separately
   // For now, only processing 'ad' content type
   // Filter schedules by content_type = 'ad'
-  const scheduledAds = scheduledContent.filter(s => s.content_type === 'ad');
+  const scheduledAds = scheduledContent.filter((s) => s.content_type === "ad");
 
   // Process live_content schedules
-  const liveContentSchedules = scheduledContent.filter(s => s.content_type === 'live_content');
-  const liveContents = await Promise.all(liveContentSchedules.map(async (schedule) => {
-    try {
-      const liveContent = await LiveContent.findOne({ where: { live_content_id: schedule.content_id, status : "active" } });
-      if (!liveContent) {
-        logger.logError(`LiveContent not found for content_id`, null, { content_id: schedule.content_id });
-        return null;
-      }
-
-      if(liveContent.content_type === "provider"){
-        let channelDetails = await StreamChannel.findOne({where:{channel_id:liveContent.channel_id, status:"live"}})
-        if(!channelDetails){
-          logger.logError(`Error processing live content client try to schedule dacast idle channel`, err, { content_id: schedule.content_id, channel_id:liveContent.channel_id });
-          return null
+  const liveContentSchedules = scheduledContent.filter(
+    (s) => s.content_type === "live_content",
+  );
+  const liveContents = await Promise.all(
+    liveContentSchedules.map(async (schedule) => {
+      try {
+        const liveContent = await LiveContent.findOne({
+          where: { live_content_id: schedule.content_id, status: "active" },
+        });
+        if (!liveContent) {
+          logger.logError(`LiveContent not found for content_id`, null, {
+            content_id: schedule.content_id,
+          });
+          return null;
         }
-      }
-      return {
-        live_content_id: liveContent.live_content_id,
-        name: liveContent.name,
-        content_type: liveContent.content_type, // streaming, website, etc.
-        url: liveContent.url,
-        duration: liveContent.duration,
-        config: liveContent.config,
-        total_plays: schedule.total_duration,
-        start_time: schedule.start_time,
-        weekdays: schedule.weekdays || null,
-        time_slots: schedule.time_slots || null,
-        is_enabled: schedule.is_enabled || true
-      };
-    } catch (err) {
-      logger.logError(`Error processing live content`, err, { content_id: schedule.content_id });
-      return null;
-    }
-  }));
 
-  // Process carousel schedules
-  const carouselSchedules = scheduledContent.filter(s => s.content_type === 'carousel');
-  const carousels = await Promise.all(carouselSchedules.map(async (schedule) => {
-    try {
-      const carousel = await Carousel.findOne({
-        where: { carousel_id: schedule.content_id },
-        include: [{
-          model: CarouselItem,
-          as: 'items',
-          include: [{ model: Ad }],
-          order: [['display_order', 'ASC']]
-        }]
-      });
-      if (!carousel) {
-        logger.logError(`Carousel not found for content_id`, null, { content_id: schedule.content_id });
-        return null;
-      }
-      // Get signed URLs for carousel items
-      const items = await Promise.all(carousel.items.map(async (item) => {
-        let url;
-        let file_extension;
-        if (use_ad_egress_lambda == "true" || use_ad_egress_lambda == true) {
-          url = ad_Egress_lambda_url + "/" + item.Ad.ad_id + "." + item.Ad.url.split(".").pop();
-          file_extension = item.Ad.url.split(".").pop();
-        } else {
-          const { getBucketURL } = require("./s3Controller");
-          url = await getBucketURL(item.Ad.url);
-          file_extension = item.Ad.url.split("?")[0].split(".").pop();
+        if (liveContent.content_type === "provider") {
+          let channelDetails = await StreamChannel.findOne({
+            where: { channel_id: liveContent.channel_id, status: "live" },
+          });
+          if (!channelDetails) {
+            logger.logError(
+              `Error processing live content client try to schedule dacast idle channel`,
+              err,
+              {
+                content_id: schedule.content_id,
+                channel_id: liveContent.channel_id,
+              },
+            );
+            return null;
+          }
         }
         return {
-          ad_id: item.Ad.ad_id,
-          name: item.Ad.name,
-          url,
-          file_extension,
-          duration: item.Ad.duration,
-          display_order: item.display_order,
+          live_content_id: liveContent.live_content_id,
+          name: liveContent.name,
+          content_type: liveContent.content_type, // streaming, website, etc.
+          url: liveContent.url,
+          duration: liveContent.duration,
+          config: liveContent.config,
+          total_plays: schedule.total_duration,
+          start_time: schedule.start_time,
+          weekdays: schedule.weekdays || null,
+          time_slots: schedule.time_slots || null,
+          is_enabled: schedule.is_enabled || true,
         };
-      }));
-      return {
-        carousel_id: carousel.carousel_id,
-        name: carousel.name,
-        total_duration: carousel.total_duration,
-        items,
-        total_plays: schedule.total_duration,
-        start_time: schedule.start_time,
-        weekdays: schedule.weekdays || null,
-        time_slots: schedule.time_slots || null,
-      };
-    } catch (err) {
-      logger.logError(`Error processing carousel`, err, { content_id: schedule.content_id });
-      return null;
-    }
-  }));
+      } catch (err) {
+        logger.logError(`Error processing live content`, err, {
+          content_id: schedule.content_id,
+        });
+        return null;
+      }
+    }),
+  );
+
+  // Process carousel schedules
+  const carouselSchedules = scheduledContent.filter(
+    (s) => s.content_type === "carousel",
+  );
+  const carousels = await Promise.all(
+    carouselSchedules.map(async (schedule) => {
+      try {
+        const carousel = await Carousel.findOne({
+          where: { carousel_id: schedule.content_id },
+          include: [
+            {
+              model: CarouselItem,
+              as: "items",
+              include: [{ model: Ad }],
+              order: [["display_order", "ASC"]],
+            },
+          ],
+        });
+        if (!carousel) {
+          logger.logError(`Carousel not found for content_id`, null, {
+            content_id: schedule.content_id,
+          });
+          return null;
+        }
+        // Get signed URLs for carousel items
+        const items = await Promise.all(
+          carousel.items.map(async (item) => {
+            let url;
+            let file_extension;
+            if (
+              use_ad_egress_lambda == "true" ||
+              use_ad_egress_lambda == true
+            ) {
+              url =
+                ad_Egress_lambda_url +
+                "/" +
+                item.Ad.ad_id +
+                "." +
+                item.Ad.url.split(".").pop();
+              file_extension = item.Ad.url.split(".").pop();
+            } else {
+              const { getBucketURL } = require("./s3Controller");
+              url = await getBucketURL(item.Ad.url);
+              file_extension = item.Ad.url.split("?")[0].split(".").pop();
+            }
+            return {
+              ad_id: item.Ad.ad_id,
+              name: item.Ad.name,
+              url,
+              file_extension,
+              duration: item.Ad.duration,
+              display_order: item.display_order,
+            };
+          }),
+        );
+        return {
+          carousel_id: carousel.carousel_id,
+          name: carousel.name,
+          total_duration: carousel.total_duration,
+          items,
+          total_plays: schedule.total_duration,
+          start_time: schedule.start_time,
+          weekdays: schedule.weekdays || null,
+          time_slots: schedule.time_slots || null,
+        };
+      } catch (err) {
+        logger.logError(`Error processing carousel`, err, {
+          content_id: schedule.content_id,
+        });
+        return null;
+      }
+    }),
+  );
 
   // Fetch Ad details for ad schedules
   const ads = await Promise.all(
     scheduledAds.map(async (schedule) => {
-
       // if (schedule.Ad.isDeleted || !schedule.Ad.url) {
       //   logger.logError(`Ad url is null`, { ad_id: schedule.Ad.ad_id });
       //   return null; // Skip this ad
       // }
       try {
         // Fetch the Ad using content_id
-        const ad = await Ad.findOne({ where: { ad_id: schedule.content_id, isDeleted: false } });
+        const ad = await Ad.findOne({
+          where: { ad_id: schedule.content_id, isDeleted: false },
+        });
         if (!ad) {
-          logger.logError(`Ad not found for content_id`, null, { content_id: schedule.content_id });
+          logger.logError(`Ad not found for content_id`, null, {
+            content_id: schedule.content_id,
+          });
           return null;
         }
 
@@ -305,7 +360,7 @@ module.exports.convertToPushReadyJSON = async (
         });
         return null; // Skip this ad
       }
-    })
+    }),
   );
   let scrollingMessage;
   const message = await ScrollText.findOne({
@@ -336,48 +391,46 @@ module.exports.convertToPushReadyJSON = async (
   //   carousels: validCarousels.map(c => ({ ...c, content_type: 'carousel' })),
   // };
 
-
   const unifiedContent = [
-  ...validAds.map(ad => ({
-    type: 'ad',
-    id: ad.ad_id,
-    name: ad.name,
-    url: ad.url,
-    file_extension: ad.file_extension,
-    duration: ad.duration,
-    total_plays: ad.total_plays,
-    start_time: ad.start_time,
-    weekdays: ad.weekdays,
-    time_slots: ad.time_slots
-  })),
+    ...validAds.map((ad) => ({
+      type: "ad",
+      id: ad.ad_id,
+      name: ad.name,
+      url: ad.url,
+      file_extension: ad.file_extension,
+      duration: ad.duration,
+      total_plays: ad.total_plays,
+      start_time: ad.start_time,
+      weekdays: ad.weekdays,
+      time_slots: ad.time_slots,
+    })),
 
-  ...validLiveContents.map(lc => ({
-    type: 'live_content',
-    id: lc.live_content_id,
-    name: lc.name,
-    live_type: lc.content_type, // streaming, website
-    url: lc.url,
-    duration: lc.duration,
-    config: lc.config,
-    total_plays: lc.total_plays,
-    start_time: lc.start_time,
-    weekdays: lc.weekdays,
-    time_slots: lc.time_slots
-  })),
+    ...validLiveContents.map((lc) => ({
+      type: "live_content",
+      id: lc.live_content_id,
+      name: lc.name,
+      live_type: lc.content_type, // streaming, website
+      url: lc.url,
+      duration: lc.duration,
+      config: lc.config,
+      total_plays: lc.total_plays,
+      start_time: lc.start_time,
+      weekdays: lc.weekdays,
+      time_slots: lc.time_slots,
+    })),
 
-  ...validCarousels.map(c => ({
-    type: 'carousel',
-    id: c.carousel_id,
-    name: c.name,
-    total_duration: c.total_duration,
-    items: c.items,
-    total_plays: c.total_plays,
-    start_time: c.start_time,
-    weekdays: c.weekdays,
-    time_slots: c.time_slots
-  }))
-];
-
+    ...validCarousels.map((c) => ({
+      type: "carousel",
+      id: c.carousel_id,
+      name: c.name,
+      total_duration: c.total_duration,
+      items: c.items,
+      total_plays: c.total_plays,
+      start_time: c.start_time,
+      weekdays: c.weekdays,
+      time_slots: c.time_slots,
+    })),
+  ];
 
   // JSON structure with backward compatibility and new content object
   const jsonToSend = {
@@ -390,14 +443,14 @@ module.exports.convertToPushReadyJSON = async (
     rcs_enabled: DeviceGroupData.rcs_enabled ?? false,
     placeholder_enabled: DeviceGroupData.placeholder_enabled ?? false,
     logo_enabled: DeviceGroupData.logo_enabled ?? false,
+    logs_enabled: Boolean(DeviceGroupData?.Client?.Tier?.is_proof_of_play_logs),
   };
   return jsonToSend;
 };
 
-
 module.exports.OldconvertToPushReadyJSON = async (
   group_id,
-  placeholder = null
+  placeholder = null,
 ) => {
   const today = new Date(getCustomUTCDateTime());
 
@@ -410,8 +463,8 @@ module.exports.OldconvertToPushReadyJSON = async (
       6,
       0,
       0,
-      0
-    )
+      0,
+    ),
   ).toISOString(); // 6 AM UTC
   const endOfDay = new Date(
     Date.UTC(
@@ -421,8 +474,8 @@ module.exports.OldconvertToPushReadyJSON = async (
       22,
       0,
       0,
-      0
-    )
+      0,
+    ),
   ).toISOString(); // 10 PM UTC
 
   logger.logDebug(`Filtering ads for group`, {
@@ -465,7 +518,6 @@ module.exports.OldconvertToPushReadyJSON = async (
   // Process ads asynchronously
   const ads = await Promise.all(
     scheduledAds.map(async (schedule) => {
-
       if (schedule.Ad.isDeleted || !schedule.Ad.url) {
         logger.logError(`Ad url is null`, { ad_id: schedule.Ad.ad_id });
         return null; // Skip this ad
@@ -502,7 +554,7 @@ module.exports.OldconvertToPushReadyJSON = async (
         });
         return null; // Skip this ad
       }
-    })
+    }),
   );
   let scrollingMessage;
   const message = await ScrollText.findOne({
@@ -556,7 +608,7 @@ module.exports.pushToGroupQueue = async (groups, placeholder = null) => {
 
       const jsonToSend = await this.convertToPushReadyJSON(
         group_id,
-        placeholder
+        placeholder,
       );
 
       mqttClient.publish(
@@ -569,11 +621,11 @@ module.exports.pushToGroupQueue = async (groups, placeholder = null) => {
           } else {
             logger.logInfo(`Successfully published ads to MQTT topic`, {
               topic,
-              qos: 2,                                
+              qos: 2,
               retain: true,
             });
           }
-        }
+        },
       );
 
       await DeviceGroup.update(
@@ -584,11 +636,11 @@ module.exports.pushToGroupQueue = async (groups, placeholder = null) => {
           where: {
             group_id,
           },
-        }
+        },
       );
     }
   } catch (error) {
-    console.log(" pushToGroupQueue ",error);
+    console.log(" pushToGroupQueue ", error);
     logger.logError("Error in pushToGroupQueue", error);
   }
 };
@@ -616,7 +668,7 @@ module.exports.exitDeviceAppliation = async (device_id) => {
             device_id,
           });
         }
-      }
+      },
     );
     return true;
   } catch (error) {
@@ -661,8 +713,8 @@ setInterval(async () => {
         logger.logError(`Failed to update device last_synced`, err, {
           android_id,
         });
-      }
-    )
+      },
+    ),
   );
 
   await Promise.allSettled(promises);
@@ -685,7 +737,7 @@ mqttClient.on("message", (topic, message) => {
     } catch (err) {
       logger.logError(
         "Invalid JSON or malformed payload from device sync",
-        err
+        err,
       );
     }
   }
@@ -696,7 +748,7 @@ module.exports.pushNewDeviceToQueue = async (device, placeholder = null) => {
     const topic = `device/register/${device.device_id}`;
     const jsonToSend = await this.convertToPushReadyJSON(
       device.group_id,
-      placeholder
+      placeholder,
     );
 
     const payload = {
@@ -734,7 +786,7 @@ module.exports.pushNewDeviceToQueue = async (device, placeholder = null) => {
             device_id: device.device_id,
           });
         }
-      }
+      },
     );
   } catch (error) {
     logger.logError("Error in pushNewDeviceToQueue", error, {
@@ -770,7 +822,7 @@ module.exports.updateDeviceGroup = async (device_id, group_id) => {
             group_id,
           });
         }
-      }
+      },
     );
   } catch (error) {
     logger.logError("Error in updateDeviceGroup", error, {
@@ -805,7 +857,7 @@ module.exports.updateDeviceMetaData = async (device_id, metadata) => {
             device_id,
           });
         }
-      }
+      },
     );
   } catch (error) {
     logger.logError("Error in updateDeviceMetaData", error, { device_id });
@@ -837,7 +889,7 @@ module.exports.DeviceOnOff = async (device_id, action) => {
             action,
           });
         }
-      }
+      },
     );
   } catch (error) {
     logger.logError("Error in DeviceOnOff", error, { device_id, action });
@@ -871,7 +923,7 @@ module.exports.sendCustomMQTTMessage = async (req, res) => {
             device_id,
           });
         }
-      }
+      },
     );
 
     return res
