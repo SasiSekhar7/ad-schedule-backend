@@ -195,7 +195,8 @@ module.exports.convertToPushReadyJSON = async (
         start_time: schedule.start_time,
         weekdays: schedule.weekdays || null,
         time_slots: schedule.time_slots || null,
-        is_enabled: schedule.is_enabled || true
+        is_enabled: schedule.is_enabled || true,
+        priority: schedule.priority || 1
       };
     } catch (err) {
       logger.logError(`Error processing live content`, err, { content_id: schedule.content_id });
@@ -250,6 +251,7 @@ module.exports.convertToPushReadyJSON = async (
         start_time: schedule.start_time,
         weekdays: schedule.weekdays || null,
         time_slots: schedule.time_slots || null,
+        priority: schedule.priority ||1
       };
     } catch (err) {
       logger.logError(`Error processing carousel`, err, { content_id: schedule.content_id });
@@ -298,6 +300,7 @@ module.exports.convertToPushReadyJSON = async (
           start_time: schedule.start_time,
           weekdays: schedule.weekdays || null,
           time_slots: schedule.time_slots || null,
+          priority: schedule.priority || 1
         };
       } catch (urlError) {
         logger.logError(`Error fetching URL for ad`, urlError, {
@@ -348,7 +351,8 @@ module.exports.convertToPushReadyJSON = async (
     total_plays: ad.total_plays,
     start_time: ad.start_time,
     weekdays: ad.weekdays,
-    time_slots: ad.time_slots
+    time_slots: ad.time_slots,
+    priority: ad.priority
   })),
 
   ...validLiveContents.map(lc => ({
@@ -362,7 +366,8 @@ module.exports.convertToPushReadyJSON = async (
     total_plays: lc.total_plays,
     start_time: lc.start_time,
     weekdays: lc.weekdays,
-    time_slots: lc.time_slots
+    time_slots: lc.time_slots,
+    priority: lc.priority
   })),
 
   ...validCarousels.map(c => ({
@@ -374,10 +379,14 @@ module.exports.convertToPushReadyJSON = async (
     total_plays: c.total_plays,
     start_time: c.start_time,
     weekdays: c.weekdays,
-    time_slots: c.time_slots
+    time_slots: c.time_slots,
+    priority: c.priority
   }))
 ];
 
+
+// Add this right before creating jsonToSend
+unifiedContent.sort((a, b) => b.priority - a.priority); // Higher priority first
 
   // JSON structure with backward compatibility and new content object
   const jsonToSend = {
