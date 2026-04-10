@@ -5,25 +5,18 @@ const { getBucketURL, getBucketURLForExports } = require("./s3Controller");
 
 exports.createExportJob = async (req, res) => {
   try {
-
-    const {
-      job_type,
-      device_id,
-      ad_id,
-      start_date,
-      end_date
-    } = req.body;
+    const { job_type, device_id, ad_id, start_date, end_date } = req.body;
 
     // 1️⃣ Required fields
     if (!job_type || !start_date || !end_date) {
       return res.status(400).json({
-        error: "job_type, start_date and end_date are required"
+        error: "job_type, start_date and end_date are required",
       });
     }
 
     // 2️⃣ Date validation
-    const start = moment(start_date);
-    const end = moment(end_date);
+    const start = moment(start_date).startOf("day");
+    const end = moment(end_date).endOf("day");
 
     if (!start.isValid() || !end.isValid()) {
       return res.status(400).json({ error: "Invalid date format" });
@@ -31,7 +24,7 @@ exports.createExportJob = async (req, res) => {
 
     if (start.isAfter(end)) {
       return res.status(400).json({
-        error: "start_date must be before end_date"
+        error: "start_date must be before end_date",
       });
     }
 
@@ -39,7 +32,7 @@ exports.createExportJob = async (req, res) => {
     const maxMonths = 13;
     if (end.diff(start, "months", true) > maxMonths) {
       return res.status(400).json({
-        error: `Date range cannot exceed ${maxMonths} months`
+        error: `Date range cannot exceed ${maxMonths} months`,
       });
     }
 
@@ -60,15 +53,15 @@ exports.createExportJob = async (req, res) => {
       where: {
         client_id: req.user.client_id,
         status: {
-          [Op.in]: ["PENDING", "PROCESSING"]
+          [Op.in]: ["PENDING", "PROCESSING"],
         },
-        job_type
-      }
+        job_type,
+      },
     });
 
     if (existingJob) {
       return res.status(409).json({
-        error: "An export job is already running"
+        error: "An export job is already running",
       });
     }
 
@@ -78,16 +71,15 @@ exports.createExportJob = async (req, res) => {
       job_type,
       device_id: device_id || null,
       ad_id: ad_id || null,
-      start_date,
-      end_date,
-      status: "PENDING"
+      start_date: start.toDate(),
+      end_date: end.toDate(),
+      status: "PENDING",
     });
 
     res.json({
       message: "Export job created",
-      job_id: job.job_id
+      job_id: job.job_id,
     });
-
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -98,8 +90,8 @@ exports.getJobStatus = async (req, res) => {
     const job = await ExportJob.findOne({
       where: {
         job_id: req.params.job_id,
-        client_id: req.user.client_id
-      }
+        client_id: req.user.client_id,
+      },
     });
 
     if (!job) {
@@ -115,13 +107,11 @@ exports.getJobStatus = async (req, res) => {
     }
 
     res.json(data);
-
   } catch (error) {
     console.error("Error fetching job status:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 };
-
 
 exports.listJobs = async (req, res) => {
   try {
@@ -132,7 +122,7 @@ exports.listJobs = async (req, res) => {
       where: { client_id: req.user.client_id },
       order: [["created_at", "DESC"]],
       limit,
-      offset
+      offset,
     });
 
     const jobsWithUrl = await Promise.all(
@@ -146,11 +136,10 @@ exports.listJobs = async (req, res) => {
         }
 
         return data;
-      })
+      }),
     );
 
     res.json(jobsWithUrl);
-
   } catch (error) {
     console.error("Error listing export jobs:", error);
     res.status(500).json({ error: "Internal server error" });
@@ -169,23 +158,23 @@ exports.updateJobStatus = async (req, res) => {
       "PROCESSING",
       "COMPLETED",
       "FAILED",
-      "CANCELLED"
+      "CANCELLED",
     ];
 
     if (!allowedStatuses.includes(status)) {
       await t.rollback();
       return res.status(400).json({
-        error: "Invalid status value"
+        error: "Invalid status value",
       });
     }
 
     const job = await ExportJob.findOne({
       where: {
         job_id,
-        client_id: req.user.client_id
+        client_id: req.user.client_id,
       },
       transaction: t,
-      lock: t.LOCK.UPDATE
+      lock: t.LOCK.UPDATE,
     });
 
     if (!job) {
@@ -222,9 +211,8 @@ exports.updateJobStatus = async (req, res) => {
 
     res.json({
       message: "Job updated",
-      status: job.status
+      status: job.status,
     });
-
   } catch (err) {
     await t.rollback();
     res.status(500).json({ error: err.message });
