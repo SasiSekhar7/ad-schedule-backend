@@ -177,7 +177,7 @@ const {
   getStreamChannelById,
   getAllStreamChannels,
   syncDacastChannels,
-  getStreamChannelsByClient,
+  getStreamChannelsByClientId,
 } = require("../controllers/streamChannelController");
 const {
   createStreamingProvider,

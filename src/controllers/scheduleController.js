@@ -195,245 +195,399 @@ module.exports.scheduleAd_alt = async (req, res) => {
  *
  * For backward compatibility, ad_id is also supported and will be treated as content_id with content_type='ad'
  */
+// module.exports.scheduleAd_v2 = async (req, res) => {
+//   try {
+//     const {
+//       ad_id, // backward compatibility
+//       content_id: rawContentId,
+//       content_type = "ad", // defaults to 'ad' for backward compatibility
+//       start_time,
+//       end_time,
+//       total_duration,
+//       priority,
+//       groups,
+//       // New fields for weekday and time scheduling
+//       weekdays, // Array of day numbers: 0=Sunday, 1=Monday, ..., 6=Saturday (null = all days)
+//       time_slots, // Array of time windows: [{start: "06:00", end: "10:00"}, {start: "18:00", end: "22:00"}]
+//     } = req.body;
+
+//     // Support both ad_id (legacy) and content_id (new)
+//     const content_id = rawContentId || ad_id;
+
+//     if (
+//       !content_id ||
+//       !start_time ||
+//       !end_time ||
+//       !total_duration ||
+//       !priority ||
+//       !groups
+//     ) {
+//       return res.status(400).json({ error: "Missing required parameters" });
+//     }
+
+//     // Validate content_type
+//     if (!VALID_CONTENT_TYPES.includes(content_type)) {
+//       return res.status(400).json({
+//         error: `Invalid content_type. Must be one of: ${VALID_CONTENT_TYPES.join(
+//           ", "
+//         )}`,
+//       });
+//     }
+
+//     // Validate weekdays if provided
+//     if (weekdays && Array.isArray(weekdays)) {
+//       const validDays = [0, 1, 2, 3, 4, 5, 6];
+//       const invalidDays = weekdays.filter((d) => !validDays.includes(d));
+//       if (invalidDays.length > 0) {
+//         return res.status(400).json({
+//           error: `Invalid weekdays: ${invalidDays.join(
+//             ", "
+//           )}. Must be 0-6 (0=Sunday, 6=Saturday)`,
+//         });
+//       }
+//     }
+
+//     // Validate time_slots format if provided
+//     const timeRegex = /^([01]?[0-9]|2[0-3]):([0-5][0-9])$/;
+//     if (time_slots && Array.isArray(time_slots)) {
+//       for (let i = 0; i < time_slots.length; i++) {
+//         const slot = time_slots[i];
+//         if (!slot.start || !slot.end) {
+//           return res.status(400).json({
+//             error: `time_slots[${i}] must have 'start' and 'end' properties`,
+//           });
+//         }
+//         if (!timeRegex.test(slot.start)) {
+//           return res.status(400).json({
+//             error: `time_slots[${i}].start is invalid. Use HH:MM format (e.g., 06:00)`,
+//           });
+//         }
+//         if (!timeRegex.test(slot.end)) {
+//           return res.status(400).json({
+//             error: `time_slots[${i}].end is invalid. Use HH:MM format (e.g., 22:00)`,
+//           });
+//         }
+//       }
+//     }
+
+//     // Validate content exists
+//     const content = await validateContent(content_id, content_type);
+//     if (!content) {
+//       return res.status(404).json({
+//         error: `${content_type} with ID ${content_id} not found`,
+//       });
+//     }
+
+//     const overallStartDate = parseISO(start_time);
+//     const overallEndDate = parseISO(end_time);
+
+//     // Use provided time_slots or default to single slot 06:00-22:00
+//     const effectiveTimeSlots =
+//       time_slots && time_slots.length > 0
+//         ? time_slots
+//         : [{ start: "06:00", end: "22:00" }];
+
+//     let schedules = [];
+//     // Store unique dates and groups for summary update
+//     const affectedDates = new Set();
+//     const affectedGroupIds = new Set(groups); // Use Set for unique group IDs
+
+//     let tempCurrentDay = new Date(overallStartDate); // Use a temp var for schedule generation loop
+
+//     // --- [Loop to generate schedule entries] ---
+//     while (
+//       isBefore(tempCurrentDay, overallEndDate) ||
+//       tempCurrentDay.toDateString() === overallEndDate.toDateString()
+//     ) {
+//       // Check if this day is in the weekdays filter (if provided)
+//       const dayOfWeek = tempCurrentDay.getDay(); // 0=Sunday, 1=Monday, etc.
+//       const shouldIncludeDay =
+//         !weekdays || weekdays.length === 0 || weekdays.includes(dayOfWeek);
+
+//       if (shouldIncludeDay) {
+//         // affectedDates.add(format(tempCurrentDay, "yyyy-MM-dd")); // Add the date string for summary update
+
+//         // const dayStart = setHours(setMinutes(new Date(tempCurrentDay), 0), 6); // 6:00 AM
+//         const dayStart = new Date(
+//           Date.UTC(
+//             tempCurrentDay.getUTCFullYear(),
+//             tempCurrentDay.getUTCMonth(),
+//             tempCurrentDay.getUTCDate(),
+//             6,
+//             0,
+//             0,
+//           ),
+//         ).toISOString();
+//         // const dayEnd = setHours(setMinutes(new Date(tempCurrentDay), 0), 22); // 10:00 PM
+//         const dayEnd = new Date(
+//           Date.UTC(
+//             tempCurrentDay.getUTCFullYear(),
+//             tempCurrentDay.getUTCMonth(),
+//             tempCurrentDay.getUTCDate(),
+//             22,
+//             0,
+//             0,
+//           ),
+//         ).toISOString();
+
+//         // Create a schedule entry for each time slot
+//         // for (const slot of effectiveTimeSlots) {
+//         //   const [startHour, startMin] = slot.start.split(":").map(Number);
+//         //   const [endHour, endMin] = slot.end.split(":").map(Number);
+
+//         //   const dayStart = setHours(setMinutes(new Date(tempCurrentDay), startMin), startHour);
+//         //   const dayEnd = setHours(setMinutes(new Date(tempCurrentDay), endMin), endHour);
+
+//         //   groups.forEach((group_id) => {
+//         //     schedules.push({
+//         //       content_id,
+//         //       content_type,
+//         //       group_id: group_id,
+//         //       start_time: formatISO(dayStart),
+//         //       end_time: formatISO(dayEnd),
+//         //       total_duration: parseInt(total_duration),
+//         //       priority,
+//         //       weekdays: weekdays && weekdays.length > 0 ? weekdays : null,
+//         //       time_slots: time_slots && time_slots.length > 0 ? time_slots : null,
+//         //     });
+//         //   });
+//         // }
+
+//         groups.forEach((group_id) => {
+//           schedules.push({
+//             content_id,
+//             content_type,
+//             group_id: group_id,
+//             start_time: formatISO(dayStart),
+//             end_time: formatISO(dayEnd),
+//             total_duration: parseInt(total_duration),
+//             priority,
+//             weekdays: weekdays && weekdays.length > 0 ? weekdays : null,
+//             time_slots: time_slots && time_slots.length > 0 ? time_slots : null,
+//           });
+//         });
+//       }
+//       tempCurrentDay = addDays(tempCurrentDay, 1); // Move to next day
+//     }
+//     // --- [End of schedule generation loop] ---
+
+//     if (schedules.length === 0) {
+//       return res.status(400).json({
+//         error:
+//           "No schedules created. Check if weekdays filter excludes all days in the date range.",
+//       });
+//     }
+
+//     console.log("schedules", schedules);
+
+//     // ---> Perform the bulkCreate
+//     const createdSchedules = await Schedule.bulkCreate(schedules);
+//     console.log("createdSchedules", createdSchedules);
+//     logger.logInfo("Schedule entries created", {
+//       count: createdSchedules.length,
+//       content_type,
+//       content_id,
+//       weekdays: weekdays || "all",
+//       time_slots: effectiveTimeSlots,
+//     });
+
+//     // ---> Update the DailyImpressionSummary table (only for ads)
+//     // if (content_type === "ad") {
+//     //   logger.logDebug("Triggering impression summary update", {
+//     //     affectedDates: affectedDates.size,
+//     //     affectedGroups: affectedGroupIds.size,
+//     //   });
+//     //   // Iterate through each affected group
+//     //   for (const groupId of affectedGroupIds) {
+//     //     // Iterate through each affected date
+//     //     for (const dateString of affectedDates) {
+//     //       logger.logDebug("Updating summary for group and date", {
+//     //         groupId,
+//     //         dateString,
+//     //       });
+//     //       try {
+//     //         // Call the update function for each specific group and date combination
+//     //         await updateImpressionsTable(dateString, { groupId: groupId });
+//     //       } catch (summaryError) {
+//     //         // Log error but don't fail the entire request
+//     //         logger.logError("Error updating summary table", summaryError, {
+//     //           groupId,
+//     //           dateString,
+//     //         });
+//     //       }
+//     //     }
+//     //   }
+//     //   logger.logDebug("Finished triggering impression summary updates");
+//     // }
+//     // --- [End of summary update section] ---
+
+//     // ---> Push to device queue
+//     await pushToGroupQueue(groups);
+
+//     return res.json({
+//       message: "Schedules Added Successfully",
+//       schedules: createdSchedules,
+//     });
+//   } catch (error) {
+//     logger.logError("Error in scheduleAd endpoint", error);
+//     return res.status(500).json({
+//       error: "Internal Server Error",
+//       message: error.message,
+//       details: error.original?.message || error.parent?.message || null,
+//     });
+//   }
+// };
+
+
+
+
+/**
+ * Optimized Schedule content (v2) with Conflict Prevention
+ */
 module.exports.scheduleAd_v2 = async (req, res) => {
   try {
     const {
-      ad_id, // backward compatibility
+      ad_id, 
       content_id: rawContentId,
-      content_type = "ad", // defaults to 'ad' for backward compatibility
+      content_type = "ad",
       start_time,
       end_time,
       total_duration,
       priority,
       groups,
-      // New fields for weekday and time scheduling
-      weekdays, // Array of day numbers: 0=Sunday, 1=Monday, ..., 6=Saturday (null = all days)
-      time_slots, // Array of time windows: [{start: "06:00", end: "10:00"}, {start: "18:00", end: "22:00"}]
+      weekdays, 
+      time_slots, 
     } = req.body;
 
-    // Support both ad_id (legacy) and content_id (new)
     const content_id = rawContentId || ad_id;
 
-    if (
-      !content_id ||
-      !start_time ||
-      !end_time ||
-      !total_duration ||
-      !priority ||
-      !groups
-    ) {
-      return res.status(400).json({ error: "Missing required parameters" });
+    // 1. Basic Parameter Validation
+    if (!content_id || !start_time || !end_time || !total_duration || !priority || !groups || !Array.isArray(groups)) {
+      return res.status(400).json({ error: "Missing or invalid required parameters" });
     }
 
-    // Validate content_type
-    if (!VALID_CONTENT_TYPES.includes(content_type)) {
-      return res.status(400).json({
-        error: `Invalid content_type. Must be one of: ${VALID_CONTENT_TYPES.join(
-          ", "
-        )}`,
-      });
-    }
-
-    // Validate weekdays if provided
-    if (weekdays && Array.isArray(weekdays)) {
-      const validDays = [0, 1, 2, 3, 4, 5, 6];
-      const invalidDays = weekdays.filter((d) => !validDays.includes(d));
-      if (invalidDays.length > 0) {
-        return res.status(400).json({
-          error: `Invalid weekdays: ${invalidDays.join(
-            ", "
-          )}. Must be 0-6 (0=Sunday, 6=Saturday)`,
-        });
-      }
-    }
-
-    // Validate time_slots format if provided
+    // 2. Weekday/Time Slot Validation
     const timeRegex = /^([01]?[0-9]|2[0-3]):([0-5][0-9])$/;
     if (time_slots && Array.isArray(time_slots)) {
-      for (let i = 0; i < time_slots.length; i++) {
-        const slot = time_slots[i];
-        if (!slot.start || !slot.end) {
-          return res.status(400).json({
-            error: `time_slots[${i}] must have 'start' and 'end' properties`,
-          });
-        }
-        if (!timeRegex.test(slot.start)) {
-          return res.status(400).json({
-            error: `time_slots[${i}].start is invalid. Use HH:MM format (e.g., 06:00)`,
-          });
-        }
-        if (!timeRegex.test(slot.end)) {
-          return res.status(400).json({
-            error: `time_slots[${i}].end is invalid. Use HH:MM format (e.g., 22:00)`,
-          });
+      for (const slot of time_slots) {
+        if (!slot.start || !slot.end || !timeRegex.test(slot.start) || !timeRegex.test(slot.end)) {
+          return res.status(400).json({ error: "Invalid time_slots format. Use HH:MM." });
         }
       }
     }
 
-    // Validate content exists
+    // 3. Content Validation
     const content = await validateContent(content_id, content_type);
     if (!content) {
-      return res.status(404).json({
-        error: `${content_type} with ID ${content_id} not found`,
-      });
+      return res.status(404).json({ error: `${content_type} with ID ${content_id} not found` });
     }
 
     const overallStartDate = parseISO(start_time);
     const overallEndDate = parseISO(end_time);
+    let tempCurrentDay = new Date(overallStartDate);
+    let potentialSchedules = [];
 
-    // Use provided time_slots or default to single slot 06:00-22:00
-    const effectiveTimeSlots =
-      time_slots && time_slots.length > 0
-        ? time_slots
-        : [{ start: "06:00", end: "22:00" }];
-
-    let schedules = [];
-    // Store unique dates and groups for summary update
-    const affectedDates = new Set();
-    const affectedGroupIds = new Set(groups); // Use Set for unique group IDs
-
-    let tempCurrentDay = new Date(overallStartDate); // Use a temp var for schedule generation loop
-
-    // --- [Loop to generate schedule entries] ---
-    while (
-      isBefore(tempCurrentDay, overallEndDate) ||
-      tempCurrentDay.toDateString() === overallEndDate.toDateString()
-    ) {
-      // Check if this day is in the weekdays filter (if provided)
-      const dayOfWeek = tempCurrentDay.getDay(); // 0=Sunday, 1=Monday, etc.
-      const shouldIncludeDay =
-        !weekdays || weekdays.length === 0 || weekdays.includes(dayOfWeek);
+    // 4. Generate the Schedule Batch
+    while (isBefore(tempCurrentDay, overallEndDate) || tempCurrentDay.toDateString() === overallEndDate.toDateString()) {
+      const dayOfWeek = tempCurrentDay.getDay(); 
+      const shouldIncludeDay = !weekdays || weekdays.length === 0 || weekdays.includes(dayOfWeek);
 
       if (shouldIncludeDay) {
-        // affectedDates.add(format(tempCurrentDay, "yyyy-MM-dd")); // Add the date string for summary update
+        // Standardize UTC times for comparison
+        const dayStart = new Date(Date.UTC(
+          tempCurrentDay.getUTCFullYear(),
+          tempCurrentDay.getUTCMonth(),
+          tempCurrentDay.getUTCDate(),
+          6, 0, 0
+        )).toISOString();
 
-        // const dayStart = setHours(setMinutes(new Date(tempCurrentDay), 0), 6); // 6:00 AM
-        const dayStart = new Date(
-          Date.UTC(
-            tempCurrentDay.getUTCFullYear(),
-            tempCurrentDay.getUTCMonth(),
-            tempCurrentDay.getUTCDate(),
-            6,
-            0,
-            0,
-          ),
-        ).toISOString();
-        // const dayEnd = setHours(setMinutes(new Date(tempCurrentDay), 0), 22); // 10:00 PM
-        const dayEnd = new Date(
-          Date.UTC(
-            tempCurrentDay.getUTCFullYear(),
-            tempCurrentDay.getUTCMonth(),
-            tempCurrentDay.getUTCDate(),
-            22,
-            0,
-            0,
-          ),
-        ).toISOString();
-
-        // Create a schedule entry for each time slot
-        // for (const slot of effectiveTimeSlots) {
-        //   const [startHour, startMin] = slot.start.split(":").map(Number);
-        //   const [endHour, endMin] = slot.end.split(":").map(Number);
-
-        //   const dayStart = setHours(setMinutes(new Date(tempCurrentDay), startMin), startHour);
-        //   const dayEnd = setHours(setMinutes(new Date(tempCurrentDay), endMin), endHour);
-
-        //   groups.forEach((group_id) => {
-        //     schedules.push({
-        //       content_id,
-        //       content_type,
-        //       group_id: group_id,
-        //       start_time: formatISO(dayStart),
-        //       end_time: formatISO(dayEnd),
-        //       total_duration: parseInt(total_duration),
-        //       priority,
-        //       weekdays: weekdays && weekdays.length > 0 ? weekdays : null,
-        //       time_slots: time_slots && time_slots.length > 0 ? time_slots : null,
-        //     });
-        //   });
-        // }
+        const dayEnd = new Date(Date.UTC(
+          tempCurrentDay.getUTCFullYear(),
+          tempCurrentDay.getUTCMonth(),
+          tempCurrentDay.getUTCDate(),
+          22, 0, 0
+        )).toISOString();
 
         groups.forEach((group_id) => {
-          schedules.push({
+          potentialSchedules.push({
             content_id,
             content_type,
-            group_id: group_id,
-            start_time: formatISO(dayStart),
-            end_time: formatISO(dayEnd),
+            group_id,
+            start_time: dayStart,
+            end_time: dayEnd,
             total_duration: parseInt(total_duration),
-            priority,
-            weekdays: weekdays && weekdays.length > 0 ? weekdays : null,
-            time_slots: time_slots && time_slots.length > 0 ? time_slots : null,
+            priority: parseInt(priority),
+            weekdays: weekdays?.length > 0 ? weekdays : null,
+            time_slots: time_slots?.length > 0 ? time_slots : null,
+            is_enabled: true
           });
         });
       }
-      tempCurrentDay = addDays(tempCurrentDay, 1); // Move to next day
+      tempCurrentDay = addDays(tempCurrentDay, 1);
     }
-    // --- [End of schedule generation loop] ---
 
-    if (schedules.length === 0) {
-      return res.status(400).json({
-        error:
-          "No schedules created. Check if weekdays filter excludes all days in the date range.",
+    if (potentialSchedules.length === 0) {
+      return res.status(400).json({ error: "No valid schedule days within the range." });
+    }
+
+    // 5. CONFLICT CHECK: Find existing schedules in one query
+    const conflicts = await Schedule.findAll({
+      where: {
+        [Op.or]: potentialSchedules.map(p => ({
+          content_id: p.content_id,
+          group_id: p.group_id,
+          start_time: p.start_time
+        }))
+      },
+      attributes: ['content_id', 'group_id', 'start_time'],
+      raw: true
+    });
+
+    // Create a Set for O(1) lookup
+    const conflictSet = new Set(conflicts.map(c => 
+      `${c.content_id}-${c.group_id}-${new Date(c.start_time).toISOString()}`
+    ));
+
+    // Filter out potential schedules that already exist
+    const finalSchedulesToCreate = potentialSchedules.filter(p => {
+      const key = `${p.content_id}-${p.group_id}-${new Date(p.start_time).toISOString()}`;
+      return !conflictSet.has(key);
+    });
+
+    // 6. Bulk Insert
+    if (finalSchedulesToCreate.length === 0) {
+      return res.status(409).json({ 
+        message: "All items are already scheduled for the selected time slots.",
+        total_attempted: potentialSchedules.length,
+        created: 0
       });
     }
 
-    console.log("schedules", schedules);
+    const createdSchedules = await Schedule.bulkCreate(finalSchedulesToCreate);
 
-    // ---> Perform the bulkCreate
-    const createdSchedules = await Schedule.bulkCreate(schedules);
-    console.log("createdSchedules", createdSchedules);
-    logger.logInfo("Schedule entries created", {
-      count: createdSchedules.length,
-      content_type,
-      content_id,
-      weekdays: weekdays || "all",
-      time_slots: effectiveTimeSlots,
+    logger.logInfo("Schedules Created Successfully", {
+      attempted: potentialSchedules.length,
+      created: createdSchedules.length,
+      skipped: potentialSchedules.length - createdSchedules.length
     });
 
-    // ---> Update the DailyImpressionSummary table (only for ads)
-    // if (content_type === "ad") {
-    //   logger.logDebug("Triggering impression summary update", {
-    //     affectedDates: affectedDates.size,
-    //     affectedGroups: affectedGroupIds.size,
-    //   });
-    //   // Iterate through each affected group
-    //   for (const groupId of affectedGroupIds) {
-    //     // Iterate through each affected date
-    //     for (const dateString of affectedDates) {
-    //       logger.logDebug("Updating summary for group and date", {
-    //         groupId,
-    //         dateString,
-    //       });
-    //       try {
-    //         // Call the update function for each specific group and date combination
-    //         await updateImpressionsTable(dateString, { groupId: groupId });
-    //       } catch (summaryError) {
-    //         // Log error but don't fail the entire request
-    //         logger.logError("Error updating summary table", summaryError, {
-    //           groupId,
-    //           dateString,
-    //         });
-    //       }
-    //     }
-    //   }
-    //   logger.logDebug("Finished triggering impression summary updates");
-    // }
-    // --- [End of summary update section] ---
-
-    // ---> Push to device queue
+    // 7. Update Device Queue
     await pushToGroupQueue(groups);
 
     return res.json({
-      message: "Schedules Added Successfully",
-      schedules: createdSchedules,
+      message: "Schedules Processed Successfully",
+      summary: {
+        created: createdSchedules.length,
+        skipped: potentialSchedules.length - createdSchedules.length
+      },
+      schedules: createdSchedules
     });
+
   } catch (error) {
-    logger.logError("Error in scheduleAd endpoint", error);
+    logger.logError("Error in scheduleAd_v2 endpoint", error);
     return res.status(500).json({
       error: "Internal Server Error",
-      message: error.message,
-      details: error.original?.message || error.parent?.message || null,
+      message: error.message
     });
   }
 };

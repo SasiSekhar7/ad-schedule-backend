@@ -277,13 +277,13 @@ module.exports.getUserData = async (req, res) => {
         items: [{ title: "All", url: "/all-exports" }],
       },
 
-      {
-        title: "Live Channels",
-        url: "/stream-providers/dacast/channel",
-        icon: "Radio",
+      // {
+      //   title: "Stream Providers",
+      //   url: "/stream-providers",
+      //   icon: "Radio",
 
-        items: [{ title: "All", url: "/stream-providers/dacast/channel" }],
-      },
+      //   items: [{ title: "All", url: "/stream-providers" }],
+      // },
     ];
 
     // Example teams (same for both roles here, but you can customize)
